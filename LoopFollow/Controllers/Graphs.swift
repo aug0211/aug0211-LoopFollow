@@ -1887,13 +1887,14 @@ extension MainViewController {
         
         var colors = [NSUIColor]()
         let maxBGOffset: Float = 20
-        
+
+        topPredictionBG = UserDefaultsRepository.minBGScale.value
         for i in 0..<predictionData.count {
             let predictionVal = Double(predictionData[i].sgv)
             if Float(predictionVal) > topPredictionBG - maxBGOffset {
                 topPredictionBG = Float(predictionVal) + maxBGOffset
             }
-            
+
             if i == 0 {
                 if UserDefaultsRepository.showDots.value {
                     colors.append((color).withAlphaComponent(0.0))
@@ -1903,15 +1904,24 @@ extension MainViewController {
             } else {
                 colors.append(color)
             }
-            
+
+            // Format the time string
+            let date = Date(timeIntervalSince1970: predictionData[i].date)
+            let dateFormatter = DateFormatter()
+            if dateTimeUtils.is24Hour() {
+                dateFormatter.setLocalizedDateFormatFromTemplate("HH:mm")
+            } else {
+                dateFormatter.setLocalizedDateFormatFromTemplate("hh:mm")
+            }
+            let formattedTime = dateFormatter.string(from: date)
+
+            // Compose the marker string in the desired order: time, type, value
+            let markerString = "\(formattedTime)\n\(chartLabel)\n\(Localizer.toDisplayUnits(String(predictionVal)))"
+
             let value = ChartDataEntry(
                 x: predictionData[i].date,
                 y: predictionVal,
-                data: formatPillText(
-                    line1: chartLabel,
-                    time: predictionData[i].date,
-                    line2: Localizer.toDisplayUnits(String(predictionVal))
-                )
+                data: markerString
             )
             mainChart.addEntry(value)
             smallChart.addEntry(value)
