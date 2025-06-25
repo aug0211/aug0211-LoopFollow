@@ -188,16 +188,18 @@ class PillMarker: MarkerImage {
             if let time = dict["time"] as? String {
                 timeString = time
             }
+        } else if let dataString = entry.data as? String, !dataString.isEmpty {
+            // For BG and other entries using a preformatted string, just show the string as-is
+            labelText = dataString
+            return
         } else {
             valueString = String(format: "%g", entry.y)
-            if let dataString = entry.data as? String, !dataString.isEmpty {
-                timeString = dataString
-            } else {
-                let date = Date(timeIntervalSince1970: entry.x)
-                let dateFormatter = DateFormatter()
-                dateFormatter.dateFormat = "h:mm a"
-                timeString = dateFormatter.string(from: date)
-            }
+            let date = Date(timeIntervalSince1970: entry.x)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "h:mm a"
+            timeString = dateFormatter.string(from: date)
+            labelText = "\(valueString)\n\(timeString)"
+            return
         }
         if !prefix.isEmpty {
             labelText = "\(timeString)\n\(prefix)\n\(valueString)"

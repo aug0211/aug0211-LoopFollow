@@ -796,10 +796,26 @@ extension MainViewController {
             if Float(entries[i].sgv) > topBG - maxBGOffset {
                 topBG = Float(entries[i].sgv) + maxBGOffset
             }
-            let value = ChartDataEntry(x: Double(entries[i].date), y: Double(entries[i].sgv), data: formatPillText(line1: Localizer.toDisplayUnits(String(entries[i].sgv)), time: entries[i].date))
+            // Format the time string for the marker
+            let date = Date(timeIntervalSince1970: entries[i].date)
+            let dateFormatter = DateFormatter()
+            if dateTimeUtils.is24Hour() {
+                dateFormatter.setLocalizedDateFormatFromTemplate("HH:mm")
+            } else {
+                dateFormatter.setLocalizedDateFormatFromTemplate("hh:mm")
+            }
+            let formattedTime = dateFormatter.string(from: date)
+            // Compose the marker string in the desired order
+            let markerString = "\(formattedTime)\nBG\n\(Localizer.toDisplayUnits(String(entries[i].sgv)))"
+
+            let value = ChartDataEntry(
+                x: Double(entries[i].date),
+                y: Double(entries[i].sgv),
+                data: markerString
+            )
             mainChart.append(value)
             smallChart.append(value)
-            
+
             if Double(entries[i].sgv) >= Double(UserDefaultsRepository.highLine.value) {
                 colors.append(NSUIColor.systemYellow)
             } else if Double(entries[i].sgv) <= Double(UserDefaultsRepository.lowLine.value) {
