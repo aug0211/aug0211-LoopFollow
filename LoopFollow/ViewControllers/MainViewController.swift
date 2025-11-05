@@ -871,7 +871,8 @@ class MainViewController: UIViewController, UITableViewDataSource, ChartViewDele
     }
 
     func calculateMaxBgGraphValue() -> Float {
-        return max(Float(topBG), Float(topPredictionBG))
+        //return max(Float(topBG), Float(topPredictionBG))
+        return 300.0
     }
 
     func loadDebugData() {
