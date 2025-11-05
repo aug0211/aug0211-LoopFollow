@@ -1,7 +1,5 @@
-//
-//  BLEDeviceSelectionView.swift
-//  LoopFollow
-//
+// LoopFollow
+// BLEDeviceSelectionView.swift
 
 import SwiftUI
 

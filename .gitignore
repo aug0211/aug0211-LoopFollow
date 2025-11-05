@@ -9,6 +9,7 @@
 build/
 DerivedData/
 R.generated.swift
+Package.resolved
 
 ## Various settings
 !default.mode1v3
@@ -79,3 +80,4 @@ fastlane/test_output
 fastlane/FastlaneRunner
 
 LoopFollowConfigOverride.xcconfig
+.history

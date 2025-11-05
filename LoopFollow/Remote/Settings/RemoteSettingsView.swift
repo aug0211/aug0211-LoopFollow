@@ -1,213 +1,406 @@
-//
-//  RemoteSettingsView.swift
-//  LoopFollow
-//
-//  Created by Jonas Björkert on 2024-08-25.
-//  Updated on 2024-09-16.
-//  Copyright © 2024 Jon Fawcett. All rights reserved.
-//
+// LoopFollow
+// RemoteSettingsView.swift
 
-import SwiftUI
 import HealthKit
+import SwiftUI
 
 struct RemoteSettingsView: View {
     @ObservedObject var viewModel: RemoteSettingsViewModel
-    @Environment(\.presentationMode) var presentationMode
+    @ObservedObject private var device = Storage.shared.device
 
     @State private var showAlert: Bool = false
     @State private var alertType: AlertType? = nil
     @State private var alertMessage: String? = nil
 
+    @State private var otpTimeRemaining: Int? = nil
+    private let otpPeriod: TimeInterval = 30
+    private var otpTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     enum AlertType {
         case validation
+        case qrCodeError
+        case urlTokenValidation
+        case urlTokenUpdate
+    }
+
+    init(viewModel: RemoteSettingsViewModel) {
+        self.viewModel = viewModel
     }
 
     var body: some View {
-        NavigationView {
-            Form {
-                // MARK: - Remote Type Section (Custom Rows)
-                Section(header: Text("Remote Type")) {
-                    remoteTypeRow(type: .none, label: "None", isEnabled: true)
+        Form {
+            // MARK: - Remote Type Section (Custom Rows)
 
-                    remoteTypeRow(type: .nightscout, label: "Nightscout", isEnabled: true)
+            Section {
+                remoteTypeRow(
+                    type: .none,
+                    label: "None",
+                    isEnabled: true
+                )
 
-                    remoteTypeRow(
-                        type: .trc,
-                        label: "Trio Remote Control",
-                        isEnabled: viewModel.isTrioDevice
-                    )
+                remoteTypeRow(
+                    type: .loopAPNS,
+                    label: "Loop Remote Control",
+                    isEnabled: viewModel.isLoopDevice
+                )
 
-                    Text("Nightscout is the only option for Loop.\nNightscout should be used for Trio 0.2.x or older.")
-                        .font(.footnote)
+                remoteTypeRow(
+                    type: .trc,
+                    label: "Trio Remote Control",
+                    isEnabled: viewModel.isTrioDevice
+                )
+
+                remoteTypeRow(
+                    type: .nightscout,
+                    label: "Nightscout",
+                    isEnabled: viewModel.isTrioDevice
+                )
+
+                Text("Nightscout should be used for Trio 0.2.x.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+
+            // MARK: - QR Code Sharing Section
+
+            Section {
+                if viewModel.remoteType == .none {
+                    Button(action: {
+                        viewModel.isShowingQRCodeScanner = true
+                    }) {
+                        HStack {
+                            Image(systemName: "qrcode.viewfinder")
+                            Text("Import Remote Settings from QR Code")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                } else {
+                    Button(action: {
+                        viewModel.isShowingQRCodeDisplay = true
+                    }) {
+                        HStack {
+                            Image(systemName: "qrcode")
+                            Text("Export Remote Settings as QR Code")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                }
+            }
+
+            // MARK: - Meal Section (for TRC only)
+
+            if viewModel.remoteType == .trc {
+                Section(header: Text("Meal Settings")) {
+                    Toggle("Meal with Bolus", isOn: $viewModel.mealWithBolus)
+                        .toggleStyle(SwitchToggleStyle())
+
+                    Toggle("Meal with Fat/Protein", isOn: $viewModel.mealWithFatProtein)
+                        .toggleStyle(SwitchToggleStyle())
+                }
+            }
+
+            // MARK: - Guardrails Section (shown for both TRC and Loop)
+
+            if viewModel.remoteType == .trc || viewModel.remoteType == .loopAPNS {
+                guardrailsSection
+            }
+
+            // MARK: - User Information Section
+
+            if viewModel.remoteType != .none && viewModel.remoteType != .loopAPNS {
+                Section(header: Text("User Information")) {
+                    HStack {
+                        Text("User")
+                        TextField("Enter User", text: $viewModel.user)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+            }
+
+            // MARK: - Trio Remote Control Settings
+
+            if viewModel.remoteType == .trc {
+                Section(header: Text("Trio Remote Control Settings")) {
+                    HStack {
+                        Text("Shared Secret")
+                        TogglableSecureInput(
+                            placeholder: "Enter Shared Secret",
+                            text: $viewModel.sharedSecret,
+                            style: .singleLine
+                        )
+                    }
+
+                    HStack {
+                        Text("APNS Key ID")
+                        TogglableSecureInput(
+                            placeholder: "Enter APNS Key ID",
+                            text: $viewModel.keyId,
+                            style: .singleLine
+                        )
+                    }
+
+                    VStack(alignment: .leading) {
+                        Text("APNS Key")
+                        TogglableSecureInput(
+                            placeholder: "Paste APNS Key",
+                            text: $viewModel.apnsKey,
+                            style: .multiLine
+                        )
+                        .frame(minHeight: 110)
+                    }
+                }
+
+                // MARK: - Debug / Info
+
+                Section(header: Text("Debug / Info")) {
+                    Text("Device Token: \(Storage.shared.deviceToken.value)")
+                    Text("Production Env.: \(Storage.shared.productionEnvironment.value ? "True" : "False")")
+                    Text("Team ID: \(Storage.shared.teamId.value ?? "")")
+                    Text("Bundle ID: \(Storage.shared.bundleId.value)")
+                }
+            }
+
+            // MARK: - Loop APNS Settings
+
+            if viewModel.remoteType == .loopAPNS {
+                Section(header: Text("Loop APNS Configuration")) {
+                    HStack {
+                        Text("Developer Team ID")
+                        TogglableSecureInput(
+                            placeholder: "Enter Team ID",
+                            text: $viewModel.loopDeveloperTeamId,
+                            style: .singleLine
+                        )
+                    }
+
+                    HStack {
+                        Text("APNS Key ID")
+                        TogglableSecureInput(
+                            placeholder: "Enter APNS Key ID",
+                            text: $viewModel.keyId,
+                            style: .singleLine
+                        )
+                    }
+
+                    VStack(alignment: .leading) {
+                        Text("APNS Key")
+                        TogglableSecureInput(
+                            placeholder: "Paste APNS Key",
+                            text: $viewModel.apnsKey,
+                            style: .multiLine
+                        )
+                        .frame(minHeight: 110)
+                    }
+
+                    HStack {
+                        Text("QR Code URL")
+                        TextField("Enter QR code URL or scan from Loop app", text: $viewModel.loopAPNSQrCodeURL)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                    }
+
+                    Button(action: {
+                        viewModel.isShowingLoopAPNSScanner = true
+                    }) {
+                        HStack {
+                            Image(systemName: "qrcode.viewfinder")
+                            Text("Scan QR Code from Loop App")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+
+                    HStack {
+                        Text("Environment")
+                        Spacer()
+                        Toggle("Production", isOn: $viewModel.productionEnvironment)
+                            .toggleStyle(SwitchToggleStyle())
+                    }
+
+                    Text("Production is used for browser builders and should be switched off for Xcode builders")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
-                // MARK: - User Information Section
-                if viewModel.remoteType != .none {
-                    Section(header: Text("User Information")) {
-                        HStack {
-                            Text("User")
-                            TextField("Enter User", text: $viewModel.user)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                                .multilineTextAlignment(.trailing)
-                        }
+                if let errorMessage = viewModel.loopAPNSErrorMessage, !errorMessage.isEmpty {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.caption)
                     }
                 }
 
-                // MARK: - Trio Remote Control Settings
-                if viewModel.remoteType == .trc {
-                    Section(header: Text("Trio Remote Control Settings")) {
-                        HStack {
-                            Text("Shared Secret")
-                            TextField("Enter Shared Secret", text: $viewModel.sharedSecret)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                                .multilineTextAlignment(.trailing)
-                        }
+                Section(header: Text("Debug / Info")) {
+                    Text("Device Token: \(Storage.shared.deviceToken.value)")
+                    Text("Bundle ID: \(Storage.shared.bundleId.value)")
 
+                    if let otpCode = TOTPGenerator.extractOTPFromURL(Storage.shared.loopAPNSQrCodeURL.value) {
                         HStack {
-                            Text("APNS Key ID")
-                            TextField("Enter APNS Key ID", text: $viewModel.keyId)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                                .multilineTextAlignment(.trailing)
+                            Text("Current TOTP Code:")
+                            Text(otpCode)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.green)
+                                .padding(.vertical, 2)
+                                .padding(.horizontal, 6)
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(4)
+                            Text("(" + (otpTimeRemaining.map { "\($0)s left" } ?? "-") + ")")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("TOTP Code: Invalid QR code URL")
+                            .foregroundColor(.red)
+                    }
+                }
+
+                if viewModel.areTeamIdsDifferent {
+                    Section(header: Text("Return Notification Settings"), footer: Text("Because LoopFollow and the target app were built with different Team IDs, you must provide the APNS credentials for LoopFollow below.").font(.caption)) {
+                        HStack {
+                            Text("Return APNS Key ID")
+                            TogglableSecureInput(
+                                placeholder: "Enter Key ID for LoopFollow",
+                                text: $viewModel.returnKeyId,
+                                style: .singleLine
+                            )
                         }
 
                         VStack(alignment: .leading) {
-                            Text("APNS Key")
-                            TextEditor(text: $viewModel.apnsKey)
-                                .frame(height: 100)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.gray.opacity(0.5), lineWidth: 1)
-                                )
-                        }
-                    }
-
-                    // MARK: - Guardrails
-                    Section(header: Text("Guardrails")) {
-                        HStack {
-                            Text("Max Bolus")
-                            Spacer()
-                            TextFieldWithToolBar(
-                                quantity: $viewModel.maxBolus,
-                                maxLength: 4,
-                                unit: HKUnit.internationalUnit(),
-                                allowDecimalSeparator: true,
-                                minValue: HKQuantity(unit: .internationalUnit(), doubleValue: 0.0),
-                                maxValue: HKQuantity(unit: .internationalUnit(), doubleValue: 10.0),
-                                onValidationError: { message in
-                                    handleValidationError(message)
-                                }
+                            Text("Return APNS Key")
+                            TogglableSecureInput(
+                                placeholder: "Paste APNS Key for LoopFollow",
+                                text: $viewModel.returnApnsKey,
+                                style: .multiLine
                             )
-                            .frame(width: 100)
-                            Text("U")
-                                .foregroundColor(.secondary)
-                        }
-
-                        HStack {
-                            Text("Max Carbs")
-                            Spacer()
-                            TextFieldWithToolBar(
-                                quantity: $viewModel.maxCarbs,
-                                maxLength: 4,
-                                unit: HKUnit.gram(),
-                                allowDecimalSeparator: true,
-                                minValue: HKQuantity(unit: .gram(), doubleValue: 0),
-                                maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
-                                onValidationError: { message in
-                                    handleValidationError(message)
-                                }
-                            )
-                            .frame(width: 100)
-                            Text("g")
-                                .foregroundColor(.secondary)
-                        }
-
-                        HStack {
-                            Text("Max Protein")
-                            Spacer()
-                            TextFieldWithToolBar(
-                                quantity: $viewModel.maxProtein,
-                                maxLength: 4,
-                                unit: HKUnit.gram(),
-                                allowDecimalSeparator: true,
-                                minValue: HKQuantity(unit: .gram(), doubleValue: 0),
-                                maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
-                                onValidationError: { message in
-                                    handleValidationError(message)
-                                }
-                            )
-                            .frame(width: 100)
-                            Text("g")
-                                .foregroundColor(.secondary)
-                        }
-
-                        HStack {
-                            Text("Max Fat")
-                            Spacer()
-                            TextFieldWithToolBar(
-                                quantity: $viewModel.maxFat,
-                                maxLength: 4,
-                                unit: HKUnit.gram(),
-                                allowDecimalSeparator: true,
-                                minValue: HKQuantity(unit: .gram(), doubleValue: 0),
-                                maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
-                                onValidationError: { message in
-                                    handleValidationError(message)
-                                }
-                            )
-                            .frame(width: 100)
-                            Text("g")
-                                .foregroundColor(.secondary)
+                            .frame(minHeight: 110)
                         }
                     }
-
-                    // MARK: - Meal Section
-                    Section(header: Text("Meal Settings")) {
-                        Toggle("Meal with Bolus", isOn: $viewModel.mealWithBolus)
-                            .toggleStyle(SwitchToggleStyle())
-
-                        Toggle("Meal with Fat/Protein", isOn: $viewModel.mealWithFatProtein)
-                            .toggleStyle(SwitchToggleStyle())
-                    }
-
-                    // MARK: - Debug / Info
-                    Section(header: Text("Debug / Info")) {
-                        Text("Device Token: \(Storage.shared.deviceToken.value)")
-                        Text("Production Env.: \(Storage.shared.productionEnvironment.value ? "True" : "False")")
-                        Text("Team ID: \(Storage.shared.teamId.value ?? "")")
-                        Text("Bundle ID: \(Storage.shared.bundleId.value)")
-                    }
-                }
-            }
-            .navigationBarTitle("Remote Settings", displayMode: .inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-            }
-            .alert(isPresented: $showAlert) {
-                switch alertType {
-                case .validation:
-                    return Alert(
-                        title: Text("Validation Error"),
-                        message: Text(alertMessage ?? "Invalid input."),
-                        dismissButton: .default(Text("OK"))
-                    )
-                case .none:
-                    return Alert(title: Text("Unknown Alert"))
                 }
             }
         }
+        .alert(isPresented: $showAlert) {
+            switch alertType {
+            case .validation:
+                return Alert(
+                    title: Text("Validation Error"),
+                    message: Text(alertMessage ?? "Invalid input."),
+                    dismissButton: .default(Text("OK"))
+                )
+            case .qrCodeError:
+                return Alert(
+                    title: Text("QR Code Error"),
+                    message: Text(alertMessage ?? "An error occurred while processing the QR code."),
+                    dismissButton: .default(Text("OK"))
+                )
+            case .urlTokenValidation:
+                return Alert(
+                    title: Text("URL/Token Validation"),
+                    message: Text(viewModel.validationMessage),
+                    dismissButton: .default(Text("OK")) {
+                        viewModel.showURLTokenValidation = false
+                    }
+                )
+            case .urlTokenUpdate:
+                return Alert(
+                    title: Text("URL/Token Update"),
+                    message: Text(viewModel.validationMessage),
+                    dismissButton: .default(Text("OK")) {
+                        viewModel.showURLTokenValidation = false
+                    }
+                )
+            case .none:
+                return Alert(title: Text("Unknown Alert"))
+            }
+        }
+        .sheet(isPresented: $viewModel.isShowingLoopAPNSScanner) {
+            SimpleQRCodeScannerView { result in
+                viewModel.handleLoopAPNSQRCodeScanResult(result)
+            }
+        }
+        .sheet(isPresented: $viewModel.isShowingQRCodeScanner) {
+            SimpleQRCodeScannerView { result in
+                viewModel.handleRemoteCommandQRCodeScanResult(result)
+            }
+        }
+        .sheet(isPresented: $viewModel.isShowingQRCodeDisplay) {
+            NavigationView {
+                VStack {
+                    if let qrCodeString = viewModel.generateQRCodeForCurrentSettings() {
+                        QRCodeDisplayView(qrCodeString: qrCodeString)
+                            .padding()
+                    } else {
+                        Text("Failed to generate QR code")
+                            .foregroundColor(.red)
+                            .padding()
+                    }
+                }
+                .navigationTitle("Share Remote Settings")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarItems(trailing: Button("Done") {
+                    viewModel.isShowingQRCodeDisplay = false
+                })
+            }
+        }
+        .sheet(isPresented: $viewModel.showURLTokenValidation) {
+            NavigationView {
+                URLTokenValidationView(
+                    settings: viewModel.pendingSettings!,
+                    shouldPromptForURL: viewModel.shouldPromptForURL,
+                    shouldPromptForToken: viewModel.shouldPromptForToken,
+                    message: viewModel.validationMessage,
+                    onConfirm: { confirmedSettings in
+                        confirmedSettings.applyToStorage()
+                        viewModel.updateViewModelFromStorage()
+                        viewModel.showURLTokenValidation = false
+                        viewModel.pendingSettings = nil
+                        LogManager.shared.log(category: .remote, message: "Remote command settings imported from QR code with URL/token updates")
+                    },
+                    onCancel: {
+                        viewModel.showURLTokenValidation = false
+                        viewModel.pendingSettings = nil
+                    }
+                )
+            }
+        }
+        .onAppear {
+            // Reset timer state so it shows '-' until first tick
+            otpTimeRemaining = nil
+            // Update view model from storage to ensure UI is current
+            viewModel.updateViewModelFromStorage()
+        }
+        .onReceive(otpTimer) { _ in
+            let now = Date().timeIntervalSince1970
+            otpTimeRemaining = Int(otpPeriod - (now.truncatingRemainder(dividingBy: otpPeriod)))
+        }
+        .onReceive(viewModel.$qrCodeErrorMessage) { errorMessage in
+            if let errorMessage = errorMessage, !errorMessage.isEmpty {
+                handleQRCodeError(errorMessage)
+                // Clear the error message after showing the alert
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    viewModel.qrCodeErrorMessage = nil
+                }
+            }
+        }
+        .onReceive(viewModel.$showURLTokenValidation) { showValidation in
+            if showValidation {
+                // The sheet will be shown automatically due to the binding
+            }
+        }
+        .preferredColorScheme(Storage.shared.forceDarkMode.value ? .dark : nil)
+        .navigationTitle("Remote Settings")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     // MARK: - Custom Row for Remote Type Selection
+
     private func remoteTypeRow(type: RemoteType, label: String, isEnabled: Bool) -> some View {
         Button(action: {
             if isEnabled {
@@ -229,9 +422,100 @@ struct RemoteSettingsView: View {
     }
 
     // MARK: - Validation Error Handler
+
     private func handleValidationError(_ message: String) {
         alertMessage = message
         alertType = .validation
         showAlert = true
+    }
+
+    // MARK: - QR Code Error Handler
+
+    private func handleQRCodeError(_ message: String) {
+        alertMessage = message
+        alertType = .qrCodeError
+        showAlert = true
+    }
+
+    private var guardrailsSection: some View {
+        Section(header: Text("Guardrails")) {
+            HStack {
+                Text("Max Bolus")
+                Spacer()
+                TextFieldWithToolBar(
+                    quantity: $viewModel.maxBolus,
+                    maxLength: 5,
+                    unit: HKUnit.internationalUnit(),
+                    allowDecimalSeparator: true,
+                    minValue: HKQuantity(unit: .internationalUnit(), doubleValue: 0),
+                    maxValue: HKQuantity(unit: .internationalUnit(), doubleValue: 10),
+                    onValidationError: { message in
+                        handleValidationError(message)
+                    }
+                )
+                .frame(width: 100)
+                Text("U")
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text("Max Carbs")
+                Spacer()
+                TextFieldWithToolBar(
+                    quantity: $viewModel.maxCarbs,
+                    maxLength: 4,
+                    unit: HKUnit.gram(),
+                    allowDecimalSeparator: true,
+                    minValue: HKQuantity(unit: .gram(), doubleValue: 0),
+                    maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
+                    onValidationError: { message in
+                        handleValidationError(message)
+                    }
+                )
+                .frame(width: 100)
+                Text("g")
+                    .foregroundColor(.secondary)
+            }
+
+            if device.value == "Trio" {
+                HStack {
+                    Text("Max Protein")
+                    Spacer()
+                    TextFieldWithToolBar(
+                        quantity: $viewModel.maxProtein,
+                        maxLength: 4,
+                        unit: HKUnit.gram(),
+                        allowDecimalSeparator: true,
+                        minValue: HKQuantity(unit: .gram(), doubleValue: 0),
+                        maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
+                        onValidationError: { message in
+                            handleValidationError(message)
+                        }
+                    )
+                    .frame(width: 100)
+                    Text("g")
+                        .foregroundColor(.secondary)
+                }
+
+                HStack {
+                    Text("Max Fat")
+                    Spacer()
+                    TextFieldWithToolBar(
+                        quantity: $viewModel.maxFat,
+                        maxLength: 4,
+                        unit: HKUnit.gram(),
+                        allowDecimalSeparator: true,
+                        minValue: HKQuantity(unit: .gram(), doubleValue: 0),
+                        maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
+                        onValidationError: { message in
+                            handleValidationError(message)
+                        }
+                    )
+                    .frame(width: 100)
+                    Text("g")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
 }
