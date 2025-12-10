@@ -104,10 +104,16 @@ struct SnoozerView: View {
 
     private func leftColumn(isLandscape: Bool, barShowing: Bool) -> some View {
         let topPad: CGFloat = barShowing ? 0 : 16
-        let bigMaxH: CGFloat = barShowing ? (isLandscape ? 210 : 220) : 240
-        let dirMaxH: CGFloat = barShowing ? (isLandscape ? 72 : 72) : 80
-        let deltaMaxH: CGFloat = barShowing ? (isLandscape ? 60 : 60) : 68
-        let ageMaxH: CGFloat = barShowing ? 36 : 40
+        let bigMaxH: CGFloat = barShowing ? (isLandscape ? 210 : 210) : 250
+        let dirMaxH: CGFloat = barShowing
+            ? (isLandscape ? 72 : 85)
+            : (isLandscape ? 80 : 100)
+        let deltaMaxH: CGFloat = barShowing
+            ? (isLandscape ? 60 : 105)
+            : (isLandscape ? 68 : 120)
+        let ageMaxH: CGFloat = barShowing
+            ? (isLandscape ? 36 : 105)
+            : (isLandscape ? 40 : 120)
 
         return VStack(spacing: 0) {
             if !isLandscape && showDisplayName.value {
@@ -139,22 +145,22 @@ struct SnoozerView: View {
                 .frame(maxWidth: .infinity, maxHeight: dirMaxH)
             } else {
                 Text(directionText.value)
-                    .font(.system(size: 110, weight: .black))
+                    .font(.system(size: 200, weight: .black))
                     .minimumScaleFactor(0.5)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity, maxHeight: dirMaxH)
 
                 Text(deltaText.value)
-                    .font(.system(size: 70))
+                    .font(.system(size: 160))
                     .minimumScaleFactor(0.5)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity, maxHeight: deltaMaxH)
             }
 
             Text(minAgoText.value)
-                .font(.system(size: 60))
+                .font(.system(size: 160))
                 .minimumScaleFactor(0.5)
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity, maxHeight: ageMaxH)
         }
         .padding(.top, topPad)
@@ -163,7 +169,11 @@ struct SnoozerView: View {
 
     private func rightColumn(isLandscape: Bool) -> some View {
         VStack(spacing: 0) {
-            Spacer()
+            if isLandscape {
+                Spacer()
+            } else {
+                Spacer().frame(maxHeight: 10)
+            }
             if showDisplayName.value && isLandscape {
                 Text(Bundle.main.displayName)
                     .font(.system(size: 50, weight: .bold))
@@ -223,13 +233,17 @@ struct SnoozerView: View {
                         }
 
                         Text(context.date, format: Date.FormatStyle(date: .omitted, time: .shortened))
-                            .font(.system(size: 70))
+                            .font(.system(size: 160))
                             .minimumScaleFactor(0.5)
                             .foregroundColor(.white)
-                            .frame(height: 78)
+                            .frame(height: 115)
                     }
                 }
-                Spacer()
+                if isLandscape {
+                    Spacer()
+                } else {
+                    Spacer().frame(maxHeight: 15)
+                }
             }
         }
     }
