@@ -1,10 +1,5 @@
-//
-//  TreatmentsTask.swift
-//  LoopFollow
-//
-//  Created by Jonas Björkert on 2025-01-11.
-//  Copyright © 2025 Jon Fawcett. All rights reserved.
-//
+// LoopFollow
+// TreatmentsTask.swift
 
 import Foundation
 
@@ -19,7 +14,7 @@ extension MainViewController {
 
     func treatmentsTaskAction() {
         // If Nightscout not enabled, wait 60s and try again
-        guard IsNightscoutEnabled(), UserDefaultsRepository.downloadTreatments.value else {
+        guard IsNightscoutEnabled(), Storage.shared.downloadTreatments.value else {
             TaskScheduler.shared.rescheduleTask(id: .treatments, to: Date().addingTimeInterval(60))
             return
         }
@@ -27,5 +22,6 @@ extension MainViewController {
         WebLoadNSTreatments()
 
         TaskScheduler.shared.rescheduleTask(id: .treatments, to: Date().addingTimeInterval(2 * 60))
+        TaskScheduler.shared.rescheduleTask(id: .alarmCheck, to: Date().addingTimeInterval(3))
     }
 }

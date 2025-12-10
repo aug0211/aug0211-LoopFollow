@@ -1,9 +1,5 @@
-//
-//  HKQuantity+AnyConvertible.swift
-//  nightguard
-//
-//  Created by Jonas Björkert on 2024-07-24.
-//
+// LoopFollow
+// HKQuantity+AnyConvertible.swift
 
 import HealthKit
 
@@ -23,7 +19,8 @@ class HKQuantityWrapper: AnyConvertible {
         // Convert dictionary back to HKQuantity
         guard let dict = anyValue as? [String: Any],
               let unitString = dict["unit"] as? String,
-              let value = dict["value"] as? Double else {
+              let value = dict["value"] as? Double
+        else {
             return nil
         }
 

@@ -1,19 +1,9 @@
-//
-//  PushNotificationManager.swift
-//  LoopFollow
-//
-//  Created by Jonas Björkert on 2024-08-27.
-//  Copyright © 2024 Jon Fawcett. All rights reserved.
-//
+// LoopFollow
+// PushNotificationManager.swift
 
 import Foundation
-import SwiftJWT
 import HealthKit
-
-struct APNsJWTClaims: Claims {
-    let iss: String
-    let iat: Date
-}
+import SwiftJWT
 
 class PushNotificationManager {
     private var deviceToken: String
@@ -26,80 +16,111 @@ class PushNotificationManager {
     private var bundleId: String
 
     init() {
-        self.deviceToken = Storage.shared.deviceToken.value
-        self.sharedSecret = Storage.shared.sharedSecret.value
-        self.productionEnvironment = Storage.shared.productionEnvironment.value
-        self.apnsKey = Storage.shared.apnsKey.value
-        self.teamId = Storage.shared.teamId.value ?? ""
-        self.keyId = Storage.shared.keyId.value
-        self.user = Storage.shared.user.value
-        self.bundleId = Storage.shared.bundleId.value
+        deviceToken = Storage.shared.deviceToken.value
+        sharedSecret = Storage.shared.sharedSecret.value
+        productionEnvironment = Storage.shared.productionEnvironment.value
+        apnsKey = Storage.shared.apnsKey.value
+        teamId = Storage.shared.teamId.value ?? ""
+        keyId = Storage.shared.keyId.value
+        user = Storage.shared.user.value
+        bundleId = Storage.shared.bundleId.value
+    }
+
+    private func createReturnNotificationInfo() -> CommandPayload.ReturnNotificationInfo? {
+        let loopFollowDeviceToken = Observable.shared.loopFollowDeviceToken.value
+
+        guard !loopFollowDeviceToken.isEmpty else {
+            return nil
+        }
+
+        guard let loopFollowTeamID = BuildDetails.default.teamID, !loopFollowTeamID.isEmpty else {
+            LogManager.shared.log(category: .apns, message: "LoopFollow Team ID not found in BuildDetails.plist. Cannot create return notification info.")
+            return nil
+        }
+
+        let teamIdsAreDifferent = loopFollowTeamID != teamId
+        let keyIdForReturn: String
+        let apnsKeyForReturn: String
+
+        if teamIdsAreDifferent {
+            keyIdForReturn = Storage.shared.returnKeyId.value
+            apnsKeyForReturn = Storage.shared.returnApnsKey.value
+        } else {
+            keyIdForReturn = keyId
+            apnsKeyForReturn = apnsKey
+        }
+
+        guard !keyIdForReturn.isEmpty, !apnsKeyForReturn.isEmpty else {
+            LogManager.shared.log(category: .apns, message: "Missing required return APNS credentials. Check Remote Settings.")
+            return nil
+        }
+
+        return CommandPayload.ReturnNotificationInfo(
+            productionEnvironment: BuildDetails.default.isTestFlightBuild(),
+            deviceToken: loopFollowDeviceToken,
+            bundleId: Bundle.main.bundleIdentifier ?? "",
+            teamId: loopFollowTeamID,
+            keyId: keyIdForReturn,
+            apnsKey: apnsKeyForReturn
+        )
     }
 
     func sendOverridePushNotification(override: ProfileManager.TrioOverride, completion: @escaping (Bool, String?) -> Void) {
-        let message = PushMessage(
+        let payload = CommandPayload(
             user: user,
             commandType: .startOverride,
-            sharedSecret: sharedSecret,
             timestamp: Date().timeIntervalSince1970,
-            overrideName: override.name
+            overrideName: override.name,
+            returnNotification: createReturnNotificationInfo()
         )
-
-        sendPushNotification(message: message, completion: completion)
+        sendEncryptedCommand(payload: payload, completion: completion)
     }
 
     func sendCancelOverridePushNotification(completion: @escaping (Bool, String?) -> Void) {
-        let message = PushMessage(
+        let payload = CommandPayload(
             user: user,
             commandType: .cancelOverride,
-            sharedSecret: sharedSecret,
             timestamp: Date().timeIntervalSince1970,
-            overrideName: nil
+            overrideName: nil,
+            returnNotification: createReturnNotificationInfo()
         )
-
-        sendPushNotification(message: message, completion: completion)
+        sendEncryptedCommand(payload: payload, completion: completion)
     }
 
     func sendBolusPushNotification(bolusAmount: HKQuantity, completion: @escaping (Bool, String?) -> Void) {
-        let bolusAmount = Decimal(bolusAmount.doubleValue(for: .internationalUnit()))
-
-        let message = PushMessage(
+        let bolusAmountDecimal = Decimal(bolusAmount.doubleValue(for: .internationalUnit()))
+        let payload = CommandPayload(
             user: user,
             commandType: .bolus,
-            bolusAmount: bolusAmount,
-            sharedSecret: sharedSecret,
-            timestamp: Date().timeIntervalSince1970
+            timestamp: Date().timeIntervalSince1970,
+            bolusAmount: bolusAmountDecimal,
+            returnNotification: createReturnNotificationInfo()
         )
-
-        sendPushNotification(message: message, completion: completion)
+        sendEncryptedCommand(payload: payload, completion: completion)
     }
 
     func sendTempTargetPushNotification(target: HKQuantity, duration: HKQuantity, completion: @escaping (Bool, String?) -> Void) {
         let targetValue = Int(target.doubleValue(for: HKUnit.milligramsPerDeciliter))
         let durationValue = Int(duration.doubleValue(for: HKUnit.minute()))
-
-        let message = PushMessage(
+        let payload = CommandPayload(
             user: user,
             commandType: .tempTarget,
-            bolusAmount: nil,
+            timestamp: Date().timeIntervalSince1970,
             target: targetValue,
             duration: durationValue,
-            sharedSecret: sharedSecret,
-            timestamp: Date().timeIntervalSince1970
+            returnNotification: createReturnNotificationInfo()
         )
-
-        sendPushNotification(message: message, completion: completion)
+        sendEncryptedCommand(payload: payload, completion: completion)
     }
 
     func sendCancelTempTargetPushNotification(completion: @escaping (Bool, String?) -> Void) {
-        let message = PushMessage(
+        let payload = CommandPayload(
             user: user,
             commandType: .cancelTempTarget,
-            sharedSecret: sharedSecret,
-            timestamp: Date().timeIntervalSince1970
+            timestamp: Date().timeIntervalSince1970,
+            returnNotification: createReturnNotificationInfo()
         )
-
-        sendPushNotification(message: message, completion: completion)
+        sendEncryptedCommand(payload: payload, completion: completion)
     }
 
     func sendMealPushNotification(
@@ -114,59 +135,47 @@ class PushNotificationManager {
             let valueInGrams = quantity.doubleValue(for: .gram())
             return valueInGrams > 0 ? Int(valueInGrams) : nil
         }
-
         func convertToOptionalDecimal(_ quantity: HKQuantity?) -> Decimal? {
             guard let quantity = quantity else { return nil }
             let value = quantity.doubleValue(for: .internationalUnit())
             return value > 0 ? Decimal(value) : nil
         }
-
         let carbsValue = convertToOptionalInt(carbs)
         let proteinValue = convertToOptionalInt(protein)
         let fatValue = convertToOptionalInt(fat)
         let scheduledTimeInterval: TimeInterval? = scheduledTime?.timeIntervalSince1970
         let bolusAmountValue = convertToOptionalDecimal(bolusAmount)
-
         guard carbsValue != nil || proteinValue != nil || fatValue != nil else {
             completion(false, "No nutrient data provided. At least one of carbs, fat, or protein must be greater than 0.")
             return
         }
-
-        let message = PushMessage(
+        let payload = CommandPayload(
             user: user,
             commandType: .meal,
+            timestamp: Date().timeIntervalSince1970,
             bolusAmount: bolusAmountValue,
             carbs: carbsValue,
             protein: proteinValue,
             fat: fatValue,
-            sharedSecret: sharedSecret,
-            timestamp: Date().timeIntervalSince1970,
-            scheduledTime: scheduledTimeInterval
+            scheduledTime: scheduledTimeInterval,
+            returnNotification: createReturnNotificationInfo()
         )
-
-        sendPushNotification(message: message, completion: completion)
+        sendEncryptedCommand(payload: payload, completion: completion)
     }
 
     private func validateCredentials() -> [String]? {
         var errors = [String]()
-
-        // Validate keyId (should be 10 alphanumeric characters)
         let keyIdPattern = "^[A-Z0-9]{10}$"
         if !matchesRegex(keyId, pattern: keyIdPattern) {
             errors.append("APNS Key ID (\(keyId)) must be 10 uppercase alphanumeric characters.")
         }
-
-        // Validate teamId (should be 10 alphanumeric characters)
         let teamIdPattern = "^[A-Z0-9]{10}$"
         if !matchesRegex(teamId, pattern: teamIdPattern) {
             errors.append("Team ID (\(teamId)) must be 10 uppercase alphanumeric characters.")
         }
-
-        // Validate apnsKey (should contain the BEGIN and END PRIVATE KEY markers)
         if !apnsKey.contains("-----BEGIN PRIVATE KEY-----") || !apnsKey.contains("-----END PRIVATE KEY-----") {
             errors.append("APNS Key must be a valid PEM-formatted private key.")
         } else {
-            // Validate that the key data between the markers is valid Base64
             if let keyData = extractKeyData(from: apnsKey) {
                 if Data(base64Encoded: keyData) == nil {
                     errors.append("APNS Key contains invalid Base64 key data.")
@@ -175,7 +184,6 @@ class PushNotificationManager {
                 errors.append("APNS Key has invalid formatting.")
             }
         }
-
         return errors.isEmpty ? nil : errors
     }
 
@@ -189,35 +197,26 @@ class PushNotificationManager {
         let lines = pemString.components(separatedBy: "\n")
         guard let startIndex = lines.firstIndex(of: "-----BEGIN PRIVATE KEY-----"),
               let endIndex = lines.firstIndex(of: "-----END PRIVATE KEY-----"),
-              startIndex < endIndex else {
+              startIndex < endIndex
+        else {
             return nil
         }
-        let keyLines = lines[(startIndex + 1)..<endIndex]
+        let keyLines = lines[(startIndex + 1) ..< endIndex]
         return keyLines.joined()
     }
 
-    private func sendPushNotification(message: PushMessage, completion: @escaping (Bool, String?) -> Void) {
-        print("Push message to send: \(message)")
-
+    private func sendEncryptedCommand(payload: CommandPayload, completion: @escaping (Bool, String?) -> Void) {
         var missingFields = [String]()
         if sharedSecret.isEmpty { missingFields.append("sharedSecret") }
-        if apnsKey.isEmpty { missingFields.append("token") }
+        if apnsKey.isEmpty { missingFields.append("apnsKey") }
         if keyId.isEmpty { missingFields.append("keyId") }
         if user.isEmpty { missingFields.append("user") }
-
-        if !missingFields.isEmpty {
-            let errorMessage = "Missing required fields, check your remote settings: \(missingFields.joined(separator: ", "))"
-            LogManager.shared.log(category: .apns, message: errorMessage)
-            completion(false, errorMessage)
-            return
-        }
-
         if deviceToken.isEmpty { missingFields.append("deviceToken") }
         if bundleId.isEmpty { missingFields.append("bundleId") }
         if teamId.isEmpty { missingFields.append("teamId") }
 
         if !missingFields.isEmpty {
-            let errorMessage = "Missing required data, verify that you are using the latest version of Trio: \(missingFields.joined(separator: ", "))"
+            let errorMessage = "Missing required fields for command: \(missingFields.joined(separator: ", "))"
             LogManager.shared.log(category: .apns, message: errorMessage)
             completion(false, errorMessage)
             return
@@ -237,25 +236,34 @@ class PushNotificationManager {
             return
         }
 
-        guard let jwt = getOrGenerateJWT() else {
+        guard let jwt = JWTManager.shared.getOrGenerateJWT(keyId: keyId, teamId: teamId, apnsKey: apnsKey) else {
             let errorMessage = "Failed to generate JWT, please check that the token is correct."
             LogManager.shared.log(category: .apns, message: errorMessage)
             completion(false, errorMessage)
             return
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("bearer \(jwt)", forHTTPHeaderField: "authorization")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        request.setValue("10", forHTTPHeaderField: "apns-priority")
-        request.setValue("0", forHTTPHeaderField: "apns-expiration")
-        request.setValue(bundleId, forHTTPHeaderField: "apns-topic")
-        request.setValue("background", forHTTPHeaderField: "apns-push-type")
-
         do {
-            let jsonData = try JSONEncoder().encode(message)
-            request.httpBody = jsonData
+            guard let messenger = SecureMessenger(sharedSecret: sharedSecret) else {
+                let errorMessage = "Failed to initialize security module. Check shared secret."
+                LogManager.shared.log(category: .apns, message: errorMessage)
+                completion(false, errorMessage)
+                return
+            }
+
+            let encryptedDataString = try messenger.encrypt(payload)
+            let finalMessage = EncryptedPushMessage(encryptedData: encryptedDataString)
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("bearer \(jwt)", forHTTPHeaderField: "authorization")
+            request.setValue("application/json", forHTTPHeaderField: "content-type")
+            request.setValue("10", forHTTPHeaderField: "apns-priority")
+            request.setValue("0", forHTTPHeaderField: "apns-expiration")
+            request.setValue(bundleId, forHTTPHeaderField: "apns-topic")
+            request.setValue("background", forHTTPHeaderField: "apns-push-type")
+
+            request.httpBody = try JSONEncoder().encode(finalMessage)
 
             let task = URLSession.shared.dataTask(with: request) { data, response, error in
                 if let error = error {
@@ -269,21 +277,14 @@ class PushNotificationManager {
                     print("Push notification sent.")
                     print("Status code: \(httpResponse.statusCode)")
 
-                    print("Response headers:")
-                    for (key, value) in httpResponse.allHeaderFields {
-                        print("\(key): \(value)")
-                    }
-
                     var responseBodyMessage = ""
                     if let data = data, let responseBody = String(data: data, encoding: .utf8) {
                         print("Response body: \(responseBody)")
-
-                            if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                           let reason = json["reason"] as? String {
+                        if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                           let reason = json["reason"] as? String
+                        {
                             responseBodyMessage = reason
                         }
-                    } else {
-                        print("No response body")
                     }
 
                     switch httpResponse.statusCode {
@@ -317,8 +318,8 @@ class PushNotificationManager {
             task.resume()
 
         } catch {
-            let errorMessage = "Failed to encode push message: \(error.localizedDescription)"
-            print(errorMessage)
+            let errorMessage = "Failed to encode or encrypt push message: \(error.localizedDescription)"
+            LogManager.shared.log(category: .apns, message: errorMessage)
             completion(false, errorMessage)
         }
     }
@@ -327,33 +328,5 @@ class PushNotificationManager {
         let host = productionEnvironment ? "api.push.apple.com" : "api.sandbox.push.apple.com"
         let urlString = "https://\(host)/3/device/\(deviceToken)"
         return URL(string: urlString)
-    }
-
-
-    private func getOrGenerateJWT() -> String? {
-        if let cachedJWT = Storage.shared.cachedJWT.value, let expirationDate = Storage.shared.jwtExpirationDate.value {
-            if Date() < expirationDate {
-                return cachedJWT
-            }
-        }
-
-        let header = Header(kid: keyId)
-        let claims = APNsJWTClaims(iss: teamId, iat: Date())
-
-        var jwt = JWT(header: header, claims: claims)
-
-        do {
-            let privateKey = Data(apnsKey.utf8)
-            let jwtSigner = JWTSigner.es256(privateKey: privateKey)
-            let signedJWT = try jwt.sign(using: jwtSigner)
-
-            Storage.shared.cachedJWT.value = signedJWT
-            Storage.shared.jwtExpirationDate.value = Date().addingTimeInterval(3600)
-
-            return signedJWT
-        } catch {
-            print("Failed to sign JWT: \(error.localizedDescription)")
-            return nil
-        }
     }
 }

@@ -1,10 +1,5 @@
-//
-//  DeviceStatusTask.swift
-//  LoopFollow
-//
-//  Created by Jonas Björkert on 2025-01-11.
-//  Copyright © 2025 Jon Fawcett. All rights reserved.
-//
+// LoopFollow
+// DeviceStatusTask.swift
 
 import Foundation
 

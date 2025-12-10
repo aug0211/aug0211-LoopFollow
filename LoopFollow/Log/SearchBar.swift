@@ -1,10 +1,5 @@
-//
-//  SearchBar.swift
-//  LoopFollow
-//
-//  Created by Jonas Björkert on 2025-01-13.
-//  Copyright © 2025 Jon Fawcett. All rights reserved.
-//
+// LoopFollow
+// SearchBar.swift
 
 import SwiftUI
 import UIKit
@@ -19,7 +14,7 @@ struct SearchBar: UIViewRepresentable {
             _text = text
         }
 
-        func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        func searchBar(_: UISearchBar, textDidChange searchText: String) {
             text = searchText
         }
 
@@ -41,7 +36,7 @@ struct SearchBar: UIViewRepresentable {
         return searchBar
     }
 
-    func updateUIView(_ uiView: UISearchBar, context: UIViewRepresentableContext<SearchBar>) {
+    func updateUIView(_ uiView: UISearchBar, context _: UIViewRepresentableContext<SearchBar>) {
         uiView.text = text
     }
 }

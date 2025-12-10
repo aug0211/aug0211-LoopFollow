@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSHumanReadableCopyright</key>
-	<string></string>
 	<key>AppGroupIdentifier</key>
 	<string>group.com.$(unique_id).LoopFollow$(app_suffix)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
@@ -47,16 +45,22 @@
 	<string>13.0</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app uses Bluetooth to connect to devices for managing background operations.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Loop Follow would like to access your calendar to update BG readings</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Loop Follow would like to access your calendar to save BG readings</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Used for scanning QR codes for remote authentication</string>
 	<key>NSContactsUsageDescription</key>
 	<string>This app requires access to contacts to update a contact image with real-time blood glucose information.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>This app requires Face ID for secure authentication.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string></string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -81,7 +85,10 @@
 		<string>audio</string>
 		<string>processing</string>
 		<string>bluetooth-central</string>
+		<string>remote-notification</string>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -102,18 +109,10 @@
 	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
-    <key>UIFileSharingEnabled</key>
-    <true/>
-    <key>LSSupportsOpeningDocumentsInPlace</key>
-    <true/>
 </dict>
 </plist>

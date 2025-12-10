@@ -1,10 +1,5 @@
-//
-//  LogManager.swift
-//  LoopFollow
-//
-//  Created by Jonas Björkert on 2025-01-10.
-//  Copyright © 2025 Jon Fawcett. All rights reserved.
-//
+// LoopFollow
+// LogManager.swift
 
 import Foundation
 
@@ -30,8 +25,10 @@ class LogManager {
         case taskScheduler = "Task Scheduler"
         case dexcom = "Dexcom"
         case alarm = "Alarm"
+        case volumeButtonSnooze = "Volume Button Snooze"
         case calendar = "Calendar"
         case deviceStatus = "Device Status"
+        case remote = "Remote"
     }
 
     init() {
@@ -63,7 +60,7 @@ class LogManager {
         consoleQueue.async {
             print(logMessage)
         }
-        
+
         if category == .taskScheduler && isDebug {
             return
         }
@@ -85,9 +82,9 @@ class LogManager {
         }
 
         if !isDebug || Storage.shared.debugLogLevel.value {
-            let logFileURL = self.currentLogFileURL
-            self.writeVersionHeaderIfNeeded(for: logFileURL)
-            self.append(logMessage + "\n", to: logFileURL)
+            let logFileURL = currentLogFileURL
+            writeVersionHeaderIfNeeded(for: logFileURL)
+            append(logMessage + "\n", to: logFileURL)
         }
     }
 
@@ -95,7 +92,8 @@ class LogManager {
     private func isLogFileEmpty(at fileURL: URL) -> Bool {
         if !fileManager.fileExists(atPath: fileURL.path) { return true }
         if let attributes = try? fileManager.attributesOfItem(atPath: fileURL.path),
-           let fileSize = attributes[.size] as? UInt64 {
+           let fileSize = attributes[.size] as? UInt64
+        {
             return fileSize == 0
         }
         return false
@@ -119,7 +117,7 @@ class LogManager {
             // Assemble header information
             var headerLines = [String]()
             headerLines.append("LoopFollow Version: \(version)")
-            if !isMacApp && !isSimulatorBuild {
+            if !isMacApp, !isSimulatorBuild {
                 headerLines.append("\(expirationHeaderString): \(expiration)")
             }
             headerLines.append("Built: \(formattedBuildDate)")
@@ -128,7 +126,7 @@ class LogManager {
             let headerMessage = headerLines.joined(separator: ", ") + "\n"
             let logMessage = formattedLogMessage(for: .general, message: headerMessage)
 
-            self.append(logMessage, to: fileURL)
+            append(logMessage, to: fileURL)
             shouldLogVersionHeader = false
         }
     }
@@ -140,7 +138,7 @@ class LogManager {
             let logFiles = try fileManager.contentsOfDirectory(at: logDirectory, includingPropertiesForKeys: nil)
             for logFile in logFiles {
                 let filename = logFile.lastPathComponent
-                if !filename.contains(today) && !filename.contains(yesterday) {
+                if !filename.contains(today), !filename.contains(yesterday) {
                     try fileManager.removeItem(at: logFile)
                 }
             }
