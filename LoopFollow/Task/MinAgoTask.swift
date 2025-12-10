@@ -62,6 +62,8 @@ extension MainViewController {
             attributeString.addAttribute(.strikethroughColor, value: UIColor.clear, range: NSRange(location: 0, length: attributeString.length))
             updateBadge(val: Observable.shared.bg.value ?? 0)
         }
+        BGText.attributedText = attributeString
+
         TaskScheduler.shared.rescheduleTask(id: .minAgoUpdate, to: Date().addingTimeInterval(1.0))
     }
 }
