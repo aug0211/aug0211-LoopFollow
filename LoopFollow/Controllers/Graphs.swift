@@ -313,21 +313,14 @@ extension MainViewController {
         lineBolus.setColor(NSUIColor.systemBlue, alpha: 1.0)
         lineBolus.lineWidth = 0
         lineBolus.axisDependency = YAxis.AxisDependency.right
-        lineBolus.valueFormatter = ChartYDataValueFormatter()
+        lineBolus.valueFormatter = BolusValueFormatter(bolusData: bolusData)
         lineBolus.valueTextColor = NSUIColor.label
         lineBolus.fillColor = NSUIColor.systemBlue
         lineBolus.fillAlpha = 0.6
-
         lineBolus.drawCirclesEnabled = true
         lineBolus.drawFilledEnabled = false
-
-        if Storage.shared.showValues.value {
-            lineBolus.drawValuesEnabled = true
-            lineBolus.highlightEnabled = false
-        } else {
-            lineBolus.drawValuesEnabled = false
-            lineBolus.highlightEnabled = true
-        }
+        lineBolus.drawValuesEnabled = true
+        lineBolus.highlightEnabled = true
 
         // Carbs
         let chartEntryCarbs = [ChartDataEntry]()
@@ -339,21 +332,14 @@ extension MainViewController {
         lineCarbs.setColor(NSUIColor.systemBlue, alpha: 1.0)
         lineCarbs.lineWidth = 0
         lineCarbs.axisDependency = YAxis.AxisDependency.right
-        lineCarbs.valueFormatter = ChartYDataValueFormatter()
+        lineCarbs.valueFormatter = CarbsValueFormatter(carbData: carbData)
         lineCarbs.valueTextColor = NSUIColor.label
         lineCarbs.fillColor = NSUIColor.systemOrange
         lineCarbs.fillAlpha = 0.6
-
         lineCarbs.drawCirclesEnabled = true
         lineCarbs.drawFilledEnabled = false
-
-        if Storage.shared.showValues.value {
-            lineCarbs.drawValuesEnabled = true
-            lineCarbs.highlightEnabled = false
-        } else {
-            lineCarbs.drawValuesEnabled = false
-            lineCarbs.highlightEnabled = true
-        }
+        lineCarbs.drawValuesEnabled = true
+        lineCarbs.highlightEnabled = true
 
         // create Scheduled Basal graph data
         let chartBasalScheduledEntry = [ChartDataEntry]()
@@ -394,7 +380,7 @@ extension MainViewController {
         lineBGCheck.lineWidth = 0
         lineBGCheck.highlightEnabled = true
         lineBGCheck.axisDependency = YAxis.AxisDependency.right
-        lineBGCheck.valueFormatter = ChartYDataValueFormatter()
+        lineBGCheck.valueFormatter = OnlyValueFormatter()
         lineBGCheck.drawValuesEnabled = false
 
         // Suspend Pump
@@ -409,7 +395,7 @@ extension MainViewController {
         lineSuspend.lineWidth = 0
         lineSuspend.highlightEnabled = true
         lineSuspend.axisDependency = YAxis.AxisDependency.right
-        lineSuspend.valueFormatter = ChartYDataValueFormatter()
+        lineSuspend.valueFormatter = OnlyValueFormatter()
         lineSuspend.drawValuesEnabled = false
 
         // Resume Pump
@@ -424,7 +410,7 @@ extension MainViewController {
         lineResume.lineWidth = 0
         lineResume.highlightEnabled = true
         lineResume.axisDependency = YAxis.AxisDependency.right
-        lineResume.valueFormatter = ChartYDataValueFormatter()
+        lineResume.valueFormatter = OnlyValueFormatter()
         lineResume.drawValuesEnabled = false
 
         // Sensor Start
@@ -439,7 +425,7 @@ extension MainViewController {
         lineSensor.lineWidth = 0
         lineSensor.highlightEnabled = true
         lineSensor.axisDependency = YAxis.AxisDependency.right
-        lineSensor.valueFormatter = ChartYDataValueFormatter()
+        lineSensor.valueFormatter = OnlyValueFormatter()
         lineSensor.drawValuesEnabled = false
 
         // Notes
@@ -454,7 +440,7 @@ extension MainViewController {
         lineNote.lineWidth = 0
         lineNote.highlightEnabled = true
         lineNote.axisDependency = YAxis.AxisDependency.right
-        lineNote.valueFormatter = ChartYDataValueFormatter()
+        lineNote.valueFormatter = OnlyValueFormatter()
         lineNote.drawValuesEnabled = false
 
         // Setup COB Prediction line details
@@ -563,19 +549,12 @@ extension MainViewController {
         lineSmb.setColor(NSUIColor.red, alpha: 1.0)
         lineSmb.lineWidth = 0
         lineSmb.axisDependency = YAxis.AxisDependency.right
-        lineSmb.valueFormatter = ChartYDataValueFormatter()
+        lineSmb.valueFormatter = SMBValueFormatter(smbData: smbData)
         lineSmb.valueTextColor = NSUIColor.label
-
         lineSmb.drawCirclesEnabled = false
         lineSmb.drawFilledEnabled = false
-
-        if Storage.shared.showValues.value {
-            lineSmb.drawValuesEnabled = true
-            lineSmb.highlightEnabled = false
-        } else {
-            lineSmb.drawValuesEnabled = false
-            lineSmb.highlightEnabled = true
-        }
+        lineSmb.drawValuesEnabled = true
+        lineSmb.highlightEnabled = true
 
         // TempTarget graph data
         let chartTempTargetEntry = [ChartDataEntry]()
@@ -845,7 +824,23 @@ extension MainViewController {
             if Double(entries[i].sgv) > topBG - maxBGOffset {
                 topBG = Double(entries[i].sgv) + maxBGOffset
             }
-            let value = ChartDataEntry(x: Double(entries[i].date), y: Double(entries[i].sgv), data: formatPillText(line1: Localizer.toDisplayUnits(String(entries[i].sgv)), time: entries[i].date))
+            // Format the time string for the marker
+            let date = Date(timeIntervalSince1970: entries[i].date)
+            let dateFormatter = DateFormatter()
+            if dateTimeUtils.is24Hour() {
+                dateFormatter.setLocalizedDateFormatFromTemplate("HH:mm")
+            } else {
+                dateFormatter.setLocalizedDateFormatFromTemplate("hh:mm")
+            }
+            let formattedTime = dateFormatter.string(from: date)
+            // Compose the marker string in the desired order
+            let markerString = "\(formattedTime)\nBG\n\(Localizer.toDisplayUnits(String(entries[i].sgv)))"
+
+            let value = ChartDataEntry(
+                x: Double(entries[i].date),
+                y: Double(entries[i].sgv),
+                data: markerString
+            )
             mainChart.append(value)
             smallChart.append(value)
 
@@ -1026,6 +1021,8 @@ extension MainViewController {
         smallChart.clear()
 
         var colors = [NSUIColor]()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "h:mm a"
         for i in 0 ..< bolusData.count {
             let formatter = NumberFormatter()
             formatter.minimumFractionDigits = 0
@@ -1047,7 +1044,11 @@ extension MainViewController {
             let graphHours = 24 * Storage.shared.downloadDays.value
             if dateTimeStamp < dateTimeUtils.getTimeIntervalNHoursAgo(N: graphHours) { continue }
 
-            let dot = ChartDataEntry(x: Double(dateTimeStamp), y: Double(bolusData[i].sgv), data: formatter.string(from: NSNumber(value: bolusData[i].value)))
+            let date = Date(timeIntervalSince1970: dateTimeStamp)
+            let timeString = dateFormatter.string(from: date)
+            let value = bolusData[i].value
+            let sgv = bolusData[i].sgv
+            let dot = ChartDataEntry(x: Double(dateTimeStamp), y: Double(sgv), data: ["amount": value, "time": timeString, "isBolus": true])
             mainChart.addEntry(dot)
             if Storage.shared.smallGraphTreatments.value {
                 smallChart.addEntry(dot)
@@ -1071,6 +1072,12 @@ extension MainViewController {
             }
         }
 
+        // Set valueFormatter for tappable treatments
+        mainChart.valueFormatter = EntryAmountValueFormatter(isBolus: true)
+        smallChart.valueFormatter = EntryAmountValueFormatter(isBolus: true)
+        mainChart.highlightEnabled = true
+        smallChart.highlightEnabled = true
+
         BGChart.data?.dataSets[dataIndex].notifyDataSetChanged()
         BGChart.data?.notifyDataChanged()
         BGChart.notifyDataSetChanged()
@@ -1092,6 +1099,8 @@ extension MainViewController {
         let lightBlue = NSUIColor(red: 135 / 255, green: 206 / 255, blue: 235 / 255, alpha: 1.0) // Light Sky Blue
 
         var colors = [NSUIColor]()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "h:mm a"
         for i in 0 ..< smbData.count {
             let formatter = NumberFormatter()
             formatter.minimumFractionDigits = 0
@@ -1119,12 +1128,22 @@ extension MainViewController {
             let graphHours = 24 * Storage.shared.downloadDays.value
             if dateTimeStamp < dateTimeUtils.getTimeIntervalNHoursAgo(N: graphHours) { continue }
 
-            let dot = ChartDataEntry(x: Double(dateTimeStamp), y: Double(smbData[i].sgv), data: formatter.string(from: NSNumber(value: smbData[i].value)))
+            let date = Date(timeIntervalSince1970: dateTimeStamp)
+            let timeString = dateFormatter.string(from: date)
+            let value = smbData[i].value
+            let sgv = smbData[i].sgv
+            let dot = ChartDataEntry(x: Double(dateTimeStamp), y: Double(sgv), data: ["amount": value, "time": timeString, "isBolus": true, "isSMB": true])
             mainChart.addEntry(dot)
             if Storage.shared.smallGraphTreatments.value {
                 smallChart.addEntry(dot)
             }
         }
+
+        // Set valueFormatter for tappable treatments
+        mainChart.valueFormatter = EntryAmountValueFormatter(isBolus: true)
+        smallChart.valueFormatter = EntryAmountValueFormatter(isBolus: true)
+        mainChart.highlightEnabled = true
+        smallChart.highlightEnabled = true
 
         BGChart.data?.dataSets[dataIndex].notifyDataSetChanged()
         BGChart.data?.notifyDataChanged()
@@ -1144,24 +1163,24 @@ extension MainViewController {
         smallChart.removeAll(keepingCapacity: true)
 
         var colors = [NSUIColor]()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "h:mm a"
         for i in 0 ..< carbData.count {
             let formatter = NumberFormatter()
             formatter.minimumFractionDigits = 0
             formatter.maximumFractionDigits = 2
             formatter.minimumIntegerDigits = 1
-
-            var valueString: String = formatter.string(from: NSNumber(value: carbData[i].value))!
+            let value = carbData[i].value
 
             var hours = 3
             if carbData[i].absorptionTime > 0, Storage.shared.showAbsorption.value {
                 hours = carbData[i].absorptionTime / 60
-                valueString += " " + String(hours) + "h"
+                // Optionally, you could append hours to the value label, but for chart display, keep it simple
             }
 
             // Check overlapping carbs to shift left if needed
             let carbShift = findNextCarbTime(timeWithin: 250, needle: carbData[i].date, haystack: carbData, startingIndex: i)
             var dateTimeStamp = carbData[i].date
-
             colors.append(NSUIColor.systemOrange.withAlphaComponent(1.0))
 
             // skip if outside of visible area
@@ -1171,13 +1190,21 @@ extension MainViewController {
             if carbShift {
                 dateTimeStamp = dateTimeStamp - 250
             }
-
-            let dot = ChartDataEntry(x: Double(dateTimeStamp), y: Double(carbData[i].sgv), data: valueString)
+            let date = Date(timeIntervalSince1970: dateTimeStamp)
+            let timeString = dateFormatter.string(from: date)
+            let sgv = carbData[i].sgv
+            let dot = ChartDataEntry(x: Double(dateTimeStamp), y: Double(sgv), data: ["amount": value, "time": timeString])
             BGChart.data?.dataSets[dataIndex].addEntry(dot)
             if Storage.shared.smallGraphTreatments.value {
                 BGChartFull.data?.dataSets[dataIndex].addEntry(dot)
             }
         }
+
+        // Set valueFormatter for tappable treatments
+        mainChart.valueFormatter = EntryAmountValueFormatter()
+        smallChart.valueFormatter = EntryAmountValueFormatter()
+        mainChart.highlightEnabled = true
+        smallChart.highlightEnabled = true
 
         // Set Colors
         let lineCarbs = BGChart.lineData!.dataSets[dataIndex] as! LineChartDataSet
@@ -1404,14 +1431,14 @@ extension MainViewController {
         lineBolus.setColor(NSUIColor.systemBlue, alpha: 1.0)
         lineBolus.lineWidth = 0
         lineBolus.axisDependency = YAxis.AxisDependency.right
-        lineBolus.valueFormatter = ChartYDataValueFormatter()
+        lineBolus.valueFormatter = OnlyValueFormatter()
         lineBolus.valueTextColor = NSUIColor.label
         lineBolus.fillColor = NSUIColor.systemBlue
         lineBolus.fillAlpha = 0.6
         lineBolus.drawCirclesEnabled = true
         lineBolus.drawFilledEnabled = false
-        lineBolus.drawValuesEnabled = false
-        lineBolus.highlightEnabled = false
+        lineBolus.drawValuesEnabled = true
+        lineBolus.highlightEnabled = true
 
         // Carbs
         var chartEntryCarbs = [ChartDataEntry]()
@@ -1423,14 +1450,14 @@ extension MainViewController {
         lineCarbs.setColor(NSUIColor.systemBlue, alpha: 1.0)
         lineCarbs.lineWidth = 0
         lineCarbs.axisDependency = YAxis.AxisDependency.right
-        lineCarbs.valueFormatter = ChartYDataValueFormatter()
+        lineCarbs.valueFormatter = OnlyValueFormatter()
         lineCarbs.valueTextColor = NSUIColor.label
         lineCarbs.fillColor = NSUIColor.systemOrange
         lineCarbs.fillAlpha = 0.6
         lineCarbs.drawCirclesEnabled = true
         lineCarbs.drawFilledEnabled = false
-        lineCarbs.drawValuesEnabled = false
-        lineCarbs.highlightEnabled = false
+        lineCarbs.drawValuesEnabled = true
+        lineCarbs.highlightEnabled = true
 
         // create Scheduled Basal graph data
         var chartBasalScheduledEntry = [ChartDataEntry]()
@@ -1471,7 +1498,7 @@ extension MainViewController {
         lineBGCheck.lineWidth = 0
         lineBGCheck.highlightEnabled = false
         lineBGCheck.axisDependency = YAxis.AxisDependency.right
-        lineBGCheck.valueFormatter = ChartYDataValueFormatter()
+        lineBGCheck.valueFormatter = OnlyValueFormatter()
         lineBGCheck.drawValuesEnabled = false
 
         // Suspend Pump
@@ -1486,7 +1513,7 @@ extension MainViewController {
         lineSuspend.lineWidth = 0
         lineSuspend.highlightEnabled = false
         lineSuspend.axisDependency = YAxis.AxisDependency.right
-        lineSuspend.valueFormatter = ChartYDataValueFormatter()
+        lineSuspend.valueFormatter = OnlyValueFormatter()
         lineSuspend.drawValuesEnabled = false
 
         // Resume Pump
@@ -1501,7 +1528,7 @@ extension MainViewController {
         lineResume.lineWidth = 0
         lineResume.highlightEnabled = false
         lineResume.axisDependency = YAxis.AxisDependency.right
-        lineResume.valueFormatter = ChartYDataValueFormatter()
+        lineResume.valueFormatter = OnlyValueFormatter()
         lineResume.drawValuesEnabled = false
 
         // Sensor Start
@@ -1516,7 +1543,7 @@ extension MainViewController {
         lineSensor.lineWidth = 0
         lineSensor.highlightEnabled = false
         lineSensor.axisDependency = YAxis.AxisDependency.right
-        lineSensor.valueFormatter = ChartYDataValueFormatter()
+        lineSensor.valueFormatter = OnlyValueFormatter()
         lineSensor.drawValuesEnabled = false
 
         // Notes
@@ -1531,7 +1558,7 @@ extension MainViewController {
         lineNote.lineWidth = 0
         lineNote.highlightEnabled = false
         lineNote.axisDependency = YAxis.AxisDependency.right
-        lineNote.valueFormatter = ChartYDataValueFormatter()
+        lineNote.valueFormatter = OnlyValueFormatter()
         lineNote.drawValuesEnabled = false
 
         // Setup COB Prediction line details
@@ -1596,14 +1623,14 @@ extension MainViewController {
         lineSmb.setColor(NSUIColor.systemBlue, alpha: 1.0)
         lineSmb.lineWidth = 0
         lineSmb.axisDependency = YAxis.AxisDependency.right
-        lineSmb.valueFormatter = ChartYDataValueFormatter()
+        lineSmb.valueFormatter = OnlyValueFormatter()
         lineSmb.valueTextColor = NSUIColor.label
         lineSmb.fillColor = NSUIColor.systemBlue
         lineSmb.fillAlpha = 0.6
         lineSmb.drawCirclesEnabled = true
         lineSmb.drawFilledEnabled = false
-        lineSmb.drawValuesEnabled = false
-        lineSmb.highlightEnabled = false
+        lineSmb.drawValuesEnabled = true // Show value always
+        lineSmb.highlightEnabled = true
 
         // Temp Target graph data
         let chartTempTargetEntry = [ChartDataEntry]()
@@ -1958,14 +1985,23 @@ extension MainViewController {
                 colors.append(color)
             }
 
+            // Format the time string
+            let date = Date(timeIntervalSince1970: predictionData[i].date)
+            let dateFormatter = DateFormatter()
+            if dateTimeUtils.is24Hour() {
+                dateFormatter.setLocalizedDateFormatFromTemplate("HH:mm")
+            } else {
+                dateFormatter.setLocalizedDateFormatFromTemplate("hh:mm")
+            }
+            let formattedTime = dateFormatter.string(from: date)
+
+            // Compose the marker string in the desired order: time, type, value
+            let markerString = "\(formattedTime)\n\(chartLabel)\n\(Localizer.toDisplayUnits(String(predictionVal)))"
+
             let value = ChartDataEntry(
                 x: predictionData[i].date,
                 y: predictionVal,
-                data: formatPillText(
-                    line1: chartLabel,
-                    time: predictionData[i].date,
-                    line2: Localizer.toDisplayUnits(String(predictionVal))
-                )
+                data: markerString
             )
             mainChart.addEntry(value)
             smallChart.addEntry(value)
@@ -1993,3 +2029,4 @@ extension MainViewController {
         BGChartFull.notifyDataSetChanged()
     }
 }
+

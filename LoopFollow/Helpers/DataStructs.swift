@@ -56,4 +56,17 @@ class DataStructs {
         var enteredBy: String
         var reason: String
     }
+
+    struct bolusGraphStruct: Codable {
+        var value: Double
+        var date: TimeInterval
+        var sgv: Int
+    }
+
+    struct carbGraphStruct: Codable {
+        var value: Double
+        var date: TimeInterval
+        var sgv: Int
+        var absorptionTime: Int
+    }
 }
