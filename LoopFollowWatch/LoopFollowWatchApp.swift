@@ -19,19 +19,29 @@ struct LoopFollowWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(sessionManager: sessionManager, bgFetcher: bgFetcher)
-                .onChange(of: sessionManager.config) { newConfig in
-                    if let config = newConfig, config.hasAnySource {
-                        bgFetcher.start(config: config)
-                    } else {
-                        bgFetcher.stop()
-                    }
+            TabView {
+                ContentView(sessionManager: sessionManager, bgFetcher: bgFetcher)
+
+                if let config = sessionManager.config, config.remoteEnabled {
+                    RemoteControlView(config: config, bgFetcher: bgFetcher)
                 }
-                .onAppear {
-                    if let config = sessionManager.config, config.hasAnySource {
-                        bgFetcher.start(config: config)
-                    }
+            }
+            .tabViewStyle(.page)
+            .onChange(of: sessionManager.config) { newConfig in
+                if let config = newConfig, config.hasAnySource {
+                    bgFetcher.start(config: config)
+                } else {
+                    bgFetcher.stop()
                 }
+            }
+            .onAppear {
+                if let config = sessionManager.config, config.hasAnySource {
+                    bgFetcher.start(config: config)
+                } else {
+                    // No config yet — ask iPhone to send it
+                    sessionManager.requestConfigFromPhone()
+                }
+            }
         }
     }
 }

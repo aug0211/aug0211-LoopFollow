@@ -13,6 +13,24 @@ struct WatchConfig: Equatable {
     var lowLine: Double
     var highLine: Double
 
+    // Remote control fields
+    var remoteType: String // "None", "Nightscout", "Trio Remote Control", "Loop APNS"
+    var maxBolus: Double
+    var maxCarbs: Double
+
+    // TRC APNS credentials
+    var trcDeviceToken: String
+    var trcSharedSecret: String
+    var trcApnsKey: String
+    var trcKeyId: String
+    var trcTeamId: String
+    var trcBundleId: String
+    var trcProductionEnv: Bool
+    var trcUser: String
+
+    // Nightscout write auth
+    var nsWriteAuth: Bool
+
     var hasDexcomCredentials: Bool {
         !dexUsername.isEmpty && !dexPassword.isEmpty
     }
@@ -23,6 +41,10 @@ struct WatchConfig: Equatable {
 
     var hasAnySource: Bool {
         hasDexcomCredentials || hasNightscoutURL
+    }
+
+    var remoteEnabled: Bool {
+        remoteType != "None"
     }
 
     var dexServerURL: String {
@@ -41,6 +63,18 @@ struct WatchConfig: Equatable {
             "units": units,
             "lowLine": lowLine,
             "highLine": highLine,
+            "remoteType": remoteType,
+            "maxBolus": maxBolus,
+            "maxCarbs": maxCarbs,
+            "trcDeviceToken": trcDeviceToken,
+            "trcSharedSecret": trcSharedSecret,
+            "trcApnsKey": trcApnsKey,
+            "trcKeyId": trcKeyId,
+            "trcTeamId": trcTeamId,
+            "trcBundleId": trcBundleId,
+            "trcProductionEnv": trcProductionEnv,
+            "trcUser": trcUser,
+            "nsWriteAuth": nsWriteAuth,
         ]
     }
 
@@ -53,6 +87,18 @@ struct WatchConfig: Equatable {
         units = dict["units"] as? String ?? "mg/dL"
         lowLine = dict["lowLine"] as? Double ?? 70.0
         highLine = dict["highLine"] as? Double ?? 180.0
+        remoteType = dict["remoteType"] as? String ?? "None"
+        maxBolus = dict["maxBolus"] as? Double ?? 10.0
+        maxCarbs = dict["maxCarbs"] as? Double ?? 100.0
+        trcDeviceToken = dict["trcDeviceToken"] as? String ?? ""
+        trcSharedSecret = dict["trcSharedSecret"] as? String ?? ""
+        trcApnsKey = dict["trcApnsKey"] as? String ?? ""
+        trcKeyId = dict["trcKeyId"] as? String ?? ""
+        trcTeamId = dict["trcTeamId"] as? String ?? ""
+        trcBundleId = dict["trcBundleId"] as? String ?? ""
+        trcProductionEnv = dict["trcProductionEnv"] as? Bool ?? false
+        trcUser = dict["trcUser"] as? String ?? ""
+        nsWriteAuth = dict["nsWriteAuth"] as? Bool ?? false
     }
 
     func saveToDefaults() {
