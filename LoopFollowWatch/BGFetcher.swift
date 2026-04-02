@@ -123,6 +123,14 @@ class BGFetcher: ObservableObject {
         }
     }
 
+    private func fallbackToNightscout(config: WatchConfig, dexError: String) {
+        if config.hasNightscoutURL {
+            fetchNightscout(config: config)
+        } else {
+            DispatchQueue.main.async { self.lastError = dexError }
+        }
+    }
+
     // MARK: - Dexcom Share
 
     private func fetchDexcom(config: WatchConfig, retryCount: Int = 0) {
@@ -144,7 +152,7 @@ class BGFetcher: ObservableObject {
         dexcomPOST(url: url, body: body) { [weak self] error, response in
             guard let self = self else { return }
             if let error = error {
-                DispatchQueue.main.async { self.lastError = "Dexcom auth failed: \(error.localizedDescription)" }
+                self.fallbackToNightscout(config: config, dexError: "Dexcom auth failed: \(error.localizedDescription)")
                 return
             }
 
@@ -152,7 +160,7 @@ class BGFetcher: ObservableObject {
                   let data = response.data(using: .utf8),
                   let accountId = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as? String
             else {
-                DispatchQueue.main.async { self.lastError = "Dexcom auth: invalid response" }
+                self.fallbackToNightscout(config: config, dexError: "Dexcom auth: invalid response")
                 return
             }
 
@@ -171,7 +179,7 @@ class BGFetcher: ObservableObject {
         dexcomPOST(url: url, body: body) { [weak self] error, response in
             guard let self = self else { return }
             if let error = error {
-                DispatchQueue.main.async { self.lastError = "Dexcom login failed: \(error.localizedDescription)" }
+                self.fallbackToNightscout(config: config, dexError: "Dexcom login failed: \(error.localizedDescription)")
                 return
             }
 
@@ -179,7 +187,7 @@ class BGFetcher: ObservableObject {
                   let data = response.data(using: .utf8),
                   let token = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as? String
             else {
-                DispatchQueue.main.async { self.lastError = "Dexcom login: invalid response" }
+                self.fallbackToNightscout(config: config, dexError: "Dexcom login: invalid response")
                 return
             }
 
@@ -199,7 +207,7 @@ class BGFetcher: ObservableObject {
         dexcomPOST(url: components.url!, body: nil) { [weak self] error, response in
             guard let self = self else { return }
             if let error = error {
-                DispatchQueue.main.async { self.lastError = "Dexcom fetch failed: \(error.localizedDescription)" }
+                self.fallbackToNightscout(config: config, dexError: "Dexcom fetch failed: \(error.localizedDescription)")
                 return
             }
 
@@ -213,16 +221,16 @@ class BGFetcher: ObservableObject {
                     self.dexSessionToken = nil
                     self.fetchDexcom(config: config, retryCount: retryCount + 1)
                 } else {
-                    DispatchQueue.main.async { self.lastError = "Dexcom: failed after retries" }
+                    self.fallbackToNightscout(config: config, dexError: "Dexcom: failed after retries")
                 }
                 return
             }
 
-            self.parseDexcomResponse(sgvs: sgvs)
+            self.parseDexcomResponse(config: config, sgvs: sgvs)
         }
     }
 
-    private func parseDexcomResponse(sgvs: [[String: Any]]) {
+    private func parseDexcomResponse(config: WatchConfig, sgvs: [[String: Any]]) {
         let trendMap = [
             "": 0, "DoubleUp": 1, "SingleUp": 2, "FortyFiveUp": 3,
             "Flat": 4, "FortyFiveDown": 5, "SingleDown": 6, "DoubleDown": 7,
@@ -260,7 +268,7 @@ class BGFetcher: ObservableObject {
         }
 
         guard let latest = readings.first else {
-            DispatchQueue.main.async { self.lastError = "No Dexcom readings" }
+            self.fallbackToNightscout(config: config, dexError: "No Dexcom readings")
             return
         }
 
