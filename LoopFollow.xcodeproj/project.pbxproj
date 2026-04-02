@@ -386,7 +386,7 @@
 		FCFEEC9E2486E68E00402A7F /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FCFEEC9D2486E68E00402A7F /* WebKit.framework */; };
 		FCFEECA02488157B00402A7F /* Chart.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFEEC9F2488157B00402A7F /* Chart.swift */; };
 		FCFEECA2248857A600402A7F /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFEECA1248857A600402A7F /* SettingsViewController.swift */; };
-		BB0100000000000B000000AA /* LoopFollowWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BB01000000000001000000AA /* LoopFollowWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB0100000000000B000000AA /* LoopFollowWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BB01000000000001000000AA /* LoopFollowWatch.app */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BB0100000000000F000000AA /* PhoneSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100000000000E000000AA /* PhoneSessionManager.swift */; };
 /* End PBXBuildFile section */
 
@@ -2247,6 +2247,9 @@
 		};
 		BB0100000000000C000000AA /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
 			target = BB01000000000003000000AA /* LoopFollowWatch */;
 			targetProxy = BB0100000000000D000000AA /* PBXContainerItemProxy */;
 		};
