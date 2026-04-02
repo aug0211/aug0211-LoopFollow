@@ -159,7 +159,10 @@ struct SettingsMenuView: View {
             Picker("Units",
                    selection: Binding(
                        get: { Storage.shared.units.value },
-                       set: { Storage.shared.units.value = $0 }
+                       set: {
+                           Storage.shared.units.value = $0
+                           PhoneSessionManager.shared.sendConfig()
+                       }
                    )) {
                 Text("mg/dL").tag("mg/dL")
                 Text("mmol/L").tag("mmol/L")

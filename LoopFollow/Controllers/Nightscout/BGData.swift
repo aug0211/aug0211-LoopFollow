@@ -272,6 +272,8 @@ extension MainViewController {
                     )
             }
             Storage.shared.lastBGChecked.value = Date()
+
+            PhoneSessionManager.shared.sendConfig()
         }
     }
 }

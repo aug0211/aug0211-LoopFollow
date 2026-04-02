@@ -110,12 +110,18 @@ struct GraphSettingsView: View {
                     BGPicker(title: "Low BG Line",
                              range: 40 ... 120,
                              value: $lowLine.value)
-                        .onChange(of: lowLine.value) { _ in markDirty() }
+                        .onChange(of: lowLine.value) { _ in
+                            markDirty()
+                            PhoneSessionManager.shared.sendConfig()
+                        }
 
                     BGPicker(title: "High BG Line",
                              range: 120 ... 400,
                              value: $highLine.value)
-                        .onChange(of: highLine.value) { _ in markDirty() }
+                        .onChange(of: highLine.value) { _ in
+                            markDirty()
+                            PhoneSessionManager.shared.sendConfig()
+                        }
                 }
 
                 // ── History window ───────────────────────────────────────────

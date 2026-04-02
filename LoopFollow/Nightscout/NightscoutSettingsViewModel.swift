@@ -19,6 +19,7 @@ class NightscoutSettingsViewModel: ObservableObject {
             if newValue != nightscoutURL {
                 Storage.shared.url.value = newValue
                 triggerCheckStatus()
+                PhoneSessionManager.shared.sendConfig()
             }
         }
     }
@@ -28,6 +29,7 @@ class NightscoutSettingsViewModel: ObservableObject {
             if newValue != nightscoutToken {
                 Storage.shared.token.value = newValue
                 triggerCheckStatus()
+                PhoneSessionManager.shared.sendConfig()
             }
         }
     }

@@ -5,6 +5,7 @@ import CoreData
 import EventKit
 import UIKit
 import UserNotifications
+import WatchConnectivity
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -40,6 +41,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ = BLEManager.shared
         // Ensure VolumeButtonHandler is initialized so it can receive alarm notifications
         _ = VolumeButtonHandler.shared
+
+        PhoneSessionManager.shared.startSession()
 
         // Register for remote notifications
         DispatchQueue.main.async {
