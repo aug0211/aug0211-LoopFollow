@@ -155,30 +155,64 @@ struct WatchMealView: View {
         return formatter.string(from: date)
     }
 
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: 8),
+    ]
+
     @ViewBuilder
     private var entryView: some View {
         Text("Meal")
             .font(.system(size: 14, weight: .semibold))
 
-        // Carbs field
-        fieldButton(label: "Carbs", value: "\(Int(carbs))g", field: .carbs, color: .yellow)
+        LazyVGrid(columns: gridColumns, spacing: 8) {
+            // Top-left: Carbs
+            mealTile(
+                label: "Carbs",
+                value: "\(Int(carbs))g",
+                field: .carbs,
+                onMinus: { carbs = max(carbs - 5, 0) },
+                onPlus: { carbs = min(carbs + 5, config.maxCarbs) }
+            )
 
-        // Protein field (only if enabled)
-        if config.mealWithFatProtein {
-            fieldButton(label: "Protein", value: "\(Int(protein))g", field: .protein, color: .orange)
-            fieldButton(label: "Fat", value: "\(Int(fat))g", field: .fat, color: .orange)
+            // Top-right: Fat
+            if config.mealWithFatProtein {
+                mealTile(
+                    label: "Fat",
+                    value: "\(Int(fat))g",
+                    field: .fat,
+                    onMinus: { fat = max(fat - 5, 0) },
+                    onPlus: { fat = min(fat + 5, config.maxFat) }
+                )
+            }
+
+            // Bottom-left: Protein
+            if config.mealWithFatProtein {
+                mealTile(
+                    label: "Protein",
+                    value: "\(Int(protein))g",
+                    field: .protein,
+                    onMinus: { protein = max(protein - 5, 0) },
+                    onPlus: { protein = min(protein + 5, config.maxProtein) }
+                )
+            }
+
+            // Bottom-right (or next to Carbs when fat/protein hidden): Time
+            mealTile(
+                label: "Time",
+                value: entryTimeText,
+                field: .time,
+                onMinus: { entryTimeOffset = max(entryTimeOffset - 15, -240) },
+                onPlus: { entryTimeOffset = min(entryTimeOffset + 15, 240) }
+            )
         }
 
-        // Entry time field
-        fieldButton(label: "Time", value: entryTimeText, field: .time, color: .blue)
-
-        Text("Tap a field, then scroll crown")
+        Text("Tap a tile, then scroll crown")
             .font(.system(size: 9))
             .foregroundColor(.secondary)
 
         Button("Confirm") {
             if carbs > 0 || protein > 0 || fat > 0 {
-                // Snapshot all values before entering confirm mode
                 confirmedCarbs = Int(carbs)
                 confirmedProtein = Int(protein)
                 confirmedFat = Int(fat)
@@ -192,25 +226,60 @@ struct WatchMealView: View {
     }
 
     @ViewBuilder
-    private func fieldButton(label: String, value: String, field: EditField, color: Color) -> some View {
-        Button {
-            editingField = field
-        } label: {
-            HStack {
-                Text("\(label):")
-                    .font(.system(size: 12))
-                    .foregroundColor(.primary)
-                Spacer()
+    private func mealTile(label: String, value: String, field: EditField, onMinus: @escaping () -> Void, onPlus: @escaping () -> Void) -> some View {
+        let isActive = editingField == field
+        VStack(spacing: 2) {
+            HStack(spacing: 4) {
+                Button {
+                    editingField = field
+                    onMinus()
+                    WKInterfaceDevice.current().play(.click)
+                } label: {
+                    Text("−")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.yellow)
+                        .frame(width: 28, height: 28)
+                        .background(Color.yellow.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
                 Text(value)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(editingField == field ? color : .primary)
+                    .foregroundColor(isActive ? .yellow : .primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                Button {
+                    editingField = field
+                    onPlus()
+                    WKInterfaceDevice.current().play(.click)
+                } label: {
+                    Text("+")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.yellow)
+                        .frame(width: 28, height: 28)
+                        .background(Color.yellow.opacity(0.3))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(editingField == field ? color.opacity(0.15) : Color.clear)
-            .cornerRadius(8)
+
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundColor(.primary)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .background(isActive ? Color.yellow.opacity(0.3) : Color.yellow.opacity(0.15))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.yellow.opacity(isActive ? 0.8 : 0), lineWidth: 2)
+        )
+        .onTapGesture {
+            editingField = field
+        }
     }
 
     private func playHaptic(_ newValue: Int) {

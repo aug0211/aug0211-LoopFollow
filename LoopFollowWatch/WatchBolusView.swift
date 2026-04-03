@@ -42,9 +42,37 @@ struct WatchBolusView: View {
                 Text("💧 Bolus")
                     .font(.system(size: 16, weight: .semibold))
 
-                Text(String(format: "%.2f U", amount))
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundColor(.blue)
+                HStack(spacing: 8) {
+                    Button {
+                        rawCrown = max(rawCrown - 1.0, 0)
+                        WKInterfaceDevice.current().play(.click)
+                    } label: {
+                        Text("−")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.blue)
+                            .frame(width: 44, height: 44)
+                            .background(Color.blue.opacity(0.3))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(String(format: "%.2f U", amount))
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .foregroundColor(.blue)
+
+                    Button {
+                        rawCrown = min(rawCrown + 1.0, config.maxBolus / 0.25)
+                        WKInterfaceDevice.current().play(.click)
+                    } label: {
+                        Text("+")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.blue)
+                            .frame(width: 44, height: 44)
+                            .background(Color.blue.opacity(0.3))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 Text("Max: \(String(format: "%.1f", config.maxBolus))U")
                     .font(.system(size: 11))
