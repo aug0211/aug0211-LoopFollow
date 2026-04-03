@@ -647,7 +647,7 @@ class BGFetcher: ObservableObject {
                     newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
                 }
 
-            case "Temporary Target":
+            case "Temporary Target", "Temp Target":
                 let duration = entry["duration"] as? Double ?? 0
                 if duration > 0 {
                     let targetTop = entry["targetTop"] as? Double ?? 0
@@ -661,7 +661,7 @@ class BGFetcher: ObservableObject {
                     ))
                 }
 
-            case "Override":
+            case "Override", "Temporary Override", "Exercise":
                 let duration = entry["duration"] as? Double ?? 60
                 let percentage = entry["insulinNeedsScaleFactor"] as? Double
                 let endDate = timestamp.addingTimeInterval(duration * 60)
