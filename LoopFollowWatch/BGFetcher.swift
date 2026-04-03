@@ -705,7 +705,8 @@ class BGFetcher: ObservableObject {
                         startDate: newTempTargets[idx].startDate,
                         endDate: startDate,
                         targetTop: newTempTargets[idx].targetTop,
-                        targetBottom: newTempTargets[idx].targetBottom
+                        targetBottom: newTempTargets[idx].targetBottom,
+                        reason: newTempTargets[idx].reason
                     )
                 }
                 continue
