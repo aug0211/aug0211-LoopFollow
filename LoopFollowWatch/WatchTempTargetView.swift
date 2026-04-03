@@ -5,6 +5,7 @@ import SwiftUI
 
 struct WatchTempTargetView: View {
     let config: WatchConfig
+    @ObservedObject var bgFetcher: BGFetcher
     @Environment(\.dismiss) private var dismiss
     @State private var mode: ViewMode = .menu
     @State private var customTarget: Double = 120
@@ -149,22 +150,40 @@ struct WatchTempTargetView: View {
                         .buttonStyle(.plain)
                     }
                 } else {
-                    // Menu mode — Cancel at top
-                    Button {
-                        cancelTarget()
-                    } label: {
-                        Text("Cancel Active Target")
-                            .font(.system(size: 15, weight: .medium))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.red.opacity(0.3))
-                            .cornerRadius(8)
+                    // Active temp target section (only when one is active)
+                    if bgFetcher.loopStatus?.tempTargetActive == true {
+                        Text("Active Temp Target")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let text = bgFetcher.loopStatus?.tempTargetText {
+                            Text(text)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 10)
+                                .background(Color.green.opacity(0.3))
+                                .cornerRadius(8)
+                        }
+
+                        Button {
+                            cancelTarget()
+                        } label: {
+                            Text("Cancel Temp Target")
+                                .font(.system(size: 15, weight: .medium))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.red.opacity(0.3))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider()
                     }
-                    .buttonStyle(.plain)
 
-                    Divider()
-
-                    Text("Temp Target")
+                    Text("Temp Targets")
                         .font(.system(size: 14, weight: .semibold))
 
                     Button {

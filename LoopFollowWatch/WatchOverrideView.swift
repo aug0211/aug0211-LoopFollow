@@ -50,22 +50,40 @@ struct WatchOverrideView: View {
                         cancelOverride()
                     }
                 } else {
-                    // Cancel at the top
-                    Button {
-                        showCancelConfirm = true
-                    } label: {
-                        Text("Cancel Active Override")
-                            .font(.system(size: 15, weight: .medium))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.red.opacity(0.3))
-                            .cornerRadius(8)
+                    // Active override section (only when one is active)
+                    if bgFetcher.loopStatus?.overrideActive == true {
+                        Text("Active Override")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let text = bgFetcher.loopStatus?.overrideText {
+                            Text(text)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 10)
+                                .background(Color.purple.opacity(0.3))
+                                .cornerRadius(8)
+                        }
+
+                        Button {
+                            showCancelConfirm = true
+                        } label: {
+                            Text("Cancel Override")
+                                .font(.system(size: 15, weight: .medium))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.red.opacity(0.3))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider()
                     }
-                    .buttonStyle(.plain)
 
-                    Divider()
-
-                    Text("Overrides")
+                    Text("Available Overrides")
                         .font(.system(size: 14, weight: .semibold))
 
                     if bgFetcher.overridePresets.isEmpty {

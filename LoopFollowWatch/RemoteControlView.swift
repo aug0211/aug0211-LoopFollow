@@ -37,7 +37,7 @@ struct RemoteControlView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    WatchTempTargetView(config: config)
+                    WatchTempTargetView(config: config, bgFetcher: bgFetcher)
                 } label: {
                     RemoteTile(icon: "🎯", label: "Temp", color: .pink)
                 }
