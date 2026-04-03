@@ -63,7 +63,7 @@ struct WatchTempTargetView: View {
             VStack(spacing: 8) {
                 if let result = resultMessage {
                     Text(result)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
                 } else if showConfirm {
@@ -148,11 +148,11 @@ struct WatchTempTargetView: View {
                         cancelTarget()
                     } label: {
                         Text("Cancel Active Target")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .background(Color.red.opacity(0.3))
-                            .cornerRadius(6)
+                            .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
 
@@ -167,11 +167,11 @@ struct WatchTempTargetView: View {
                         showConfirm = true
                     } label: {
                         Text("Exercise: 160 / 3h")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .background(Color.pink.opacity(0.4))
-                            .cornerRadius(6)
+                            .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
 
@@ -181,11 +181,11 @@ struct WatchTempTargetView: View {
                         showConfirm = true
                     } label: {
                         Text("Mealtime: 80 / 2h")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .background(Color.pink.opacity(0.4))
-                            .cornerRadius(6)
+                            .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
 
@@ -196,11 +196,11 @@ struct WatchTempTargetView: View {
                         editingField = .target
                     } label: {
                         Text("Custom...")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .background(Color.pink)
-                            .cornerRadius(6)
+                            .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
                 }

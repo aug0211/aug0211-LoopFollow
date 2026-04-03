@@ -18,7 +18,7 @@ struct WatchOverrideView: View {
             VStack(spacing: 6) {
                 if let result = resultMessage {
                     Text(result)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
                 } else if showConfirm, let override = selectedOverride {
@@ -49,11 +49,11 @@ struct WatchOverrideView: View {
                         showCancelConfirm = true
                     } label: {
                         Text("Cancel Active Override")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .background(Color.red.opacity(0.3))
-                            .cornerRadius(6)
+                            .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
 
@@ -75,18 +75,18 @@ struct WatchOverrideView: View {
                             } label: {
                                 HStack {
                                     Text(preset.name)
-                                        .font(.system(size: 13, weight: .medium))
+                                        .font(.system(size: 15, weight: .medium))
                                     Spacer()
                                     if let pct = preset.percentage {
                                         Text(String(format: "%.0f%%", pct))
-                                            .font(.system(size: 11))
+                                            .font(.system(size: 12))
                                             .foregroundColor(.secondary)
                                     }
                                 }
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 16)
                                 .background(Color.purple.opacity(0.3))
-                                .cornerRadius(6)
+                                .cornerRadius(8)
                             }
                             .buttonStyle(.plain)
                         }

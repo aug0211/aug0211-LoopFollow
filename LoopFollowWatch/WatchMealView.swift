@@ -82,7 +82,7 @@ struct WatchMealView: View {
             VStack(spacing: 4) {
                 if let result = resultMessage {
                     Text(result)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
                 } else if showConfirm {
