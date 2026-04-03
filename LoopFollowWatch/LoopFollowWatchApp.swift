@@ -34,6 +34,7 @@ struct LoopFollowWatchApp: App {
         WindowGroup {
             TabView {
                 ContentView(sessionManager: sessionManager, bgFetcher: bgFetcher)
+                    .edgesIgnoringSafeArea(.vertical)
 
                 if let config = sessionManager.config, config.remoteEnabled {
                     RemoteControlView(config: config, bgFetcher: bgFetcher)

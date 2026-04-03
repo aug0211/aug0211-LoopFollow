@@ -102,7 +102,6 @@ struct ContentView: View {
         ZStack {
             VStack(spacing: 0) {
                 // Row 1: Large BG + trend arrow + delta
-                // Fixed sizes that won't clip or change dynamically
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
                         .font(.system(size: 48, weight: .bold, design: .default))
@@ -132,10 +131,8 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.top, -14)
 
                 // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
-                // Edge-to-edge, no rounded corners
                 HStack(spacing: 0) {
                     if let status = displayStatus {
                         let dataColor: Color = isTimeTravel && !bgFetcher.statusMatchesScroll ? .gray : .white
@@ -156,7 +153,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                .font(.system(size: 14, weight: .medium, design: .default))
+                .font(.system(size: 15, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -188,7 +185,7 @@ struct ContentView: View {
                     Text(bgFetcher.activeSource.isEmpty ? "---" : bgFetcher.activeSource)
                         .foregroundColor(.secondary)
                 }
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .lineLimit(1)
                 .onTapGesture(count: 2) {
                     timeOffset = 0
@@ -209,6 +206,7 @@ struct ContentView: View {
                     }
                 }
             }
+            .padding(.top, 2)
             .opacity(stale ? 0.6 : 1.0)
 
             // Reload overlay

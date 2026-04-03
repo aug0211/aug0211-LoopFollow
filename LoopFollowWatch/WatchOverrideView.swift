@@ -14,14 +14,20 @@ struct WatchOverrideView: View {
     @State private var isError = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 6) {
-                if let result = resultMessage {
+        Group {
+            if let result = resultMessage {
+                VStack {
+                    Spacer()
                     Text(result)
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
-                } else if showConfirm, let override = selectedOverride {
+                    Spacer()
+                }
+            } else {
+        ScrollView {
+            VStack(spacing: 6) {
+                if showConfirm, let override = selectedOverride {
                     Text(override.name)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.purple)
@@ -92,6 +98,8 @@ struct WatchOverrideView: View {
                         }
                     }
                 }
+            }
+        }
             }
         }
     }

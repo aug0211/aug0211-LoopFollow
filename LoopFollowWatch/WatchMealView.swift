@@ -78,17 +78,25 @@ struct WatchMealView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 4) {
-                if let result = resultMessage {
+        Group {
+            if let result = resultMessage {
+                VStack {
+                    Spacer()
                     Text(result)
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
-                } else if showConfirm {
-                    confirmView
-                } else {
-                    entryView
+                    Spacer()
+                }
+            } else {
+                ScrollView {
+                    VStack(spacing: 4) {
+                        if showConfirm {
+                            confirmView
+                        } else {
+                            entryView
+                        }
+                    }
                 }
             }
         }

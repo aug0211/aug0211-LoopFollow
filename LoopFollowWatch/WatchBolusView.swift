@@ -24,10 +24,12 @@ struct WatchBolusView: View {
     var body: some View {
         VStack(spacing: 6) {
             if let result = resultMessage {
+                Spacer()
                 Text(result)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(isError ? .red : .green)
                     .multilineTextAlignment(.center)
+                Spacer()
             } else if showConfirm {
                 Text(String(format: "%.2f U", confirmedAmount))
                     .font(.system(size: 24, weight: .bold, design: .rounded))

@@ -59,14 +59,20 @@ struct WatchTempTargetView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                if let result = resultMessage {
+        Group {
+            if let result = resultMessage {
+                VStack {
+                    Spacer()
                     Text(result)
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
-                } else if showConfirm {
+                    Spacer()
+                }
+            } else {
+        ScrollView {
+            VStack(spacing: 8) {
+                if showConfirm {
                     Text("\(pendingTarget) \(config.units == "mmol/L" ? "mmol/L" : "mg/dL") for \(pendingDuration)m")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.pink)
@@ -204,6 +210,8 @@ struct WatchTempTargetView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
             }
         }
         .focusable(mode == .custom && !showConfirm)
