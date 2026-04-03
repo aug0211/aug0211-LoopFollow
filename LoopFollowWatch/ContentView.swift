@@ -117,18 +117,11 @@ struct ContentView: View {
                     Spacer()
 
                     if !reading.deltaText(units: config.units).isEmpty {
-                        VStack(spacing: 1) {
-                            Text(reading.deltaText(units: config.units))
-                                .font(.system(size: 30, weight: .bold, design: .default))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .fixedSize()
-                            Text(config.units)
-                                .font(.system(size: 11))
-                                .foregroundColor(.white)
-                                .fixedSize()
-                        }
-                        .padding(.top, 4)
+                        Text(reading.deltaText(units: config.units))
+                            .font(.system(size: 36, weight: .bold, design: .default))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .fixedSize()
                     }
                 }
                 .padding(.horizontal, 4)
