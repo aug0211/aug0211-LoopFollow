@@ -615,42 +615,22 @@ class BGFetcher: ObservableObject {
         var newOverrides: [OverrideEntry] = []
 
         for entry in entries {
-            guard let eventType = entry["eventType"] as? String,
-                  let createdAt = entry["created_at"] as? String,
-                  let timestamp = parseDate(createdAt)
+            let createdAt = entry["created_at"] as? String
+            let timestampStr = entry["timestamp"] as? String
+            let dateStr = createdAt ?? timestampStr
+            guard let dateString = dateStr,
+                  let timestamp = parseDate(dateString)
             else { continue }
 
-            switch eventType {
-            case "Correction Bolus", "Bolus Wizard":
-                if let insulin = entry["insulin"] as? Double, insulin > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
-                }
-                if let carbs = entry["carbs"] as? Double, carbs > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
-                }
+            let eventType = (entry["eventType"] as? String ?? "").lowercased()
 
-            case "Meal Bolus":
-                if let insulin = entry["insulin"] as? Double, insulin > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
-                }
-                if let carbs = entry["carbs"] as? Double, carbs > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
-                }
-
-            case "SMB":
-                if let insulin = entry["insulin"] as? Double, insulin > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .smb, value: insulin))
-                }
-
-            case "Carb Correction":
-                if let carbs = entry["carbs"] as? Double, carbs > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
-                }
-
-            case "Temporary Target", "Temp Target":
+            // Detect temp targets by event type OR by presence of target fields
+            let hasTempTargetFields = entry["targetTop"] != nil || entry["targetBottom"] != nil
+            if eventType.contains("temp") && eventType.contains("target") || hasTempTargetFields && eventType.contains("target") {
                 let duration = entry["duration"] as? Double ?? 0
                 if duration > 0 {
-                    let targetTop = entry["targetTop"] as? Double ?? 0
+                    let targetTop = entry["targetTop"] as? Double
+                        ?? entry["target"] as? Double ?? 0
                     let targetBottom = entry["targetBottom"] as? Double ?? targetTop
                     let endDate = timestamp.addingTimeInterval(duration * 60)
                     newTempTargets.append(TempTargetEntry(
@@ -660,19 +640,33 @@ class BGFetcher: ObservableObject {
                         targetBottom: targetBottom
                     ))
                 }
+                continue
+            }
 
-            case "Override", "Temporary Override", "Exercise":
+            // Detect overrides by event type OR by presence of override-related fields
+            let isOverride = eventType.contains("override") || eventType == "exercise"
+                || eventType.contains("profile switch")
+                || entry["insulinNeedsScaleFactor"] != nil
+            if isOverride {
                 let duration = entry["duration"] as? Double ?? 60
-                let percentage = entry["insulinNeedsScaleFactor"] as? Double
+                let scaleFactor = entry["insulinNeedsScaleFactor"] as? Double
+                let pctDirect = entry["percentage"] as? Double
+                let percentage = scaleFactor.map { $0 * 100 } ?? pctDirect
                 let endDate = timestamp.addingTimeInterval(duration * 60)
                 newOverrides.append(OverrideEntry(
                     startDate: timestamp,
                     endDate: endDate,
-                    percentage: percentage.map { $0 * 100 }
+                    percentage: percentage
                 ))
+                continue
+            }
 
-            default:
-                // Check for generic bolus/carb entries
+            // Bolus/carb treatments
+            if eventType.contains("smb") {
+                if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .smb, value: insulin))
+                }
+            } else {
                 if let insulin = entry["insulin"] as? Double, insulin > 0 {
                     newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
                 }
