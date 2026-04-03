@@ -65,6 +65,6 @@ private struct RemoteTile: View {
         .frame(maxWidth: .infinity)
         .frame(height: 72)
         .background(color.opacity(0.3))
-        .cornerRadius(12)
+        .cornerRadius(8)
     }
 }

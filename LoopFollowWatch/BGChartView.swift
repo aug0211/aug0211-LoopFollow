@@ -8,9 +8,13 @@ import WatchKit
 struct BGChartView: View {
     let bgHistory: [BGReading]
     let loopStatus: LoopStatus?
+    let treatments: [Treatment]
+    let tempTargetEntries: [TempTargetEntry]
+    let overrideEntries: [OverrideEntry]
     let config: WatchConfig
     @Binding var timeOffset: Double
     @State private var lastHapticOffset: Double = 0
+    @State private var zoomHours: Double = 3
 
     // timeOffset is in units of 5 minutes (1 BG reading), snapped to integers
     private var snappedOffset: Double {
@@ -18,7 +22,7 @@ struct BGChartView: View {
     }
 
     private var visibleStart: Date {
-        Date().addingTimeInterval(-3 * 3600 + snappedOffset * 300)
+        Date().addingTimeInterval(-zoomHours * 3600 + snappedOffset * 300)
     }
 
     private var visibleEnd: Date {
@@ -36,8 +40,42 @@ struct BGChartView: View {
         config.units == "mmol/L" ? mgdl * 0.0555 : mgdl
     }
 
+    /// Find the closest BG value at a given timestamp for positioning treatment dots
+    private func bgValueAt(timestamp: Date) -> Double {
+        let closest = bgHistory.min(by: {
+            abs($0.timestamp.timeIntervalSince(timestamp)) < abs($1.timestamp.timeIntervalSince(timestamp))
+        })
+        if let closest = closest, abs(closest.timestamp.timeIntervalSince(timestamp)) < 600 {
+            return convertBG(Double(closest.bgValue))
+        }
+        // Default to middle of range if no close BG reading
+        return convertBG(150)
+    }
+
     var body: some View {
         Chart {
+            // Override shading (green)
+            ForEach(overrideEntries) { entry in
+                RectangleMark(
+                    xStart: .value("Start", entry.startDate),
+                    xEnd: .value("End", entry.endDate),
+                    yStart: .value("Low", convertBG(0)),
+                    yEnd: .value("High", convertBG(300))
+                )
+                .foregroundStyle(.green.opacity(0.12))
+            }
+
+            // Temp target shading (purple)
+            ForEach(tempTargetEntries) { entry in
+                RectangleMark(
+                    xStart: .value("Start", entry.startDate),
+                    xEnd: .value("End", entry.endDate),
+                    yStart: .value("Low", convertBG(entry.targetBottom)),
+                    yEnd: .value("High", convertBG(entry.targetTop))
+                )
+                .foregroundStyle(.purple.opacity(0.2))
+            }
+
             // Threshold lines
             RuleMark(y: .value("Low", convertBG(config.lowLine)))
                 .foregroundStyle(.red.opacity(0.4))
@@ -56,22 +94,54 @@ struct BGChartView: View {
                 .foregroundStyle(pointColor(bgValue: reading.bgValue))
             }
 
-            // Prediction lines
+            // Prediction lines — detect OpenAPS by checking for populated prediction arrays
             if let status = loopStatus {
-                if status.isOpenAPS {
-                    predictionMarks(values: status.ztPredictions, start: status.predictionStart, color: Color(red: 0.443, green: 0.380, blue: 0.937))
-                    predictionMarks(values: status.iobPredictions, start: status.predictionStart, color: Color(red: 0.118, green: 0.588, blue: 0.988))
-                    predictionMarks(values: status.cobPredictions, start: status.predictionStart, color: Color(red: 1.0, green: 0.757, blue: 0.271))
-                    predictionMarks(values: status.uamPredictions, start: status.predictionStart, color: Color(red: 1.0, green: 0.518, blue: 0.271))
+                let hasOpenAPSPredictions = status.ztPredictions != nil || status.iobPredictions != nil ||
+                    status.cobPredictions != nil || status.uamPredictions != nil
+                if status.isOpenAPS || hasOpenAPSPredictions {
+                    predictionMarks(values: status.ztPredictions, start: status.predictionStart, color: Color(red: 0.443, green: 0.380, blue: 0.937), series: "ZT")
+                    predictionMarks(values: status.iobPredictions, start: status.predictionStart, color: Color(red: 0.118, green: 0.588, blue: 0.988), series: "IOB")
+                    predictionMarks(values: status.cobPredictions, start: status.predictionStart, color: Color(red: 1.0, green: 0.757, blue: 0.271), series: "COB")
+                    predictionMarks(values: status.uamPredictions, start: status.predictionStart, color: Color(red: 1.0, green: 0.518, blue: 0.271), series: "UAM")
                 } else {
-                    predictionMarks(values: status.predictions, start: status.predictionStart, color: .purple)
+                    predictionMarks(values: status.predictions, start: status.predictionStart, color: .purple, series: "Pred")
+                }
+            }
+
+            // Bolus dots (yellow) with value labels
+            ForEach(treatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
+                PointMark(
+                    x: .value("Time", treatment.timestamp),
+                    y: .value("BG", bgValueAt(timestamp: treatment.timestamp))
+                )
+                .symbolSize(20)
+                .foregroundStyle(.yellow)
+                .annotation(position: .top, spacing: 1) {
+                    Text(String(format: "%.1fU", treatment.value))
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            }
+
+            // Carb dots (yellow) with value labels
+            ForEach(treatments.filter { $0.type == .carbs }) { treatment in
+                PointMark(
+                    x: .value("Time", treatment.timestamp),
+                    y: .value("BG", bgValueAt(timestamp: treatment.timestamp))
+                )
+                .symbolSize(20)
+                .foregroundStyle(.yellow)
+                .annotation(position: .top, spacing: 1) {
+                    Text("\(Int(treatment.value))g")
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(.white)
                 }
             }
         }
         .chartYScale(domain: yDomain)
         .chartXScale(domain: visibleStart ... visibleEnd)
         .chartXAxis {
-            AxisMarks(values: .stride(by: .hour)) { value in
+            AxisMarks(values: .stride(by: .hour)) { _ in
                 AxisGridLine()
                 AxisValueLabel(format: .dateTime.hour(.defaultDigits(amPM: .abbreviated)))
                     .font(.system(size: 8))
@@ -89,13 +159,31 @@ struct BGChartView: View {
             }
         }
         .focusable()
-        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .low, isHapticFeedbackEnabled: false)
+        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .medium, isHapticFeedbackEnabled: false)
         .onChange(of: timeOffset) { newValue in
             let snapped = newValue.rounded()
             if snapped != lastHapticOffset {
                 lastHapticOffset = snapped
                 timeOffset = snapped
                 WKInterfaceDevice.current().play(.click)
+            }
+        }
+        .onTapGesture(count: 3) {
+            // Triple-tap: zoom out (reverse cycle)
+            switch zoomHours {
+            case 3: zoomHours = 0.5
+            case 0.5: zoomHours = 1
+            case 1: zoomHours = 2
+            default: zoomHours = 3
+            }
+        }
+        .onTapGesture(count: 2) {
+            // Double-tap: zoom in cycle
+            switch zoomHours {
+            case 3: zoomHours = 2
+            case 2: zoomHours = 1
+            case 1: zoomHours = 0.5
+            default: zoomHours = 3
             }
         }
     }
@@ -108,12 +196,13 @@ struct BGChartView: View {
     }
 
     @ChartContentBuilder
-    private func predictionMarks(values: [Double]?, start: Date?, color: Color) -> some ChartContent {
+    private func predictionMarks(values: [Double]?, start: Date?, color: Color, series: String) -> some ChartContent {
         if let values = values, let start = start, !values.isEmpty {
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
                 LineMark(
                     x: .value("Time", start.addingTimeInterval(Double(index) * 300)),
-                    y: .value("BG", convertBG(value))
+                    y: .value("BG", convertBG(value)),
+                    series: .value("Series", series)
                 )
                 .foregroundStyle(color.opacity(0.7))
                 .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 2]))

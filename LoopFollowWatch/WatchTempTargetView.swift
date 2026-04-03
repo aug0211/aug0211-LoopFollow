@@ -136,17 +136,17 @@ struct WatchTempTargetView: View {
                         .font(.system(size: 14, weight: .semibold))
 
                     // Presets
-                    Button("Exercise: 150 / 60m") {
-                        pendingTarget = 150
-                        pendingDuration = 60
+                    Button("Exercise: 160 / 3h") {
+                        pendingTarget = 160
+                        pendingDuration = 180
                         showConfirm = true
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.pink.opacity(0.6))
 
-                    Button("Eating Soon: 80 / 60m") {
+                    Button("Mealtime: 80 / 2h") {
                         pendingTarget = 80
-                        pendingDuration = 60
+                        pendingDuration = 120
                         showConfirm = true
                     }
                     .buttonStyle(.borderedProminent)
@@ -188,6 +188,10 @@ struct WatchTempTargetView: View {
         WatchRemoteService.sendTempTarget(target: pendingTarget, duration: pendingDuration, config: config) { success, error in
             if success {
                 resultMessage = "Target set!"
+                WatchRemoteService.postLocalNotification(
+                    title: "Temp Target Set",
+                    body: "\(pendingTarget) mg/dL for \(pendingDuration)m"
+                )
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true
@@ -199,6 +203,10 @@ struct WatchTempTargetView: View {
         WatchRemoteService.cancelTempTarget(config: config) { success, error in
             if success {
                 resultMessage = "Target cancelled"
+                WatchRemoteService.postLocalNotification(
+                    title: "Temp Target Cancelled",
+                    body: "Temp target cancel command sent"
+                )
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

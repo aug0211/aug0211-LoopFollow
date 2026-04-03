@@ -88,6 +88,10 @@ struct WatchOverrideView: View {
         WatchRemoteService.sendOverride(name: name, config: config) { success, error in
             if success {
                 resultMessage = "Override activated!"
+                WatchRemoteService.postLocalNotification(
+                    title: "Override Activated",
+                    body: "\(name) override command sent"
+                )
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true
@@ -99,6 +103,10 @@ struct WatchOverrideView: View {
         WatchRemoteService.cancelOverride(config: config) { success, error in
             if success {
                 resultMessage = "Override cancelled"
+                WatchRemoteService.postLocalNotification(
+                    title: "Override Cancelled",
+                    body: "Override cancel command sent"
+                )
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

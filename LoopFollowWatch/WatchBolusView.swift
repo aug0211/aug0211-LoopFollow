@@ -84,6 +84,10 @@ struct WatchBolusView: View {
         WatchRemoteService.sendBolus(amount: confirmedAmount, config: config) { success, error in
             if success {
                 resultMessage = "Bolus sent!"
+                WatchRemoteService.postLocalNotification(
+                    title: "Bolus Sent",
+                    body: String(format: "%.2fU bolus command sent", confirmedAmount)
+                )
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

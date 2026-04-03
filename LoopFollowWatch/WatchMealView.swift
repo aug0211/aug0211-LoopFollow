@@ -7,73 +7,196 @@ import WatchKit
 struct WatchMealView: View {
     let config: WatchConfig
     @State private var carbs: Double = 0
-    @State private var lastHapticCarbs: Int = 0
-    @State private var confirmedCarbs: Int = 0
+    @State private var protein: Double = 0
+    @State private var fat: Double = 0
+    @State private var entryTimeOffset: Double = 0 // minutes offset from now (-240 to +240)
+    @State private var editingField: EditField = .carbs
+    @State private var lastHapticValue: Int = 0
     @State private var showConfirm = false
     @State private var resultMessage: String?
     @State private var isError = false
 
+    enum EditField {
+        case carbs, protein, fat, time
+    }
+
+    private var entryTime: Date {
+        Date().addingTimeInterval(entryTimeOffset * 60)
+    }
+
+    private var entryTimeText: String {
+        if abs(entryTimeOffset) < 1 { return "Now" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: entryTime)
+    }
+
+    private var crownBinding: Binding<Double> {
+        switch editingField {
+        case .carbs: return $carbs
+        case .protein: return $protein
+        case .fat: return $fat
+        case .time: return $entryTimeOffset
+        }
+    }
+
+    private var crownRange: ClosedRange<Double> {
+        switch editingField {
+        case .carbs: return 0...config.maxCarbs
+        case .protein: return 0...config.maxProtein
+        case .fat: return 0...config.maxFat
+        case .time: return -240...240
+        }
+    }
+
+    private var crownStep: Double {
+        switch editingField {
+        case .time: return 5
+        default: return 1
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 6) {
-            if let result = resultMessage {
-                Text(result)
-                    .font(.system(size: 14))
-                    .foregroundColor(isError ? .red : .green)
-                    .multilineTextAlignment(.center)
-            } else if showConfirm {
-                Text("\(confirmedCarbs)g carbs")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.yellow)
-
-                CrownConfirmView(label: "to send meal") {
-                    sendMeal()
+        ScrollView {
+            VStack(spacing: 4) {
+                if let result = resultMessage {
+                    Text(result)
+                        .font(.system(size: 14))
+                        .foregroundColor(isError ? .red : .green)
+                        .multilineTextAlignment(.center)
+                } else if showConfirm {
+                    confirmView
+                } else {
+                    entryView
                 }
-            } else {
-                Text("🍽️ Meal")
-                    .font(.system(size: 16, weight: .semibold))
-
-                Text("\(Int(carbs))g")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundColor(.yellow)
-
-                Text("Max: \(Int(config.maxCarbs))g")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-
-                Button("Confirm") {
-                    if carbs > 0 {
-                        confirmedCarbs = Int(carbs)
-                        showConfirm = true
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.yellow)
-                .disabled(carbs <= 0)
             }
         }
         .focusable(!showConfirm)
         .digitalCrownRotation(
-            $carbs,
-            from: 0,
-            through: config.maxCarbs,
-            by: 1,
+            crownBinding,
+            from: crownRange.lowerBound,
+            through: crownRange.upperBound,
+            by: crownStep,
             sensitivity: .medium,
             isContinuous: false,
             isHapticFeedbackEnabled: false
         )
-        .onChange(of: carbs) { _ in
-            let current = Int(carbs)
-            if current != lastHapticCarbs {
-                lastHapticCarbs = current
-                WKInterfaceDevice.current().play(.click)
+        .onChange(of: carbs) { _ in playHaptic(Int(carbs)) }
+        .onChange(of: protein) { _ in playHaptic(Int(protein)) }
+        .onChange(of: fat) { _ in playHaptic(Int(fat)) }
+        .onChange(of: entryTimeOffset) { _ in playHaptic(Int(entryTimeOffset)) }
+    }
+
+    @ViewBuilder
+    private var confirmView: some View {
+        VStack(spacing: 2) {
+            Text("\(Int(carbs))g carbs")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(.yellow)
+
+            if config.mealWithFatProtein {
+                if protein > 0 {
+                    Text("\(Int(protein))g protein")
+                        .font(.system(size: 13))
+                        .foregroundColor(.orange)
+                }
+                if fat > 0 {
+                    Text("\(Int(fat))g fat")
+                        .font(.system(size: 13))
+                        .foregroundColor(.orange)
+                }
             }
+
+            if abs(entryTimeOffset) >= 1 {
+                Text("at \(entryTimeText)")
+                    .font(.system(size: 12))
+                    .foregroundColor(.blue)
+            }
+        }
+
+        CrownConfirmView(label: "to send meal") {
+            sendMeal()
+        }
+    }
+
+    @ViewBuilder
+    private var entryView: some View {
+        Text("Meal")
+            .font(.system(size: 14, weight: .semibold))
+
+        // Carbs field
+        fieldButton(label: "Carbs", value: "\(Int(carbs))g", field: .carbs, color: .yellow)
+
+        // Protein field (only if enabled)
+        if config.mealWithFatProtein {
+            fieldButton(label: "Protein", value: "\(Int(protein))g", field: .protein, color: .orange)
+            fieldButton(label: "Fat", value: "\(Int(fat))g", field: .fat, color: .orange)
+        }
+
+        // Entry time field
+        fieldButton(label: "Time", value: entryTimeText, field: .time, color: .blue)
+
+        Text("Tap a field, then scroll crown")
+            .font(.system(size: 9))
+            .foregroundColor(.secondary)
+
+        Button("Confirm") {
+            if carbs > 0 || protein > 0 || fat > 0 {
+                showConfirm = true
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.yellow)
+        .disabled(carbs <= 0 && protein <= 0 && fat <= 0)
+    }
+
+    @ViewBuilder
+    private func fieldButton(label: String, value: String, field: EditField, color: Color) -> some View {
+        Button {
+            editingField = field
+        } label: {
+            HStack {
+                Text("\(label):")
+                    .font(.system(size: 12))
+                    .foregroundColor(.primary)
+                Spacer()
+                Text(value)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(editingField == field ? color : .primary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(editingField == field ? color.opacity(0.15) : Color.clear)
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func playHaptic(_ newValue: Int) {
+        if newValue != lastHapticValue {
+            lastHapticValue = newValue
+            WKInterfaceDevice.current().play(.click)
         }
     }
 
     private func sendMeal() {
-        WatchRemoteService.sendMeal(carbs: confirmedCarbs, config: config) { success, error in
+        let mealProtein = config.mealWithFatProtein && protein > 0 ? Int(protein) : nil
+        let mealFat = config.mealWithFatProtein && fat > 0 ? Int(fat) : nil
+        let mealTime = abs(entryTimeOffset) >= 1 ? entryTime : nil
+
+        WatchRemoteService.sendMeal(
+            carbs: Int(carbs),
+            protein: mealProtein,
+            fat: mealFat,
+            entryTime: mealTime,
+            config: config
+        ) { success, error in
             if success {
                 resultMessage = "Meal sent!"
+                WatchRemoteService.postLocalNotification(
+                    title: "Meal Sent",
+                    body: "\(Int(carbs))g carbs logged"
+                )
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

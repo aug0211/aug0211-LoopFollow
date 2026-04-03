@@ -40,6 +40,9 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             "trcProductionEnv": Storage.shared.productionEnvironment.value,
             "trcUser": Storage.shared.user.value,
             "nsWriteAuth": Storage.shared.nsWriteAuth.value,
+            "mealWithFatProtein": Storage.shared.mealWithFatProtein.value,
+            "maxProtein": Storage.shared.maxProtein.value.doubleValue(for: .gram()),
+            "maxFat": Storage.shared.maxFat.value.doubleValue(for: .gram()),
         ]
     }
 

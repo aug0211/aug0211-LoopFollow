@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var timeOffset: Double = 0
     @State private var showReloadCheck = false
     @State private var timeTravelDebounce: Timer?
-    let minuteTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     /// Whether the user has scrolled away from the present (more than 1 reading back)
     private var isTimeTravel: Bool { timeOffset < -1 }
@@ -57,11 +57,11 @@ struct ContentView: View {
                 }
             }
         }
-        .onReceive(minuteTimer) { _ in now = Date() }
+        .onReceive(secondTimer) { _ in now = Date() }
         .onChange(of: timeOffset) { _ in
             timeTravelDebounce?.invalidate()
             if isTimeTravel, let config = sessionManager.config {
-                timeTravelDebounce = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+                timeTravelDebounce = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { _ in
                     bgFetcher.fetchDeviceStatusAt(config: config, date: viewCenterTime)
                 }
             }
@@ -83,17 +83,17 @@ struct ContentView: View {
         let stale = isTimeTravel ? false : reading.isStale
 
         ZStack {
-            VStack(spacing: 2) {
+            VStack(spacing: 0) {
                 // Row 1: Large BG + trend arrow + delta
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
-                        .font(.system(size: 60, weight: .bold, design: .default))
+                        .font(.system(size: 64, weight: .bold, design: .default))
                         .foregroundColor(bgColor)
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
 
                     Text(reading.direction)
-                        .font(.system(size: 44, weight: .bold, design: .default))
+                        .font(.system(size: 48, weight: .bold, design: .default))
                         .foregroundColor(bgColor)
 
                     Spacer()
@@ -102,63 +102,46 @@ struct ContentView: View {
                         VStack(spacing: 0) {
                             Text(reading.deltaText(units: config.units))
                                 .font(.system(size: 32, weight: .bold, design: .default))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white)
                                 .lineLimit(1)
                             Text(config.units)
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
+                                .font(.system(size: 12))
+                                .foregroundColor(.white)
                         }
                     }
                 }
                 .padding(.horizontal, 4)
 
-                // Row 2: Gray capsule bar — IOB, COB, Basal, checkmark, freshness
-                HStack(spacing: 5) {
+                // Row 2: Gray capsule bar — IOB, COB, Basal (centered)
+                HStack(spacing: 0) {
                     if let status = displayStatus {
+                        let dataColor: Color = isTimeTravel && !bgFetcher.statusMatchesScroll ? .gray : .white
+                        Spacer()
                         if let iob = status.iob {
                             Text(String(format: "%.1fU", iob))
+                                .foregroundColor(dataColor)
                         }
+                        Spacer()
                         if let cob = status.cob {
                             Text(String(format: "%.0fg", cob))
+                                .foregroundColor(dataColor)
                         }
+                        Spacer()
                         if let currentBasal = status.basalRate {
                             let scheduled = bgFetcher.scheduledBasal ?? currentBasal
-                            let diff = currentBasal - scheduled
-                            if abs(diff) < 0.005 {
-                                Text("⏷0")
-                            } else if diff > 0 {
-                                Text(String(format: "⏶%.1f", diff))
-                            } else {
-                                Text(String(format: "⏷%.1f", abs(diff)))
-                            }
+                            Text(String(format: "%.1f\u{2192}%.1fU/h", scheduled, currentBasal))
+                                .foregroundColor(dataColor)
                         }
+                        Spacer()
                     }
-
-                    Spacer()
-
-                    if bgFetcher.lastError == nil {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.green)
-                    } else {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.red)
-                    }
-
-                    Text(freshnessText(reading: reading))
-                        .foregroundColor(isTimeTravel ? .blue : .white)
-                        .onTapGesture(count: 2) {
-                            bgFetcher.reload()
-                        }
                 }
-                .font(.system(size: 13, weight: .medium, design: .default))
+                .font(.system(size: 15, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .padding(.horizontal, 8)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, 6)
                 .padding(.vertical, 4)
-                .background(Color.white.opacity(0.15))
+                .background(Color.white.opacity(0.25))
                 .cornerRadius(10)
                 .padding(.horizontal, 2)
 
@@ -166,37 +149,58 @@ struct ContentView: View {
                 BGChartView(
                     bgHistory: bgFetcher.bgHistory,
                     loopStatus: bgFetcher.loopStatus,
+                    treatments: bgFetcher.treatments,
+                    tempTargetEntries: bgFetcher.tempTargetEntries,
+                    overrideEntries: bgFetcher.overrideEntries,
                     config: config,
                     timeOffset: $timeOffset
                 )
                 .frame(maxHeight: .infinity)
 
+                // Row 4: Loop status + time since (below graph)
+                HStack(spacing: 4) {
+                    if bgFetcher.lastError == nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.green)
+                    } else {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red)
+                    }
+
+                    Text(freshnessText(reading: reading))
+                        .foregroundColor(isTimeTravel ? .blue : .white)
+                }
+                .font(.system(size: 11))
+                .onTapGesture(count: 2) {
+                    timeOffset = 0
+                    bgFetcher.reload()
+                }
+
                 // Footer: Override and/or Temp Target (only when active)
                 if let status = displayStatus {
                     if status.overrideActive, let text = status.overrideText {
                         Text("Override: \(text)")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundColor(.purple)
-                            .padding(.top, 1)
                     }
                     if status.tempTargetActive, let text = status.tempTargetText {
                         Text("Temp Target: \(text)")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundColor(.orange)
-                            .padding(.top, 1)
                     }
                 }
 
                 // Source footer — shows actual data source
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Circle()
                         .fill(bgFetcher.lastError == nil ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 6, height: 6)
                     Text(bgFetcher.activeSource.isEmpty ? "---" : bgFetcher.activeSource)
-                        .font(.system(size: 12))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
-                .padding(.top, 1)
             }
             .opacity(stale ? 0.6 : 1.0)
 

@@ -13,6 +13,12 @@ class BGFetcher: ObservableObject {
     @Published var lastError: String?
     @Published var isReloading = false
     @Published var activeSource: String = "" // "Nightscout" or "Dexcom"
+    @Published var statusMatchesScroll: Bool = true
+
+    // Treatment data for chart display
+    @Published var treatments: [Treatment] = []
+    @Published var tempTargetEntries: [TempTargetEntry] = []
+    @Published var overrideEntries: [OverrideEntry] = []
 
     private var timer: Timer?
     private var dexSessionToken: String?
@@ -49,10 +55,11 @@ class BGFetcher: ObservableObject {
     func fetch(config: WatchConfig) {
         currentConfig = config
 
-        // Always fetch from Nightscout if available (BG entries + devicestatus + profile)
+        // Always fetch from Nightscout if available (BG entries + devicestatus + profile + treatments)
         if config.hasNightscoutURL {
             fetchNightscout(config: config)
             fetchDeviceStatus(config: config)
+            fetchTreatments(config: config)
             if !profileLoaded {
                 fetchProfile(config: config)
             }
@@ -193,6 +200,7 @@ class BGFetcher: ObservableObject {
     }
 
     func fetchDeviceStatusAt(config: WatchConfig, date: Date) {
+        DispatchQueue.main.async { self.statusMatchesScroll = false }
         var components = URLComponents(string: config.nsURL)
         components?.path = "/api/v1/devicestatus.json"
 
@@ -223,7 +231,10 @@ class BGFetcher: ObservableObject {
         guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
               let entries = json as? [[String: Any]],
               let lastEntry = entries.first
-        else { return }
+        else {
+            DispatchQueue.main.async { self.statusMatchesScroll = true }
+            return
+        }
 
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
@@ -309,6 +320,7 @@ class BGFetcher: ObservableObject {
 
         DispatchQueue.main.async {
             self.loopStatus = status
+            self.statusMatchesScroll = true
             self.updateScheduledBasal(for: timestamp)
         }
     }
@@ -406,6 +418,7 @@ class BGFetcher: ObservableObject {
 
         DispatchQueue.main.async {
             self.loopStatus = status
+            self.statusMatchesScroll = true
             self.updateScheduledBasal(for: timestamp)
         }
     }
@@ -550,6 +563,129 @@ class BGFetcher: ObservableObject {
             self.overridePresets = presets
             // Update scheduled basal for current time
             self.updateScheduledBasal(for: Date())
+        }
+    }
+
+    // MARK: - Nightscout Treatments (Bolus, Carbs, Temp Targets, Overrides)
+
+    private func fetchTreatments(config: WatchConfig) {
+        var components = URLComponents(string: config.nsURL)
+        components?.path = "/api/v1/treatments.json"
+
+        let cutoff = Date().addingTimeInterval(-24 * 3600)
+        let formatter = ISO8601DateFormatter()
+
+        var queryItems = [URLQueryItem]()
+        if !config.nsToken.isEmpty {
+            queryItems.append(URLQueryItem(name: "token", value: config.nsToken))
+        }
+        queryItems.append(URLQueryItem(name: "count", value: "100"))
+        queryItems.append(URLQueryItem(name: "find[created_at][$gte]", value: formatter.string(from: cutoff)))
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else { return }
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
+            guard let self = self, error == nil, let data = data else { return }
+            self.parseTreatments(data: data)
+        }.resume()
+    }
+
+    private func parseTreatments(data: Data) {
+        guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
+              let entries = json as? [[String: Any]]
+        else { return }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]
+
+        let fallbackFormatter = ISO8601DateFormatter()
+        fallbackFormatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+
+        func parseDate(_ str: String) -> Date? {
+            formatter.date(from: str) ?? fallbackFormatter.date(from: str)
+        }
+
+        var newTreatments: [Treatment] = []
+        var newTempTargets: [TempTargetEntry] = []
+        var newOverrides: [OverrideEntry] = []
+
+        for entry in entries {
+            guard let eventType = entry["eventType"] as? String,
+                  let createdAt = entry["created_at"] as? String,
+                  let timestamp = parseDate(createdAt)
+            else { continue }
+
+            switch eventType {
+            case "Correction Bolus", "Bolus Wizard":
+                if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
+                }
+                if let carbs = entry["carbs"] as? Double, carbs > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
+                }
+
+            case "Meal Bolus":
+                if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
+                }
+                if let carbs = entry["carbs"] as? Double, carbs > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
+                }
+
+            case "SMB":
+                if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .smb, value: insulin))
+                }
+
+            case "Carb Correction":
+                if let carbs = entry["carbs"] as? Double, carbs > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
+                }
+
+            case "Temporary Target":
+                let duration = entry["duration"] as? Double ?? 0
+                if duration > 0 {
+                    let targetTop = entry["targetTop"] as? Double ?? 0
+                    let targetBottom = entry["targetBottom"] as? Double ?? targetTop
+                    let endDate = timestamp.addingTimeInterval(duration * 60)
+                    newTempTargets.append(TempTargetEntry(
+                        startDate: timestamp,
+                        endDate: endDate,
+                        targetTop: targetTop,
+                        targetBottom: targetBottom
+                    ))
+                }
+
+            case "Override":
+                let duration = entry["duration"] as? Double ?? 60
+                let percentage = entry["insulinNeedsScaleFactor"] as? Double
+                let endDate = timestamp.addingTimeInterval(duration * 60)
+                newOverrides.append(OverrideEntry(
+                    startDate: timestamp,
+                    endDate: endDate,
+                    percentage: percentage.map { $0 * 100 }
+                ))
+
+            default:
+                // Check for generic bolus/carb entries
+                if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
+                }
+                if let carbs = entry["carbs"] as? Double, carbs > 0 {
+                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
+                }
+            }
+        }
+
+        DispatchQueue.main.async {
+            self.treatments = newTreatments
+            self.tempTargetEntries = newTempTargets
+            self.overrideEntries = newOverrides
         }
     }
 

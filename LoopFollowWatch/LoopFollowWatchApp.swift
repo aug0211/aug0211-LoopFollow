@@ -2,11 +2,13 @@
 // LoopFollowWatchApp.swift
 
 import SwiftUI
+import UserNotifications
 import WatchKit
 
 class ExtensionDelegate: NSObject, WKApplicationDelegate {
     func applicationDidFinishLaunching() {
         WatchSessionManager.shared.startSession()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 }
 
