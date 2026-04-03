@@ -119,7 +119,7 @@ struct ContentView: View {
                     if !reading.deltaText(units: config.units).isEmpty {
                         VStack(spacing: 0) {
                             Text(reading.deltaText(units: config.units))
-                                .font(.system(size: 28, weight: .bold, design: .default))
+                                .font(.system(size: 30, weight: .bold, design: .default))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                                 .fixedSize()
@@ -154,13 +154,16 @@ struct ContentView: View {
                         }
                     }
                 }
-                .font(.system(size: 15, weight: .medium, design: .default))
+                .font(.system(size: 16, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 2)
+                .padding(.vertical, 3)
                 .background(Color.white.opacity(0.25))
+
+                // Small spacer so chart y-axis labels don't overlap gray bar
+                Spacer().frame(height: 3)
 
                 // Row 3: Chart — takes all remaining space
                 BGChartView(
