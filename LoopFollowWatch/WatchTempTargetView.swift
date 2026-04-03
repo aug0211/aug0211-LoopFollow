@@ -66,7 +66,7 @@ struct WatchTempTargetView: View {
                         sendTempTarget()
                     }
                 } else if mode == .custom {
-                    Text("🎯 Custom Target")
+                    Text("Custom Target")
                         .font(.system(size: 14, weight: .semibold))
 
                     // Target row — tappable to select for crown editing
@@ -87,7 +87,7 @@ struct WatchTempTargetView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(editingField == .target ? Color.pink.opacity(0.15) : Color.clear)
-                        .cornerRadius(8)
+                        .cornerRadius(4)
                     }
                     .buttonStyle(.plain)
 
@@ -107,7 +107,7 @@ struct WatchTempTargetView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(editingField == .duration ? Color.pink.opacity(0.15) : Color.clear)
-                        .cornerRadius(8)
+                        .cornerRadius(4)
                     }
                     .buttonStyle(.plain)
 
@@ -121,54 +121,83 @@ struct WatchTempTargetView: View {
                         }
                         .font(.system(size: 12))
 
-                        Button("Set") {
+                        Button {
                             pendingTarget = Int(customTarget)
                             pendingDuration = Int(customDuration)
                             showConfirm = true
+                        } label: {
+                            Text("Set")
+                                .font(.system(size: 12, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(Color.pink)
+                                .cornerRadius(4)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.pink)
-                        .font(.system(size: 12))
+                        .buttonStyle(.plain)
                     }
                 } else {
-                    // Menu mode
-                    Text("🎯 Temp Target")
+                    // Menu mode — Cancel at top
+                    Button {
+                        cancelTarget()
+                    } label: {
+                        Text("Cancel Active Target")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.3))
+                            .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+
+                    Text("Temp Target")
                         .font(.system(size: 14, weight: .semibold))
 
-                    // Presets
-                    Button("Exercise: 160 / 3h") {
+                    // Presets — rectangular buttons
+                    Button {
                         pendingTarget = 160
                         pendingDuration = 180
                         showConfirm = true
+                    } label: {
+                        Text("Exercise: 160 / 3h")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.pink.opacity(0.4))
+                            .cornerRadius(4)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.pink.opacity(0.6))
+                    .buttonStyle(.plain)
 
-                    Button("Mealtime: 80 / 2h") {
+                    Button {
                         pendingTarget = 80
                         pendingDuration = 120
                         showConfirm = true
+                    } label: {
+                        Text("Mealtime: 80 / 2h")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.pink.opacity(0.4))
+                            .cornerRadius(4)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.pink.opacity(0.6))
+                    .buttonStyle(.plain)
 
-                    // Custom
                     Divider()
 
-                    Button("Custom...") {
+                    // Custom — rectangular
+                    Button {
                         mode = .custom
                         editingField = .target
+                    } label: {
+                        Text("Custom...")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.pink)
+                            .cornerRadius(4)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.pink)
-
-                    Divider()
-
-                    // Cancel
-                    Button("Cancel Active") {
-                        cancelTarget()
-                    }
-                    .foregroundColor(.red)
+                    .buttonStyle(.plain)
                 }
             }
         }

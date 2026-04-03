@@ -43,7 +43,22 @@ struct WatchOverrideView: View {
                         cancelOverride()
                     }
                 } else {
-                    Text("⚡ Overrides")
+                    // Cancel at the top
+                    Button {
+                        showCancelConfirm = true
+                    } label: {
+                        Text("Cancel Active Override")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.3))
+                            .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+
+                    Text("Overrides")
                         .font(.system(size: 14, weight: .semibold))
 
                     if bgFetcher.overridePresets.isEmpty {
@@ -67,18 +82,14 @@ struct WatchOverrideView: View {
                                             .foregroundColor(.secondary)
                                     }
                                 }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.purple.opacity(0.3))
+                                .cornerRadius(4)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.purple.opacity(0.4))
+                            .buttonStyle(.plain)
                         }
                     }
-
-                    Divider()
-
-                    Button("Cancel Active Override") {
-                        showCancelConfirm = true
-                    }
-                    .foregroundColor(.red)
                 }
             }
         }

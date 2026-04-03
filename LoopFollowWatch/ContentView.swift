@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var timeOffset: Double = 0
     @State private var showReloadCheck = false
     @State private var timeTravelDebounce: Timer?
+    @Environment(\.scenePhase) private var scenePhase
     let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     /// Whether the user has scrolled away from the present (more than 1 reading back)
@@ -66,6 +67,22 @@ struct ContentView: View {
                 }
             }
         }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                refreshIfStale()
+            }
+        }
+    }
+
+    /// Refresh data if the last BG reading is older than 5 minutes
+    private func refreshIfStale() {
+        guard let reading = bgFetcher.currentBG else {
+            bgFetcher.reload()
+            return
+        }
+        if Date().timeIntervalSince(reading.timestamp) > 300 {
+            bgFetcher.reload()
+        }
     }
 
     private var displayReading: BGReading? {
@@ -84,16 +101,16 @@ struct ContentView: View {
 
         ZStack {
             VStack(spacing: 0) {
-                // Row 1: Large BG + trend arrow + delta
+                // Row 1: Large BG + trend arrow + delta — flush to top
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
-                        .font(.system(size: 64, weight: .bold, design: .default))
+                        .font(.system(size: 68, weight: .bold, design: .default))
                         .foregroundColor(bgColor)
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
 
                     Text(reading.direction)
-                        .font(.system(size: 48, weight: .bold, design: .default))
+                        .font(.system(size: 52, weight: .bold, design: .default))
                         .foregroundColor(bgColor)
 
                     Spacer()
@@ -101,22 +118,22 @@ struct ContentView: View {
                     if !reading.deltaText(units: config.units).isEmpty {
                         VStack(spacing: 0) {
                             Text(reading.deltaText(units: config.units))
-                                .font(.system(size: 32, weight: .bold, design: .default))
+                                .font(.system(size: 36, weight: .bold, design: .default))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                             Text(config.units)
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundColor(.white)
                         }
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 2)
 
-                // Row 2: Gray capsule bar — IOB, COB, Basal (centered)
+                // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
+                // Edge-to-edge, no rounded corners
                 HStack(spacing: 0) {
                     if let status = displayStatus {
                         let dataColor: Color = isTimeTravel && !bgFetcher.statusMatchesScroll ? .gray : .white
-                        Spacer()
                         if let iob = status.iob {
                             Text(String(format: "%.1fU", iob))
                                 .foregroundColor(dataColor)
@@ -132,20 +149,20 @@ struct ContentView: View {
                             Text(String(format: "%.1f\u{2192}%.1fU/h", scheduled, currentBasal))
                                 .foregroundColor(dataColor)
                         }
-                        Spacer()
                     }
                 }
                 .font(.system(size: 15, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .minimumScaleFactor(0.5)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
                 .background(Color.white.opacity(0.25))
-                .cornerRadius(10)
-                .padding(.horizontal, 2)
 
-                // Row 3: Chart
+                // Tiny spacer between gray bar and chart
+                Spacer().frame(height: 2)
+
+                // Row 3: Chart — takes all remaining space
                 BGChartView(
                     bgHistory: bgFetcher.bgHistory,
                     loopStatus: bgFetcher.loopStatus,
@@ -161,18 +178,18 @@ struct ContentView: View {
                 HStack(spacing: 4) {
                     if bgFetcher.lastError == nil {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundColor(.green)
                     } else {
                         Image(systemName: "exclamationmark.circle.fill")
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundColor(.red)
                     }
 
                     Text(freshnessText(reading: reading))
                         .foregroundColor(isTimeTravel ? .blue : .white)
                 }
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .onTapGesture(count: 2) {
                     timeOffset = 0
                     bgFetcher.reload()
@@ -192,17 +209,18 @@ struct ContentView: View {
                     }
                 }
 
-                // Source footer — shows actual data source
+                // Source footer
                 HStack(spacing: 4) {
                     Circle()
                         .fill(bgFetcher.lastError == nil ? Color.green : Color.red)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 7, height: 7)
                     Text(bgFetcher.activeSource.isEmpty ? "---" : bgFetcher.activeSource)
-                        .font(.system(size: 10))
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
             }
             .opacity(stale ? 0.6 : 1.0)
+            .edgesIgnoringSafeArea(.all)
 
             // Reload overlay
             if bgFetcher.isReloading {

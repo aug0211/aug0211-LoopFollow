@@ -40,16 +40,19 @@ struct BGChartView: View {
         config.units == "mmol/L" ? mgdl * 0.0555 : mgdl
     }
 
-    /// Find the closest BG value at a given timestamp for positioning treatment dots
-    private func bgValueAt(timestamp: Date) -> Double {
+    /// Find the closest BG value at a given timestamp, offset slightly above for treatment dots
+    private func bgValueAbove(timestamp: Date) -> Double {
         let closest = bgHistory.min(by: {
             abs($0.timestamp.timeIntervalSince(timestamp)) < abs($1.timestamp.timeIntervalSince(timestamp))
         })
+        let baseBG: Double
         if let closest = closest, abs(closest.timestamp.timeIntervalSince(timestamp)) < 600 {
-            return convertBG(Double(closest.bgValue))
+            baseBG = Double(closest.bgValue)
+        } else {
+            baseBG = 150
         }
-        // Default to middle of range if no close BG reading
-        return convertBG(150)
+        // Offset above by ~15 mg/dL so dots sit above the BG point
+        return convertBG(baseBG + 15)
     }
 
     var body: some View {
@@ -108,14 +111,19 @@ struct BGChartView: View {
                 }
             }
 
-            // Bolus dots (yellow) with value labels
+            // Bolus dots — blue upside-down triangles, offset above BG
             ForEach(treatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
                 PointMark(
                     x: .value("Time", treatment.timestamp),
-                    y: .value("BG", bgValueAt(timestamp: treatment.timestamp))
+                    y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
                 )
-                .symbolSize(20)
-                .foregroundStyle(.yellow)
+                .symbol {
+                    Image(systemName: "arrowtriangle.down.fill")
+                        .font(.system(size: 6))
+                        .foregroundColor(.blue)
+                }
+                .symbolSize(30)
+                .foregroundStyle(.blue)
                 .annotation(position: .top, spacing: 1) {
                     Text(String(format: "%.1fU", treatment.value))
                         .font(.system(size: 7, weight: .medium))
@@ -123,13 +131,14 @@ struct BGChartView: View {
                 }
             }
 
-            // Carb dots (yellow) with value labels
+            // Carb dots — yellow circles, offset above BG
             ForEach(treatments.filter { $0.type == .carbs }) { treatment in
                 PointMark(
                     x: .value("Time", treatment.timestamp),
-                    y: .value("BG", bgValueAt(timestamp: treatment.timestamp))
+                    y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
                 )
-                .symbolSize(20)
+                .symbol(.circle)
+                .symbolSize(30)
                 .foregroundStyle(.yellow)
                 .annotation(position: .top, spacing: 1) {
                     Text("\(Int(treatment.value))g")
