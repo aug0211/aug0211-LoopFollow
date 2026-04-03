@@ -131,6 +131,7 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 4)
+                .padding(.top, 26)
 
                 // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
                 HStack(spacing: 0) {
@@ -206,7 +207,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .padding(.top, 2)
+            .padding(.bottom, 10)
             .opacity(stale ? 0.6 : 1.0)
 
             // Reload overlay
