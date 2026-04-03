@@ -117,7 +117,7 @@ struct ContentView: View {
                     Spacer()
 
                     if !reading.deltaText(units: config.units).isEmpty {
-                        VStack(spacing: 0) {
+                        VStack(spacing: 1) {
                             Text(reading.deltaText(units: config.units))
                                 .font(.system(size: 30, weight: .bold, design: .default))
                                 .foregroundColor(.white)
@@ -128,10 +128,11 @@ struct ContentView: View {
                                 .foregroundColor(.white)
                                 .fixedSize()
                         }
+                        .padding(.top, 4)
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.top, 26)
+                .padding(.top, 30)
 
                 // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
                 HStack(spacing: 0) {
@@ -162,8 +163,8 @@ struct ContentView: View {
                 .padding(.vertical, 3)
                 .background(Color.white.opacity(0.25))
 
-                // Small spacer so chart y-axis labels don't overlap gray bar
-                Spacer().frame(height: 3)
+                // Spacer so chart y-axis "300" label doesn't overlap gray bar
+                Spacer().frame(height: 6)
 
                 // Row 3: Chart — takes all remaining space
                 BGChartView(

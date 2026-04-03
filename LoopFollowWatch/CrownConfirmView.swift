@@ -5,7 +5,7 @@ import SwiftUI
 import WatchKit
 
 /// Reusable crown-rotation confirmation component.
-/// User must TAP the wheel icon first (one tap), then scroll the Digital Crown to confirm.
+/// User must TAP the wheel icon once, then scroll the Digital Crown to confirm.
 struct CrownConfirmView: View {
     let label: String
     let onConfirm: () -> Void
@@ -20,44 +20,51 @@ struct CrownConfirmView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            ZStack {
-                // Background ring
-                Circle()
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 6)
-
-                // Progress ring (only visible after tap)
-                if tapped {
-                    Circle()
-                        .trim(from: 0, to: min(progress / fullRotation, 1.0))
-                        .stroke(
-                            confirmed ? Color.green : Color.blue,
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                        .animation(.easeInOut(duration: 0.15), value: progress)
+            Button {
+                if !tapped && !confirmed {
+                    withAnimation { tapped = true }
+                    WKInterfaceDevice.current().play(.click)
                 }
+            } label: {
+                ZStack {
+                    // Background ring
+                    Circle()
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 6)
 
-                // Center content
-                if confirmed {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.green)
-                        .transition(.scale)
-                } else {
-                    VStack(spacing: 2) {
-                        Image(systemName: "digitalcrown.arrow.clockwise")
-                            .font(.system(size: tapped ? 20 : 24))
-                            .foregroundColor(tapped ? .blue : .gray.opacity(0.5))
-                            .rotationEffect(.degrees(tapped ? progress / fullRotation * 360 : 0))
-                        if tapped {
-                            Text("Scroll")
+                    // Progress ring (only visible after tap)
+                    if tapped {
+                        Circle()
+                            .trim(from: 0, to: min(progress / fullRotation, 1.0))
+                            .stroke(
+                                confirmed ? Color.green : Color.blue,
+                                style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+                            .animation(.easeInOut(duration: 0.15), value: progress)
+                    }
+
+                    // Center content
+                    if confirmed {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.green)
+                            .transition(.scale)
+                    } else {
+                        VStack(spacing: 2) {
+                            Image(systemName: "digitalcrown.arrow.clockwise")
+                                .font(.system(size: tapped ? 20 : 24))
+                                .foregroundColor(tapped ? .blue : .gray.opacity(0.5))
+                                .rotationEffect(.degrees(tapped ? progress / fullRotation * 360 : 0))
+                            Text(tapped ? "Scroll" : "Tap")
                                 .font(.system(size: 10))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(tapped ? .secondary : .gray.opacity(0.5))
                         }
                     }
                 }
+                .frame(width: 70, height: 70)
             }
-            .frame(width: 70, height: 70)
+            .buttonStyle(.plain)
+            .disabled(tapped || confirmed)
 
             // Instruction text
             if confirmed {
@@ -70,17 +77,10 @@ struct CrownConfirmView: View {
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
             } else {
-                // Use a Button for reliable single-tap activation
-                Button {
-                    withAnimation { tapped = true }
-                    WKInterfaceDevice.current().play(.click)
-                } label: {
-                    Text("Tap to confirm \(label)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .buttonStyle(.plain)
+                Text("Tap wheel \(label)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .focusable(tapped && !confirmed)
