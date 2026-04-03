@@ -595,85 +595,182 @@ class BGFetcher: ObservableObject {
         }.resume()
     }
 
+    /// Parse a Nightscout date string, matching the iPhone app's NightscoutUtils.parseDate logic.
+    /// Handles: "2024-01-01T12:00:00.000Z", "2024-01-01T12:00:00+00:00", "2024-01-01T12:00:00", etc.
+    private func parseNSDate(_ rawString: String) -> Date? {
+        var s = rawString
+        // Strip trailing Z
+        if s.hasSuffix("Z") { s = String(s.dropLast()) }
+        // Strip timezone offset like +00:00 or -05:00
+        else if let range = s.range(of: "[\\+\\-]\\d{2}:\\d{2}$", options: .regularExpression) {
+            s.removeSubrange(range)
+        }
+        // Strip fractional seconds like .000 or .123456
+        s = s.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        df.locale = Locale(identifier: "en_US")
+        df.timeZone = TimeZone(abbreviation: "UTC")
+        return df.date(from: s)
+    }
+
     private func parseTreatments(data: Data) {
         guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
               let entries = json as? [[String: Any]]
         else { return }
 
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]
+        var newTreatments: [Treatment] = []
+        var tempTargetRaw: [[String: Any]] = []
+        var overrideRaw: [[String: Any]] = []
 
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withFullDate, .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+        // Step 1: Sort entries into categories, matching iPhone app event types exactly
+        for entry in entries {
+            guard let eventType = entry["eventType"] as? String else { continue }
 
-        func parseDate(_ str: String) -> Date? {
-            formatter.date(from: str) ?? fallbackFormatter.date(from: str)
+            switch eventType {
+            case "Correction Bolus", "Bolus", "External Insulin":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr) {
+                    if let automatic = entry["automatic"] as? Bool, automatic {
+                        if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                            newTreatments.append(Treatment(timestamp: ts, type: .smb, value: insulin))
+                        }
+                    } else {
+                        if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                            newTreatments.append(Treatment(timestamp: ts, type: .bolus, value: insulin))
+                        }
+                    }
+                }
+
+            case "SMB":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr),
+                   let insulin = entry["insulin"] as? Double, insulin > 0 {
+                    newTreatments.append(Treatment(timestamp: ts, type: .smb, value: insulin))
+                }
+
+            case "Meal Bolus":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr) {
+                    if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                        newTreatments.append(Treatment(timestamp: ts, type: .bolus, value: insulin))
+                    }
+                    if let carbs = entry["carbs"] as? Double, carbs > 0 {
+                        newTreatments.append(Treatment(timestamp: ts, type: .carbs, value: carbs))
+                    }
+                }
+
+            case "Carb Correction":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr),
+                   let carbs = entry["carbs"] as? Double, carbs > 0 {
+                    newTreatments.append(Treatment(timestamp: ts, type: .carbs, value: carbs))
+                }
+
+            case "Temporary Override", "Exercise":
+                overrideRaw.append(entry)
+
+            case "Temporary Target":
+                tempTargetRaw.append(entry)
+
+            default:
+                // Generic bolus/carb fallback
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr) {
+                    if let insulin = entry["insulin"] as? Double, insulin > 0 {
+                        newTreatments.append(Treatment(timestamp: ts, type: .bolus, value: insulin))
+                    }
+                    if let carbs = entry["carbs"] as? Double, carbs > 0 {
+                        newTreatments.append(Treatment(timestamp: ts, type: .carbs, value: carbs))
+                    }
+                }
+            }
         }
 
-        var newTreatments: [Treatment] = []
+        // Step 2: Process temp targets (matching iPhone app TemporaryTarget.swift)
         var newTempTargets: [TempTargetEntry] = []
-        var newOverrides: [OverrideEntry] = []
-
-        for entry in entries {
-            let createdAt = entry["created_at"] as? String
-            let timestampStr = entry["timestamp"] as? String
-            let dateStr = createdAt ?? timestampStr
-            guard let dateString = dateStr,
-                  let timestamp = parseDate(dateString)
+        for entry in tempTargetRaw.reversed() {
+            guard let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                  let startDate = parseNSDate(dateStr)
             else { continue }
 
-            let eventType = (entry["eventType"] as? String ?? "").lowercased()
+            let duration = (entry["duration"] as? Double ?? 5.0) * 60 // seconds
 
-            // Detect temp targets by event type OR by presence of target fields
-            let hasTempTargetFields = entry["targetTop"] != nil || entry["targetBottom"] != nil
-            if eventType.contains("temp") && eventType.contains("target") || hasTempTargetFields && eventType.contains("target") {
-                let duration = entry["duration"] as? Double ?? 0
-                if duration > 0 {
-                    let targetTop = entry["targetTop"] as? Double
-                        ?? entry["target"] as? Double ?? 0
-                    let targetBottom = entry["targetBottom"] as? Double ?? targetTop
-                    let endDate = timestamp.addingTimeInterval(duration * 60)
-                    newTempTargets.append(TempTargetEntry(
-                        startDate: timestamp,
-                        endDate: endDate,
-                        targetTop: targetTop,
-                        targetBottom: targetBottom
-                    ))
+            // duration 0 = cancellation marker: cap the previous active temp target
+            if duration == 0 {
+                let cancelTime = startDate.timeIntervalSince1970
+                if let idx = newTempTargets.lastIndex(where: { $0.endDate.timeIntervalSince1970 > cancelTime }) {
+                    newTempTargets[idx] = TempTargetEntry(
+                        startDate: newTempTargets[idx].startDate,
+                        endDate: startDate,
+                        targetTop: newTempTargets[idx].targetTop,
+                        targetBottom: newTempTargets[idx].targetBottom
+                    )
                 }
                 continue
             }
 
-            // Detect overrides by event type OR by presence of override-related fields
-            let isOverride = eventType.contains("override") || eventType == "exercise"
-                || eventType.contains("profile switch")
-                || entry["insulinNeedsScaleFactor"] != nil
-            if isOverride {
-                let duration = entry["duration"] as? Double ?? 60
-                let scaleFactor = entry["insulinNeedsScaleFactor"] as? Double
-                let pctDirect = entry["percentage"] as? Double
-                let percentage = scaleFactor.map { $0 * 100 } ?? pctDirect
-                let endDate = timestamp.addingTimeInterval(duration * 60)
-                newOverrides.append(OverrideEntry(
-                    startDate: timestamp,
-                    endDate: endDate,
-                    percentage: percentage
-                ))
-                continue
-            }
+            if duration < 300 { continue } // skip < 5 min
 
-            // Bolus/carb treatments
-            if eventType.contains("smb") {
-                if let insulin = entry["insulin"] as? Double, insulin > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .smb, value: insulin))
-                }
+            let low = entry["targetBottom"] as? Double
+            let high = entry["targetTop"] as? Double
+            guard let targetValue = low ?? high else { continue }
+
+            let endDate = startDate.addingTimeInterval(duration)
+            newTempTargets.append(TempTargetEntry(
+                startDate: startDate,
+                endDate: endDate,
+                targetTop: high ?? targetValue,
+                targetBottom: low ?? targetValue
+            ))
+        }
+
+        // Step 3: Process overrides (matching iPhone app Overrides.swift)
+        let sortedOverrides = overrideRaw.sorted { lhs, rhs in
+            guard let ls = lhs["timestamp"] as? String ?? lhs["created_at"] as? String,
+                  let rs = rhs["timestamp"] as? String ?? rhs["created_at"] as? String,
+                  let ld = parseNSDate(ls), let rd = parseNSDate(rs)
+            else { return false }
+            return ld < rd
+        }
+
+        var newOverrides: [OverrideEntry] = []
+        let now = Date()
+        let maxEndDate = now.addingTimeInterval(6 * 3600)
+
+        for i in 0 ..< sortedOverrides.count {
+            let e = sortedOverrides[i]
+            guard let dateStr = e["timestamp"] as? String ?? e["created_at"] as? String,
+                  let startDate = parseNSDate(dateStr)
+            else { continue }
+
+            var endDate: Date
+            if (e["durationType"] as? String) == "indefinite" {
+                endDate = maxEndDate
             } else {
-                if let insulin = entry["insulin"] as? Double, insulin > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .bolus, value: insulin))
-                }
-                if let carbs = entry["carbs"] as? Double, carbs > 0 {
-                    newTreatments.append(Treatment(timestamp: timestamp, type: .carbs, value: carbs))
+                let durationMin = e["duration"] as? Double ?? 5
+                endDate = startDate.addingTimeInterval(durationMin * 60)
+            }
+
+            // Cap at next override start to prevent overlap
+            if i + 1 < sortedOverrides.count,
+               let nextDateStr = sortedOverrides[i + 1]["timestamp"] as? String ?? sortedOverrides[i + 1]["created_at"] as? String,
+               let nextStart = parseNSDate(nextDateStr) {
+                if endDate > nextStart.addingTimeInterval(-60) {
+                    endDate = nextStart.addingTimeInterval(-60)
                 }
             }
+
+            if endDate > maxEndDate { endDate = maxEndDate }
+            if endDate.timeIntervalSince(startDate) < 300 { continue } // skip < 5 min
+
+            let scaleFactor = e["insulinNeedsScaleFactor"] as? Double
+            newOverrides.append(OverrideEntry(
+                startDate: startDate,
+                endDate: endDate,
+                percentage: scaleFactor.map { $0 * 100 }
+            ))
         }
 
         DispatchQueue.main.async {
