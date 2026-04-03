@@ -189,18 +189,20 @@ struct BGChartView: View {
         .onTapGesture(count: 3) {
             // Triple-tap: zoom out (reverse cycle)
             switch zoomHours {
-            case 3: zoomHours = 0.5
+            case 3: zoomHours = 0.25
+            case 0.25: zoomHours = 0.5
             case 0.5: zoomHours = 1
             case 1: zoomHours = 2
             default: zoomHours = 3
             }
         }
         .onTapGesture(count: 2) {
-            // Double-tap: zoom in cycle
+            // Double-tap: zoom in cycle 3h→2h→1h→30m→15m→3h
             switch zoomHours {
             case 3: zoomHours = 2
             case 2: zoomHours = 1
             case 1: zoomHours = 0.5
+            case 0.5: zoomHours = 0.25
             default: zoomHours = 3
             }
         }
