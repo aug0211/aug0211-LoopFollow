@@ -717,12 +717,14 @@ class BGFetcher: ObservableObject {
             let high = entry["targetTop"] as? Double
             guard let targetValue = low ?? high else { continue }
 
+            let reason = entry["reason"] as? String ?? ""
             let endDate = startDate.addingTimeInterval(duration)
             newTempTargets.append(TempTargetEntry(
                 startDate: startDate,
                 endDate: endDate,
                 targetTop: high ?? targetValue,
-                targetBottom: low ?? targetValue
+                targetBottom: low ?? targetValue,
+                reason: reason
             ))
         }
 
@@ -766,10 +768,12 @@ class BGFetcher: ObservableObject {
             if endDate.timeIntervalSince(startDate) < 300 { continue } // skip < 5 min
 
             let scaleFactor = e["insulinNeedsScaleFactor"] as? Double
+            let overrideName = e["notes"] as? String ?? e["reason"] as? String ?? ""
             newOverrides.append(OverrideEntry(
                 startDate: startDate,
                 endDate: endDate,
-                percentage: scaleFactor.map { $0 * 100 }
+                percentage: scaleFactor.map { $0 * 100 },
+                name: overrideName
             ))
         }
 

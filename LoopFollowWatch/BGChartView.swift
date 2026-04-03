@@ -59,26 +59,44 @@ struct BGChartView: View {
     var body: some View {
         Chart {
             if showTreatments {
-                // Override shading (green)
+                // Override ticker tape (purple band at bottom: 0-29 mg/dL)
                 ForEach(overrideEntries) { entry in
                     RectangleMark(
                         xStart: .value("Start", entry.startDate),
                         xEnd: .value("End", entry.endDate),
                         yStart: .value("Low", convertBG(0)),
-                        yEnd: .value("High", convertBG(300))
+                        yEnd: .value("High", convertBG(29))
                     )
-                    .foregroundStyle(.green.opacity(0.12))
+                    .foregroundStyle(.purple.opacity(0.6))
+                    .annotation(position: .overlay, alignment: .leading) {
+                        Text(entry.name.isEmpty
+                            ? (entry.percentage.map { String(format: "%.0f%%", $0) } ?? "Override")
+                            : entry.name)
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .padding(.leading, 2)
+                    }
                 }
 
-                // Temp target shading (purple)
+                // Temp target ticker tape (green band: 31-60 mg/dL)
                 ForEach(tempTargetEntries) { entry in
                     RectangleMark(
                         xStart: .value("Start", entry.startDate),
                         xEnd: .value("End", entry.endDate),
-                        yStart: .value("Low", convertBG(entry.targetBottom)),
-                        yEnd: .value("High", convertBG(entry.targetTop))
+                        yStart: .value("Low", convertBG(31)),
+                        yEnd: .value("High", convertBG(60))
                     )
-                    .foregroundStyle(.purple.opacity(0.2))
+                    .foregroundStyle(.green.opacity(0.6))
+                    .annotation(position: .overlay, alignment: .leading) {
+                        Text(entry.reason.isEmpty
+                            ? String(format: "%.0f", entry.targetTop)
+                            : entry.reason)
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .padding(.leading, 2)
+                    }
                 }
             }
 

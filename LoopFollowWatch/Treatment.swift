@@ -20,6 +20,7 @@ struct TempTargetEntry: Identifiable {
     let endDate: Date
     let targetTop: Double
     let targetBottom: Double
+    let reason: String
 }
 
 struct OverrideEntry: Identifiable {
@@ -27,4 +28,5 @@ struct OverrideEntry: Identifiable {
     let startDate: Date
     let endDate: Date
     let percentage: Double?
+    let name: String
 }
