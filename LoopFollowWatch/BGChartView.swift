@@ -15,6 +15,7 @@ struct BGChartView: View {
     @Binding var timeOffset: Double
     @State private var lastHapticOffset: Double = 0
     @State private var zoomHours: Double = 3
+    @AppStorage("showTreatments") private var showTreatments: Bool = false
 
     // timeOffset is in units of 5 minutes (1 BG reading), snapped to integers
     private var snappedOffset: Double {
@@ -57,26 +58,28 @@ struct BGChartView: View {
 
     var body: some View {
         Chart {
-            // Override shading (green)
-            ForEach(overrideEntries) { entry in
-                RectangleMark(
-                    xStart: .value("Start", entry.startDate),
-                    xEnd: .value("End", entry.endDate),
-                    yStart: .value("Low", convertBG(0)),
-                    yEnd: .value("High", convertBG(300))
-                )
-                .foregroundStyle(.green.opacity(0.12))
-            }
+            if showTreatments {
+                // Override shading (green)
+                ForEach(overrideEntries) { entry in
+                    RectangleMark(
+                        xStart: .value("Start", entry.startDate),
+                        xEnd: .value("End", entry.endDate),
+                        yStart: .value("Low", convertBG(0)),
+                        yEnd: .value("High", convertBG(300))
+                    )
+                    .foregroundStyle(.green.opacity(0.12))
+                }
 
-            // Temp target shading (purple)
-            ForEach(tempTargetEntries) { entry in
-                RectangleMark(
-                    xStart: .value("Start", entry.startDate),
-                    xEnd: .value("End", entry.endDate),
-                    yStart: .value("Low", convertBG(entry.targetBottom)),
-                    yEnd: .value("High", convertBG(entry.targetTop))
-                )
-                .foregroundStyle(.purple.opacity(0.2))
+                // Temp target shading (purple)
+                ForEach(tempTargetEntries) { entry in
+                    RectangleMark(
+                        xStart: .value("Start", entry.startDate),
+                        xEnd: .value("End", entry.endDate),
+                        yStart: .value("Low", convertBG(entry.targetBottom)),
+                        yEnd: .value("High", convertBG(entry.targetTop))
+                    )
+                    .foregroundStyle(.purple.opacity(0.2))
+                }
             }
 
             // Threshold lines
@@ -111,39 +114,41 @@ struct BGChartView: View {
                 }
             }
 
-            // Bolus dots — blue upside-down triangles, offset above BG
-            ForEach(treatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
-                PointMark(
-                    x: .value("Time", treatment.timestamp),
-                    y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
-                )
-                .symbol {
-                    Image(systemName: "arrowtriangle.down.fill")
-                        .font(.system(size: 6))
-                        .foregroundColor(.blue)
+            if showTreatments {
+                // Bolus dots — blue upside-down triangles, offset above BG
+                ForEach(treatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
+                    PointMark(
+                        x: .value("Time", treatment.timestamp),
+                        y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
+                    )
+                    .symbol {
+                        Image(systemName: "arrowtriangle.down.fill")
+                            .font(.system(size: 6))
+                            .foregroundColor(.blue)
+                    }
+                    .symbolSize(30)
+                    .foregroundStyle(.blue)
+                    .annotation(position: .top, spacing: 1) {
+                        Text(String(format: "%.1fU", treatment.value))
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundColor(.white)
+                    }
                 }
-                .symbolSize(30)
-                .foregroundStyle(.blue)
-                .annotation(position: .top, spacing: 1) {
-                    Text(String(format: "%.1fU", treatment.value))
-                        .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(.white)
-                }
-            }
 
-            // Carb dots — yellow circles, offset above BG
-            ForEach(treatments.filter { $0.type == .carbs }) { treatment in
-                PointMark(
-                    x: .value("Time", treatment.timestamp),
-                    y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
-                )
-                .symbol(.circle)
-                .symbolSize(30)
-                .foregroundStyle(.yellow)
-                .annotation(position: .top, spacing: 1) {
-                    Text("\(Int(treatment.value))g")
-                        .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(.white)
+                // Carb dots — yellow circles, offset above BG
+                ForEach(treatments.filter { $0.type == .carbs }) { treatment in
+                    PointMark(
+                        x: .value("Time", treatment.timestamp),
+                        y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
+                    )
+                    .symbol(.circle)
+                    .symbolSize(30)
+                    .foregroundStyle(.yellow)
+                    .annotation(position: .top, spacing: 1) {
+                        Text("\(Int(treatment.value))g")
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundColor(.white)
+                    }
                 }
             }
         }
@@ -176,6 +181,10 @@ struct BGChartView: View {
                 timeOffset = snapped
                 WKInterfaceDevice.current().play(.click)
             }
+        }
+        .onTapGesture(count: 5) {
+            showTreatments.toggle()
+            WKInterfaceDevice.current().play(.click)
         }
         .onTapGesture(count: 3) {
             // Triple-tap: zoom out (reverse cycle)

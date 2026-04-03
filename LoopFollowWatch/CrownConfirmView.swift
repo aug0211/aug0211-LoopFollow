@@ -22,7 +22,7 @@ struct CrownConfirmView: View {
         VStack(spacing: 6) {
             Button {
                 if !tapped && !confirmed {
-                    withAnimation { tapped = true }
+                    withAnimation(.none) { tapped = true }
                     WKInterfaceDevice.current().play(.click)
                 }
             } label: {
@@ -48,7 +48,6 @@ struct CrownConfirmView: View {
                         Image(systemName: "checkmark")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(.green)
-                            .transition(.scale)
                     } else {
                         VStack(spacing: 2) {
                             Image(systemName: "digitalcrown.arrow.clockwise")
@@ -57,7 +56,7 @@ struct CrownConfirmView: View {
                                 .rotationEffect(.degrees(tapped ? progress / fullRotation * 360 : 0))
                             Text(tapped ? "Scroll" : "Tap")
                                 .font(.system(size: 10))
-                                .foregroundColor(tapped ? .secondary : .gray.opacity(0.5))
+                                .foregroundColor(tapped ? .blue : .gray.opacity(0.5))
                         }
                     }
                 }
@@ -66,22 +65,26 @@ struct CrownConfirmView: View {
             .buttonStyle(.plain)
             .disabled(tapped || confirmed)
 
-            // Instruction text
-            if confirmed {
-                Text("Sent!")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.green)
-            } else if tapped {
-                Text("Scroll crown \(label)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.center)
-            } else {
-                Text("Tap wheel \(label)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+            // Instruction text — fixed height to prevent layout shifts
+            Group {
+                if confirmed {
+                    Text("Sent!")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.green)
+                } else if tapped {
+                    Text("Scroll crown \(label)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+                } else {
+                    Text("Tap wheel \(label)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(height: 16)
+            .multilineTextAlignment(.center)
         }
         .focusable(tapped && !confirmed)
         .digitalCrownRotation(
