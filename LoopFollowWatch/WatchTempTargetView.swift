@@ -5,6 +5,7 @@ import SwiftUI
 
 struct WatchTempTargetView: View {
     let config: WatchConfig
+    @Environment(\.dismiss) private var dismiss
     @State private var mode: ViewMode = .menu
     @State private var customTarget: Double = 120
     @State private var customDuration: Double = 60
@@ -23,8 +24,6 @@ struct WatchTempTargetView: View {
         case target, duration
     }
 
-    /// The value bound to the crown depending on which field is being edited.
-    /// Returns a dummy binding when in confirm mode to prevent accidental changes.
     private var crownBinding: Binding<Double> {
         Binding(
             get: {
@@ -45,11 +44,10 @@ struct WatchTempTargetView: View {
     }
 
     private var crownRange: ClosedRange<Double> {
+        guard !showConfirm else { return 0...1 }
         switch editingField {
-        case .target:
-            return 60...300
-        case .duration:
-            return 5...480
+        case .target: return 60...300
+        case .duration: return 5...480
         }
     }
 
@@ -65,7 +63,7 @@ struct WatchTempTargetView: View {
             VStack(spacing: 8) {
                 if let result = resultMessage {
                     Text(result)
-                        .font(.system(size: 14))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
                 } else if showConfirm {
@@ -80,7 +78,6 @@ struct WatchTempTargetView: View {
                     Text("Custom Target")
                         .font(.system(size: 14, weight: .semibold))
 
-                    // Target row — tappable to select for crown editing
                     Button {
                         editingField = .target
                     } label: {
@@ -98,11 +95,10 @@ struct WatchTempTargetView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(editingField == .target ? Color.pink.opacity(0.15) : Color.clear)
-                        .cornerRadius(4)
+                        .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
 
-                    // Duration row — tappable to select for crown editing
                     Button {
                         editingField = .duration
                     } label: {
@@ -118,7 +114,7 @@ struct WatchTempTargetView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(editingField == .duration ? Color.pink.opacity(0.15) : Color.clear)
-                        .cornerRadius(4)
+                        .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
 
@@ -140,9 +136,9 @@ struct WatchTempTargetView: View {
                             Text("Set")
                                 .font(.system(size: 12, weight: .semibold))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
+                                .padding(.vertical, 8)
                                 .background(Color.pink)
-                                .cornerRadius(4)
+                                .cornerRadius(6)
                         }
                         .buttonStyle(.plain)
                     }
@@ -154,9 +150,9 @@ struct WatchTempTargetView: View {
                         Text("Cancel Active Target")
                             .font(.system(size: 13, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.red.opacity(0.3))
-                            .cornerRadius(4)
+                            .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
 
@@ -165,7 +161,6 @@ struct WatchTempTargetView: View {
                     Text("Temp Target")
                         .font(.system(size: 14, weight: .semibold))
 
-                    // Presets — rectangular buttons
                     Button {
                         pendingTarget = 160
                         pendingDuration = 180
@@ -174,9 +169,9 @@ struct WatchTempTargetView: View {
                         Text("Exercise: 160 / 3h")
                             .font(.system(size: 13, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.pink.opacity(0.4))
-                            .cornerRadius(4)
+                            .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
 
@@ -188,15 +183,14 @@ struct WatchTempTargetView: View {
                         Text("Mealtime: 80 / 2h")
                             .font(.system(size: 13, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.pink.opacity(0.4))
-                            .cornerRadius(4)
+                            .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
 
                     Divider()
 
-                    // Custom — rectangular
                     Button {
                         mode = .custom
                         editingField = .target
@@ -204,9 +198,9 @@ struct WatchTempTargetView: View {
                         Text("Custom...")
                             .font(.system(size: 13, weight: .semibold))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.pink)
-                            .cornerRadius(4)
+                            .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
                 }
@@ -224,6 +218,12 @@ struct WatchTempTargetView: View {
         )
     }
 
+    private func autoDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            dismiss()
+        }
+    }
+
     private func sendTempTarget() {
         WatchRemoteService.sendTempTarget(target: pendingTarget, duration: pendingDuration, config: config) { success, error in
             if success {
@@ -232,6 +232,7 @@ struct WatchTempTargetView: View {
                     title: "Temp Target Set",
                     body: "\(pendingTarget) mg/dL for \(pendingDuration)m"
                 )
+                autoDismiss()
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true
@@ -247,6 +248,7 @@ struct WatchTempTargetView: View {
                     title: "Temp Target Cancelled",
                     body: "Temp target cancel command sent"
                 )
+                autoDismiss()
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

@@ -6,6 +6,7 @@ import WatchKit
 
 struct WatchMealView: View {
     let config: WatchConfig
+    @Environment(\.dismiss) private var dismiss
     @State private var carbs: Double = 0
     @State private var protein: Double = 0
     @State private var fat: Double = 0
@@ -81,7 +82,7 @@ struct WatchMealView: View {
             VStack(spacing: 4) {
                 if let result = resultMessage {
                     Text(result)
-                        .font(.system(size: 14))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
                 } else if showConfirm {
@@ -211,6 +212,12 @@ struct WatchMealView: View {
         }
     }
 
+    private func autoDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            dismiss()
+        }
+    }
+
     private func sendMeal() {
         let mealProtein = config.mealWithFatProtein && confirmedProtein > 0 ? confirmedProtein : nil
         let mealFat = config.mealWithFatProtein && confirmedFat > 0 ? confirmedFat : nil
@@ -229,6 +236,7 @@ struct WatchMealView: View {
                     title: "Meal Sent",
                     body: "\(confirmedCarbs)g carbs logged"
                 )
+                autoDismiss()
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

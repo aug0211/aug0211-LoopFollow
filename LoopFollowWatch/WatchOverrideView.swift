@@ -6,6 +6,7 @@ import SwiftUI
 struct WatchOverrideView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
+    @Environment(\.dismiss) private var dismiss
     @State private var selectedOverride: OverridePreset?
     @State private var showConfirm = false
     @State private var showCancelConfirm = false
@@ -17,7 +18,7 @@ struct WatchOverrideView: View {
             VStack(spacing: 6) {
                 if let result = resultMessage {
                     Text(result)
-                        .font(.system(size: 14))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(isError ? .red : .green)
                         .multilineTextAlignment(.center)
                 } else if showConfirm, let override = selectedOverride {
@@ -50,9 +51,9 @@ struct WatchOverrideView: View {
                         Text("Cancel Active Override")
                             .font(.system(size: 13, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.red.opacity(0.3))
-                            .cornerRadius(4)
+                            .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
 
@@ -83,15 +84,21 @@ struct WatchOverrideView: View {
                                     }
                                 }
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 12)
                                 .background(Color.purple.opacity(0.3))
-                                .cornerRadius(4)
+                                .cornerRadius(6)
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
             }
+        }
+    }
+
+    private func autoDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            dismiss()
         }
     }
 
@@ -103,6 +110,7 @@ struct WatchOverrideView: View {
                     title: "Override Activated",
                     body: "\(name) override command sent"
                 )
+                autoDismiss()
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true
@@ -118,6 +126,7 @@ struct WatchOverrideView: View {
                     title: "Override Cancelled",
                     body: "Override cancel command sent"
                 )
+                autoDismiss()
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

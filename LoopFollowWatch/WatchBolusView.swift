@@ -6,6 +6,7 @@ import WatchKit
 
 struct WatchBolusView: View {
     let config: WatchConfig
+    @Environment(\.dismiss) private var dismiss
     @State private var rawCrown: Double = 0
     @State private var lastHapticAmount: Double = 0
     @State private var confirmedAmount: Double = 0
@@ -24,7 +25,7 @@ struct WatchBolusView: View {
         VStack(spacing: 6) {
             if let result = resultMessage {
                 Text(result)
-                    .font(.system(size: 14))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(isError ? .red : .green)
                     .multilineTextAlignment(.center)
             } else if showConfirm {
@@ -80,6 +81,12 @@ struct WatchBolusView: View {
         }
     }
 
+    private func autoDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            dismiss()
+        }
+    }
+
     private func sendBolus() {
         WatchRemoteService.sendBolus(amount: confirmedAmount, config: config) { success, error in
             if success {
@@ -88,6 +95,7 @@ struct WatchBolusView: View {
                     title: "Bolus Sent",
                     body: String(format: "%.2fU bolus command sent", confirmedAmount)
                 )
+                autoDismiss()
             } else {
                 resultMessage = error ?? "Failed"
                 isError = true

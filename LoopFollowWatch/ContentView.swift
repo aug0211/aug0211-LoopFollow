@@ -132,6 +132,7 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 4)
+                .padding(.top, -6)
 
                 // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
                 // Edge-to-edge, no rounded corners
@@ -163,8 +164,8 @@ struct ContentView: View {
                 .padding(.vertical, 3)
                 .background(Color.white.opacity(0.25))
 
-                // Tiny spacer between gray bar and chart
-                Spacer().frame(height: 2)
+                // Small spacer so treatment labels don't overlap gray bar
+                Spacer().frame(height: 4)
 
                 // Row 3: Chart — takes all remaining space
                 BGChartView(
@@ -222,7 +223,7 @@ struct ContentView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, 2)
             }
             .opacity(stale ? 0.6 : 1.0)
 
