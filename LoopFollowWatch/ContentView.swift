@@ -101,33 +101,37 @@ struct ContentView: View {
 
         ZStack {
             VStack(spacing: 0) {
-                // Row 1: Large BG + trend arrow + delta — flush to top
+                // Row 1: Large BG + trend arrow + delta
+                // Fixed sizes that won't clip or change dynamically
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
-                        .font(.system(size: 68, weight: .bold, design: .default))
+                        .font(.system(size: 48, weight: .bold, design: .default))
                         .foregroundColor(bgColor)
-                        .minimumScaleFactor(0.5)
                         .lineLimit(1)
+                        .fixedSize()
 
                     Text(reading.direction)
-                        .font(.system(size: 52, weight: .bold, design: .default))
+                        .font(.system(size: 36, weight: .bold, design: .default))
                         .foregroundColor(bgColor)
+                        .fixedSize()
 
                     Spacer()
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         VStack(spacing: 0) {
                             Text(reading.deltaText(units: config.units))
-                                .font(.system(size: 36, weight: .bold, design: .default))
+                                .font(.system(size: 28, weight: .bold, design: .default))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
+                                .fixedSize()
                             Text(config.units)
-                                .font(.system(size: 13))
+                                .font(.system(size: 11))
                                 .foregroundColor(.white)
+                                .fixedSize()
                         }
                     }
                 }
-                .padding(.horizontal, 2)
+                .padding(.horizontal, 4)
 
                 // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
                 // Edge-to-edge, no rounded corners
@@ -151,7 +155,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                .font(.system(size: 15, weight: .medium, design: .default))
+                .font(.system(size: 14, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -209,7 +213,7 @@ struct ContentView: View {
                     }
                 }
 
-                // Source footer
+                // Source footer — with bottom padding to clear page dots
                 HStack(spacing: 4) {
                     Circle()
                         .fill(bgFetcher.lastError == nil ? Color.green : Color.red)
@@ -218,9 +222,9 @@ struct ContentView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
+                .padding(.bottom, 4)
             }
             .opacity(stale ? 0.6 : 1.0)
-            .edgesIgnoringSafeArea(.all)
 
             // Reload overlay
             if bgFetcher.isReloading {

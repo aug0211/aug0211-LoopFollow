@@ -16,31 +16,51 @@ struct WatchMealView: View {
     @State private var resultMessage: String?
     @State private var isError = false
 
+    // Snapshot values locked in when user taps Confirm
+    @State private var confirmedCarbs: Int = 0
+    @State private var confirmedProtein: Int = 0
+    @State private var confirmedFat: Int = 0
+    @State private var confirmedTimeOffset: Double = 0
+
     enum EditField {
         case carbs, protein, fat, time
-    }
-
-    private var entryTime: Date {
-        Date().addingTimeInterval(entryTimeOffset * 60)
     }
 
     private var entryTimeText: String {
         if abs(entryTimeOffset) < 1 { return "Now" }
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
+        let entryTime = Date().addingTimeInterval(entryTimeOffset * 60)
         return formatter.string(from: entryTime)
     }
 
-    private var crownBinding: Binding<Double> {
-        switch editingField {
-        case .carbs: return $carbs
-        case .protein: return $protein
-        case .fat: return $fat
-        case .time: return $entryTimeOffset
-        }
+    /// Crown binding that is completely disabled when in confirm mode.
+    /// This prevents accidental value changes during the CrownConfirmView scroll.
+    private var guardedCrownBinding: Binding<Double> {
+        Binding(
+            get: {
+                guard !showConfirm else { return 0 }
+                switch editingField {
+                case .carbs: return carbs
+                case .protein: return protein
+                case .fat: return fat
+                case .time: return entryTimeOffset
+                }
+            },
+            set: { newValue in
+                guard !showConfirm else { return }
+                switch editingField {
+                case .carbs: carbs = newValue
+                case .protein: protein = newValue
+                case .fat: fat = newValue
+                case .time: entryTimeOffset = newValue
+                }
+            }
+        )
     }
 
     private var crownRange: ClosedRange<Double> {
+        guard !showConfirm else { return 0...1 }
         switch editingField {
         case .carbs: return 0...config.maxCarbs
         case .protein: return 0...config.maxProtein
@@ -73,7 +93,7 @@ struct WatchMealView: View {
         }
         .focusable(!showConfirm)
         .digitalCrownRotation(
-            crownBinding,
+            guardedCrownBinding,
             from: crownRange.lowerBound,
             through: crownRange.upperBound,
             by: crownStep,
@@ -81,34 +101,36 @@ struct WatchMealView: View {
             isContinuous: false,
             isHapticFeedbackEnabled: false
         )
-        .onChange(of: carbs) { _ in playHaptic(Int(carbs)) }
-        .onChange(of: protein) { _ in playHaptic(Int(protein)) }
-        .onChange(of: fat) { _ in playHaptic(Int(fat)) }
-        .onChange(of: entryTimeOffset) { _ in playHaptic(Int(entryTimeOffset)) }
+        .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
+        .onChange(of: protein) { _ in if !showConfirm { playHaptic(Int(protein)) } }
+        .onChange(of: fat) { _ in if !showConfirm { playHaptic(Int(fat)) } }
+        .onChange(of: entryTimeOffset) { _ in if !showConfirm { playHaptic(Int(entryTimeOffset)) } }
     }
 
     @ViewBuilder
     private var confirmView: some View {
         VStack(spacing: 2) {
-            Text("\(Int(carbs))g carbs")
+            Text("\(confirmedCarbs)g carbs")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(.yellow)
 
             if config.mealWithFatProtein {
-                if protein > 0 {
-                    Text("\(Int(protein))g protein")
+                if confirmedProtein > 0 {
+                    Text("\(confirmedProtein)g protein")
                         .font(.system(size: 13))
                         .foregroundColor(.orange)
                 }
-                if fat > 0 {
-                    Text("\(Int(fat))g fat")
+                if confirmedFat > 0 {
+                    Text("\(confirmedFat)g fat")
                         .font(.system(size: 13))
                         .foregroundColor(.orange)
                 }
             }
 
-            if abs(entryTimeOffset) >= 1 {
-                Text("at \(entryTimeText)")
+            if abs(confirmedTimeOffset) >= 1 {
+                let confirmedTime = Date().addingTimeInterval(confirmedTimeOffset * 60)
+                let formatter = DateFormatter()
+                Text("at \(formattedTime(confirmedTime, formatter: formatter))")
                     .font(.system(size: 12))
                     .foregroundColor(.blue)
             }
@@ -117,6 +139,11 @@ struct WatchMealView: View {
         CrownConfirmView(label: "to send meal") {
             sendMeal()
         }
+    }
+
+    private func formattedTime(_ date: Date, formatter: DateFormatter) -> String {
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
     }
 
     @ViewBuilder
@@ -142,6 +169,11 @@ struct WatchMealView: View {
 
         Button("Confirm") {
             if carbs > 0 || protein > 0 || fat > 0 {
+                // Snapshot all values before entering confirm mode
+                confirmedCarbs = Int(carbs)
+                confirmedProtein = Int(protein)
+                confirmedFat = Int(fat)
+                confirmedTimeOffset = entryTimeOffset
                 showConfirm = true
             }
         }
@@ -180,12 +212,12 @@ struct WatchMealView: View {
     }
 
     private func sendMeal() {
-        let mealProtein = config.mealWithFatProtein && protein > 0 ? Int(protein) : nil
-        let mealFat = config.mealWithFatProtein && fat > 0 ? Int(fat) : nil
-        let mealTime = abs(entryTimeOffset) >= 1 ? entryTime : nil
+        let mealProtein = config.mealWithFatProtein && confirmedProtein > 0 ? confirmedProtein : nil
+        let mealFat = config.mealWithFatProtein && confirmedFat > 0 ? confirmedFat : nil
+        let mealTime = abs(confirmedTimeOffset) >= 1 ? Date().addingTimeInterval(confirmedTimeOffset * 60) : nil
 
         WatchRemoteService.sendMeal(
-            carbs: Int(carbs),
+            carbs: confirmedCarbs,
             protein: mealProtein,
             fat: mealFat,
             entryTime: mealTime,
@@ -195,7 +227,7 @@ struct WatchMealView: View {
                 resultMessage = "Meal sent!"
                 WatchRemoteService.postLocalNotification(
                     title: "Meal Sent",
-                    body: "\(Int(carbs))g carbs logged"
+                    body: "\(confirmedCarbs)g carbs logged"
                 )
             } else {
                 resultMessage = error ?? "Failed"

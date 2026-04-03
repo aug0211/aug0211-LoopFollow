@@ -23,14 +23,25 @@ struct WatchTempTargetView: View {
         case target, duration
     }
 
-    /// The value bound to the crown depending on which field is being edited
+    /// The value bound to the crown depending on which field is being edited.
+    /// Returns a dummy binding when in confirm mode to prevent accidental changes.
     private var crownBinding: Binding<Double> {
-        switch editingField {
-        case .target:
-            return $customTarget
-        case .duration:
-            return $customDuration
-        }
+        Binding(
+            get: {
+                guard !showConfirm else { return 0 }
+                switch editingField {
+                case .target: return customTarget
+                case .duration: return customDuration
+                }
+            },
+            set: { newValue in
+                guard !showConfirm else { return }
+                switch editingField {
+                case .target: customTarget = newValue
+                case .duration: customDuration = newValue
+                }
+            }
+        )
     }
 
     private var crownRange: ClosedRange<Double> {
