@@ -132,7 +132,7 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.top, -6)
+                .padding(.top, -14)
 
                 // Row 2: Gray bar — IOB (left), COB (center), Basal (right)
                 // Edge-to-edge, no rounded corners
@@ -161,11 +161,8 @@ struct ContentView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 3)
+                .padding(.vertical, 2)
                 .background(Color.white.opacity(0.25))
-
-                // Small spacer so treatment labels don't overlap gray bar
-                Spacer().frame(height: 4)
 
                 // Row 3: Chart — takes all remaining space
                 BGChartView(
@@ -179,22 +176,20 @@ struct ContentView: View {
                 )
                 .frame(maxHeight: .infinity)
 
-                // Row 4: Loop status + time since (below graph)
+                // Row 4: Status + source combined in one row
                 HStack(spacing: 4) {
-                    if bgFetcher.lastError == nil {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.green)
-                    } else {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.red)
-                    }
-
+                    Circle()
+                        .fill(bgFetcher.lastError == nil ? Color.green : Color.red)
+                        .frame(width: 6, height: 6)
                     Text(freshnessText(reading: reading))
                         .foregroundColor(isTimeTravel ? .blue : .white)
+                    Text("·")
+                        .foregroundColor(.secondary)
+                    Text(bgFetcher.activeSource.isEmpty ? "---" : bgFetcher.activeSource)
+                        .foregroundColor(.secondary)
                 }
-                .font(.system(size: 13))
+                .font(.system(size: 11))
+                .lineLimit(1)
                 .onTapGesture(count: 2) {
                     timeOffset = 0
                     bgFetcher.reload()
@@ -204,26 +199,15 @@ struct ContentView: View {
                 if let status = displayStatus {
                     if status.overrideActive, let text = status.overrideText {
                         Text("Override: \(text)")
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                             .foregroundColor(.purple)
                     }
                     if status.tempTargetActive, let text = status.tempTargetText {
                         Text("Temp Target: \(text)")
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                             .foregroundColor(.orange)
                     }
                 }
-
-                // Source footer — with bottom padding to clear page dots
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(bgFetcher.lastError == nil ? Color.green : Color.red)
-                        .frame(width: 7, height: 7)
-                    Text(bgFetcher.activeSource.isEmpty ? "---" : bgFetcher.activeSource)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
-                .padding(.bottom, 2)
             }
             .opacity(stale ? 0.6 : 1.0)
 
