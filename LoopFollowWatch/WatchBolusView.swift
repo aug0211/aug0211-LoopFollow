@@ -137,11 +137,11 @@ struct WatchBolusView: View {
                     Label("\(meal.carbs)g", systemImage: "fork.knife")
                         .foregroundColor(.yellow)
                     if let f = meal.fat, f > 0 {
-                        Text("\(f)g fat")
+                        Label("\(f)g", systemImage: "circle.hexagongrid.fill")
                             .foregroundColor(.orange)
                     }
                     if let p = meal.protein, p > 0 {
-                        Text("\(p)g pro")
+                        Label("\(p)g", systemImage: "figure.strengthtraining.functional")
                             .foregroundColor(.orange)
                     }
                 }
