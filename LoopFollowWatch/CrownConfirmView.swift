@@ -84,7 +84,7 @@ struct CrownConfirmView: View {
             .frame(height: 16)
             .multilineTextAlignment(.center)
         }
-        .focusable(tapped && !confirmed)
+        .focusable()
         .digitalCrownRotation(
             $progress,
             from: 0,
@@ -92,7 +92,7 @@ struct CrownConfirmView: View {
             by: 0.02,
             sensitivity: .medium,
             isContinuous: false,
-            isHapticFeedbackEnabled: false
+            isHapticFeedbackEnabled: true
         )
         .onChange(of: progress) { newValue in
             guard tapped else {

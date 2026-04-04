@@ -231,16 +231,14 @@ struct WatchTempTargetView: View {
         }
             }
         }
-        .focusable(mode == .custom && !showConfirm && resultMessage == nil)
-        .digitalCrownRotation(
-            crownBinding,
+        .modifier(CrownRotationModifier(
+            isActive: mode == .custom && !showConfirm && resultMessage == nil,
+            value: crownBinding,
             from: crownRange.lowerBound,
             through: crownRange.upperBound,
             by: crownStep,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: false
-        )
+            sensitivity: .medium
+        ))
     }
 
     /// Returns the currently active temp target from treatments, or nil if none active.

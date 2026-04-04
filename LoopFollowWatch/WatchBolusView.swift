@@ -96,16 +96,14 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0)
             }
         }
-        .focusable(!showConfirm && resultMessage == nil)
-        .digitalCrownRotation(
-            $rawCrown,
+        .modifier(CrownRotationModifier(
+            isActive: !showConfirm && resultMessage == nil,
+            value: $rawCrown,
             from: 0,
             through: config.maxBolus / 0.25,
             by: 0.01,
-            sensitivity: .low,
-            isContinuous: false,
-            isHapticFeedbackEnabled: false
-        )
+            sensitivity: .low
+        ))
         .onChange(of: rawCrown) { _ in
             let current = amount
             if current != lastHapticAmount {

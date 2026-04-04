@@ -100,16 +100,14 @@ struct WatchMealView: View {
                 }
             }
         }
-        .focusable(!showConfirm && resultMessage == nil)
-        .digitalCrownRotation(
-            guardedCrownBinding,
+        .modifier(CrownRotationModifier(
+            isActive: !showConfirm && resultMessage == nil,
+            value: guardedCrownBinding,
             from: crownRange.lowerBound,
             through: crownRange.upperBound,
             by: crownStep,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: false
-        )
+            sensitivity: .medium
+        ))
         .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
         .onChange(of: protein) { _ in if !showConfirm { playHaptic(Int(protein)) } }
         .onChange(of: fat) { _ in if !showConfirm { playHaptic(Int(fat)) } }
