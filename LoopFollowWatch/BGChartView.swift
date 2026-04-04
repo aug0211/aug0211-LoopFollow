@@ -30,6 +30,29 @@ struct BGChartView: View {
         Date().addingTimeInterval(snappedOffset * 300)
     }
 
+    // Pre-filtered data for visible window only (with small margin)
+    private var visibleBG: [BGReading] {
+        let margin: TimeInterval = 600 // 10-min margin
+        let start = visibleStart.addingTimeInterval(-margin)
+        let end = visibleEnd.addingTimeInterval(margin)
+        return bgHistory.filter { $0.timestamp >= start && $0.timestamp <= end }
+    }
+
+    private var visibleTreatments: [Treatment] {
+        let margin: TimeInterval = 600
+        let start = visibleStart.addingTimeInterval(-margin)
+        let end = visibleEnd.addingTimeInterval(margin)
+        return treatments.filter { $0.timestamp >= start && $0.timestamp <= end }
+    }
+
+    private var visibleOverrides: [OverrideEntry] {
+        return overrideEntries.filter { $0.endDate >= visibleStart && $0.startDate <= visibleEnd }
+    }
+
+    private var visibleTempTargets: [TempTargetEntry] {
+        return tempTargetEntries.filter { $0.endDate >= visibleStart && $0.startDate <= visibleEnd }
+    }
+
     private var yDomain: ClosedRange<Double> {
         if config.units == "mmol/L" {
             return 0 ... 16.7
@@ -43,7 +66,7 @@ struct BGChartView: View {
 
     /// Find the closest BG value at a given timestamp, offset slightly above for treatment dots
     private func bgValueAbove(timestamp: Date) -> Double {
-        let closest = bgHistory.min(by: {
+        let closest = visibleBG.min(by: {
             abs($0.timestamp.timeIntervalSince(timestamp)) < abs($1.timestamp.timeIntervalSince(timestamp))
         })
         let baseBG: Double
@@ -60,7 +83,7 @@ struct BGChartView: View {
         Chart {
             if showTreatments {
                 // Override ticker tape (purple band at bottom: 0-29 mg/dL)
-                ForEach(overrideEntries) { entry in
+                ForEach(visibleOverrides) { entry in
                     RectangleMark(
                         xStart: .value("Start", entry.startDate),
                         xEnd: .value("End", entry.endDate),
@@ -80,7 +103,7 @@ struct BGChartView: View {
                 }
 
                 // Temp target ticker tape (green band: 31-60 mg/dL)
-                ForEach(tempTargetEntries) { entry in
+                ForEach(visibleTempTargets) { entry in
                     RectangleMark(
                         xStart: .value("Start", entry.startDate),
                         xEnd: .value("End", entry.endDate),
@@ -109,7 +132,7 @@ struct BGChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [4, 3]))
 
             // BG history points
-            ForEach(bgHistory, id: \.timestamp) { reading in
+            ForEach(visibleBG, id: \.timestamp) { reading in
                 PointMark(
                     x: .value("Time", reading.timestamp),
                     y: .value("BG", convertBG(Double(reading.bgValue)))
@@ -134,7 +157,7 @@ struct BGChartView: View {
 
             if showTreatments {
                 // Bolus dots — blue upside-down triangles, offset above BG
-                ForEach(treatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
+                ForEach(visibleTreatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
                     PointMark(
                         x: .value("Time", treatment.timestamp),
                         y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
@@ -154,7 +177,7 @@ struct BGChartView: View {
                 }
 
                 // Carb dots — yellow circles, offset above BG
-                ForEach(treatments.filter { $0.type == .carbs }) { treatment in
+                ForEach(visibleTreatments.filter { $0.type == .carbs }) { treatment in
                     PointMark(
                         x: .value("Time", treatment.timestamp),
                         y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
@@ -191,7 +214,7 @@ struct BGChartView: View {
             }
         }
         .focusable()
-        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .medium, isHapticFeedbackEnabled: false)
+        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .high, isContinuous: false, isHapticFeedbackEnabled: false)
         .onChange(of: timeOffset) { newValue in
             let snapped = newValue.rounded()
             if snapped != lastHapticOffset {

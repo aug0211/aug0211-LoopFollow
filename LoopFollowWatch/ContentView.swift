@@ -62,7 +62,7 @@ struct ContentView: View {
         .onChange(of: timeOffset) { _ in
             timeTravelDebounce?.invalidate()
             if isTimeTravel, let config = sessionManager.config {
-                timeTravelDebounce = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { _ in
+                timeTravelDebounce = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { _ in
                     bgFetcher.fetchDeviceStatusAt(config: config, date: viewCenterTime)
                 }
             }
