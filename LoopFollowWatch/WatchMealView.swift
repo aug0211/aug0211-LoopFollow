@@ -92,12 +92,15 @@ struct WatchMealView: View {
                 }
             } else if editingField != nil && !showConfirm {
                 // ── Tile-editing mode ──
-                // No ScrollView here. Crown controls the selected field value.
-                // .digitalCrownRotation() is ONLY in this branch, so it never
-                // poisons the ScrollView branch's native crown scrolling.
-                VStack(spacing: 4) {
-                    entryView
+                // ScrollView for identical layout, but crown modifiers on the
+                // wrapper outside it. .digitalCrownRotation() is ONLY in this
+                // branch, so it never poisons the browse branch's native scrolling.
+                ScrollView {
+                    VStack(spacing: 4) {
+                        entryView
+                    }
                 }
+                .scrollDisabled(true)
                 .focusable()
                 .focused($crownFocused)
                 .digitalCrownRotation(
