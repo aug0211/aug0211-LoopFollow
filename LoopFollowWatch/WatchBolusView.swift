@@ -42,21 +42,7 @@ struct WatchBolusView: View {
                     .multilineTextAlignment(.center)
                 Spacer()
             } else if showConfirm {
-                if let meal = pendingMeal {
-                    HStack(spacing: 4) {
-                        Text("\(meal.carbs)c")
-                        if let f = meal.fat, f > 0 { Text("\(f)f") }
-                        if let p = meal.protein, p > 0 { Text("\(p)p") }
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.yellow)
-                }
-
-                if confirmedAmount > 0 {
-                    Text(String(format: "%.2f U", confirmedAmount))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.blue)
-                }
+                confirmSummary
 
                 CrownConfirmView(label: confirmedAmount > 0 ? "to deliver" : "to send meal") {
                     sendBolusAndMeal()
@@ -134,6 +120,34 @@ struct WatchBolusView: View {
             if current != lastHapticAmount {
                 lastHapticAmount = current
                 WKInterfaceDevice.current().play(.click)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var confirmSummary: some View {
+        VStack(spacing: 2) {
+            if confirmedAmount > 0 {
+                Text(String(format: "%.2f U", confirmedAmount))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.blue)
+            }
+            if let meal = pendingMeal {
+                HStack(spacing: 8) {
+                    Label("\(meal.carbs)g", systemImage: "fork.knife")
+                        .foregroundColor(.yellow)
+                    if let f = meal.fat, f > 0 {
+                        Text("\(f)g fat")
+                            .foregroundColor(.orange)
+                    }
+                    if let p = meal.protein, p > 0 {
+                        Text("\(p)g pro")
+                            .foregroundColor(.orange)
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             }
         }
     }

@@ -6,7 +6,8 @@ import SwiftUI
 struct RemoteControlView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
-    @State private var navPath = NavigationPath()
+    @State private var showBolus = false
+    @State private var showMeal = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -14,17 +15,17 @@ struct RemoteControlView: View {
     ]
 
     var body: some View {
-        NavigationStack(path: $navPath) {
+        NavigationStack {
             LazyVGrid(columns: columns, spacing: 8) {
-                NavigationLink {
-                    WatchBolusView(config: config, bgFetcher: bgFetcher, popToRoot: { navPath = NavigationPath() })
+                Button {
+                    showBolus = true
                 } label: {
                     RemoteTile(icon: "💧", label: "Bolus", color: .blue)
                 }
                 .buttonStyle(.plain)
 
-                NavigationLink {
-                    WatchMealView(config: config, bgFetcher: bgFetcher, popToRoot: { navPath = NavigationPath() })
+                Button {
+                    showMeal = true
                 } label: {
                     RemoteTile(icon: "🍽️", label: "Meal", color: .yellow)
                 }
@@ -46,6 +47,12 @@ struct RemoteControlView: View {
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
+            .navigationDestination(isPresented: $showBolus) {
+                WatchBolusView(config: config, bgFetcher: bgFetcher, popToRoot: { showBolus = false })
+            }
+            .navigationDestination(isPresented: $showMeal) {
+                WatchMealView(config: config, bgFetcher: bgFetcher, popToRoot: { showMeal = false })
+            }
         }
     }
 }
