@@ -16,6 +16,7 @@ struct BGChartView: View {
     @State private var lastHapticOffset: Double = 0
     @State private var zoomHours: Double = 3
     @AppStorage("showTreatments") private var showTreatments: Bool = false
+    @FocusState private var chartFocused: Bool
 
     // timeOffset is in units of 5 minutes (1 BG reading), snapped to integers
     private var snappedOffset: Double {
@@ -214,7 +215,9 @@ struct BGChartView: View {
             }
         }
         .focusable()
+        .focused($chartFocused)
         .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: false)
+        .onAppear { chartFocused = true }
         .onChange(of: timeOffset) { newValue in
             let snapped = newValue.rounded()
             if snapped != lastHapticOffset {
