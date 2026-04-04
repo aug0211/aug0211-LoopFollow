@@ -3,6 +3,7 @@
 
 import Combine
 import Foundation
+import WidgetKit
 
 struct BolusCalculation {
     let bg: Double
@@ -184,6 +185,7 @@ class BGFetcher: ObservableObject {
                 } else {
                     self.lastError = nil
                     self.activeSource = "Nightscout"
+                    self.updateWidgetData()
                 }
             }
         } catch {
@@ -494,6 +496,28 @@ class BGFetcher: ObservableObject {
         }
 
         DispatchQueue.main.async { self.scheduledBasal = scheduled }
+    }
+
+    func updateWidgetData() {
+        guard let bg = currentBG else { return }
+        let cutoff = Date().addingTimeInterval(-3.5 * 3600)
+        let recentHistory = bgHistory.filter { $0.timestamp > cutoff }
+        let points = recentHistory.map { WidgetBGPoint(value: $0.bgValue, timestamp: $0.timestamp) }
+        let data = WidgetData(
+            bgValue: bg.bgValue,
+            direction: bg.direction,
+            delta: bg.delta,
+            bgTimestamp: bg.timestamp,
+            iob: loopStatus?.iob,
+            cob: loopStatus?.cob,
+            basalRate: loopStatus?.basalRate,
+            scheduledBasal: scheduledBasal,
+            history: points,
+            units: currentConfig?.units ?? "mg/dL",
+            updatedAt: Date()
+        )
+        data.save()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func lookupScheduleValue(_ schedule: [(timeAsSeconds: Double, value: Double)]) -> Double? {
@@ -1111,6 +1135,7 @@ class BGFetcher: ObservableObject {
             self.isReloading = false
             self.lastError = nil
             self.activeSource = "Dexcom"
+            self.updateWidgetData()
         }
     }
 
