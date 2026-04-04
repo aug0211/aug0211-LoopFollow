@@ -189,23 +189,7 @@ struct WatchMealView: View {
 
     @ViewBuilder
     private var entryView: some View {
-        Text("Meal")
-            .font(.system(size: 14, weight: .semibold))
-
-        LazyVGrid(columns: gridColumns, spacing: 8) {
-            mealTile(label: "Carbs", value: "\(Int(carbs))g", field: .carbs)
-
-            if config.mealWithFatProtein {
-                mealTile(label: "Fat", value: "\(Int(fat))g", field: .fat)
-                mealTile(label: "Protein", value: "\(Int(protein))g", field: .protein)
-            }
-
-            mealTile(label: "Time", value: entryTimeText, field: .time)
-        }
-
-        // Shared +/- bar for the active field (hidden when no tile selected)
-        if editingField != nil {
-        HStack(spacing: 12) {
+        HStack {
             Button {
                 adjustActiveField(by: -stepSize)
             } label: {
@@ -218,9 +202,12 @@ struct WatchMealView: View {
             }
             .buttonStyle(.plain)
 
-            Text(activeFieldLabel)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.yellow)
+            Spacer()
+
+            Text("Meal")
+                .font(.system(size: 16, weight: .semibold))
+
+            Spacer()
 
             Button {
                 adjustActiveField(by: stepSize)
@@ -234,6 +221,17 @@ struct WatchMealView: View {
             }
             .buttonStyle(.plain)
         }
+        .padding(.horizontal, 20)
+
+        LazyVGrid(columns: gridColumns, spacing: 8) {
+            mealTile(label: "Carbs", value: "\(Int(carbs))g", field: .carbs)
+
+            if config.mealWithFatProtein {
+                mealTile(label: "Fat", value: "\(Int(fat))g", field: .fat)
+                mealTile(label: "Protein", value: "\(Int(protein))g", field: .protein)
+            }
+
+            mealTile(label: "Time", value: entryTimeText, field: .time)
         }
 
         Text("Tap a tile, then scroll crown")
