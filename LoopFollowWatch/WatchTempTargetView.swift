@@ -16,6 +16,7 @@ struct WatchTempTargetView: View {
     @State private var pendingDuration: Int = 0
     @State private var resultMessage: String?
     @State private var isError = false
+    @State private var showCelebration = false
 
     enum ViewMode {
         case menu, custom
@@ -62,13 +63,16 @@ struct WatchTempTargetView: View {
     var body: some View {
         Group {
             if let result = resultMessage {
-                VStack {
-                    Spacer()
-                    Text(result)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(isError ? .red : .green)
-                        .multilineTextAlignment(.center)
-                    Spacer()
+                ZStack {
+                    VStack {
+                        Spacer()
+                        Text(result)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(isError ? .red : .green)
+                            .multilineTextAlignment(.center)
+                        Spacer()
+                    }
+                    CelebrationOverlay(isActive: $showCelebration)
                 }
             } else {
         ScrollView {
@@ -257,6 +261,7 @@ struct WatchTempTargetView: View {
         WatchRemoteService.sendTempTarget(target: pendingTarget, duration: pendingDuration, config: config) { success, error in
             if success {
                 resultMessage = "Target set!"
+                showCelebration = CelebrationOverlay.shouldCelebrate()
                 WatchRemoteService.postLocalNotification(
                     title: "Temp Target Set",
                     body: "\(pendingTarget) mg/dL for \(pendingDuration)m"
@@ -273,6 +278,7 @@ struct WatchTempTargetView: View {
         WatchRemoteService.cancelTempTarget(config: config) { success, error in
             if success {
                 resultMessage = "Target cancelled"
+                showCelebration = CelebrationOverlay.shouldCelebrate()
                 WatchRemoteService.postLocalNotification(
                     title: "Temp Target Cancelled",
                     body: "Temp target cancel command sent"

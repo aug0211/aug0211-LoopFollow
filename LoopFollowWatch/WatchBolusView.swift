@@ -25,6 +25,7 @@ struct WatchBolusView: View {
     @State private var resultMessage: String?
     @State private var isError = false
     @State private var showCalcDetail = false
+    @State private var showCelebration = false
 
     /// The displayed amount, snapped to 0.05U increments
     private var amount: Double {
@@ -36,12 +37,17 @@ struct WatchBolusView: View {
     var body: some View {
         VStack(spacing: 6) {
             if let result = resultMessage {
-                Spacer()
-                Text(result)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(isError ? .red : .green)
-                    .multilineTextAlignment(.center)
-                Spacer()
+                ZStack {
+                    VStack {
+                        Spacer()
+                        Text(result)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(isError ? .red : .green)
+                            .multilineTextAlignment(.center)
+                        Spacer()
+                    }
+                    CelebrationOverlay(isActive: $showCelebration)
+                }
             } else if showConfirm {
                 confirmSummary
 
@@ -210,6 +216,7 @@ struct WatchBolusView: View {
                     sendMeal(meal)
                 } else {
                     resultMessage = "Bolus sent!"
+                    showCelebration = CelebrationOverlay.shouldCelebrate()
                     WatchRemoteService.postLocalNotification(
                         title: "Bolus Sent",
                         body: String(format: "%.2fU bolus command sent", confirmedAmount)
@@ -238,12 +245,14 @@ struct WatchBolusView: View {
             if success {
                 if confirmedAmount > 0 {
                     resultMessage = "Bolus + Meal\nsent!"
+                    showCelebration = CelebrationOverlay.shouldCelebrate()
                     WatchRemoteService.postLocalNotification(
                         title: "Bolus + Meal Sent",
                         body: String(format: "%.2fU bolus + %dg carbs", confirmedAmount, meal.carbs)
                     )
                 } else {
                     resultMessage = "Meal sent!"
+                    showCelebration = CelebrationOverlay.shouldCelebrate()
                     WatchRemoteService.postLocalNotification(
                         title: "Meal Sent",
                         body: "\(meal.carbs)g carbs logged"

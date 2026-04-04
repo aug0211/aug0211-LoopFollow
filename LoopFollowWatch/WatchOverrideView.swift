@@ -12,17 +12,21 @@ struct WatchOverrideView: View {
     @State private var showCancelConfirm = false
     @State private var resultMessage: String?
     @State private var isError = false
+    @State private var showCelebration = false
 
     var body: some View {
         Group {
             if let result = resultMessage {
-                VStack {
-                    Spacer()
-                    Text(result)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(isError ? .red : .green)
-                        .multilineTextAlignment(.center)
-                    Spacer()
+                ZStack {
+                    VStack {
+                        Spacer()
+                        Text(result)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(isError ? .red : .green)
+                            .multilineTextAlignment(.center)
+                        Spacer()
+                    }
+                    CelebrationOverlay(isActive: $showCelebration)
                 }
             } else {
         ScrollView {
@@ -136,6 +140,7 @@ struct WatchOverrideView: View {
         WatchRemoteService.sendOverride(name: name, config: config) { success, error in
             if success {
                 resultMessage = "Override activated!"
+                showCelebration = CelebrationOverlay.shouldCelebrate()
                 WatchRemoteService.postLocalNotification(
                     title: "Override Activated",
                     body: "\(name) override command sent"
@@ -152,6 +157,7 @@ struct WatchOverrideView: View {
         WatchRemoteService.cancelOverride(config: config) { success, error in
             if success {
                 resultMessage = "Override cancelled"
+                showCelebration = CelebrationOverlay.shouldCelebrate()
                 WatchRemoteService.postLocalNotification(
                     title: "Override Cancelled",
                     body: "Override cancel command sent"
