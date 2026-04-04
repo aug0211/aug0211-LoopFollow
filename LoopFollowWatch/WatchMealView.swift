@@ -98,18 +98,17 @@ struct WatchMealView: View {
                             entryView
                         }
                     }
+                    .modifier(CrownRotationModifier(
+                        isActive: editingField != nil && !showConfirm && resultMessage == nil,
+                        value: guardedCrownBinding,
+                        from: crownRange.lowerBound,
+                        through: crownRange.upperBound,
+                        by: crownStep,
+                        sensitivity: .medium
+                    ))
                 }
-                .focusable(editingField == nil && !showConfirm && resultMessage == nil)
             }
         }
-        .modifier(CrownRotationModifier(
-            isActive: editingField != nil && !showConfirm && resultMessage == nil,
-            value: guardedCrownBinding,
-            from: crownRange.lowerBound,
-            through: crownRange.upperBound,
-            by: crownStep,
-            sensitivity: .medium
-        ))
         .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
         .onChange(of: protein) { _ in if !showConfirm { playHaptic(Int(protein)) } }
         .onChange(of: fat) { _ in if !showConfirm { playHaptic(Int(fat)) } }
