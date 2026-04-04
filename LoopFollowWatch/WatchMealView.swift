@@ -81,7 +81,7 @@ struct WatchMealView: View {
 
     var body: some View {
         Group {
-            if editingField != nil && !showBolusStep {
+            if editingField != nil {
                 // ── Tile-editing mode ──
                 // ScrollView for identical layout, but crown modifiers on the
                 // wrapper outside it. .digitalCrownRotation() is ONLY in this
@@ -104,7 +104,7 @@ struct WatchMealView: View {
                     isHapticFeedbackEnabled: false
                 )
                 .onAppear { crownFocused = true }
-            } else if !showBolusStep {
+            } else {
                 // ── Browse mode ──
                 // Plain ScrollView, ZERO crown modifiers anywhere.
                 // Native watchOS crown scrolling works unimpeded.
@@ -116,7 +116,7 @@ struct WatchMealView: View {
             }
         }
         .onChange(of: editingField) { field in
-            if field != nil && !showBolusStep {
+            if field != nil {
                 crownFocused = true
             }
         }
