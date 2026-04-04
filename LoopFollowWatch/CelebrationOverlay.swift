@@ -51,8 +51,9 @@ struct CelebrationOverlay: View {
     private static let counterKey = "celebrationSendCount"
 
     /// Returns true roughly every 5–15 sends (≈10% chance per send).
+    /// TODO: Revert to `Int.random(in: 1...10) == 1` after testing
     static func shouldCelebrate() -> Bool {
-        return Int.random(in: 1...10) == 1
+        return true
     }
 
     // MARK: - Particle Generation
