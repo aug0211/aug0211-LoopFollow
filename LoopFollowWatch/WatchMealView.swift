@@ -90,28 +90,34 @@ struct WatchMealView: View {
                     Spacer()
                 }
             } else {
-                ScrollView {
-                    VStack(spacing: 4) {
-                        if showConfirm {
-                            confirmView
-                        } else {
-                            entryView
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            if showConfirm {
+                                confirmView
+                            } else {
+                                entryView
+                            }
                         }
                     }
-                }
-                .overlay {
-                    if editingField != nil && !showConfirm {
-                        CrownCaptureView(
-                            value: guardedCrownBinding,
-                            from: crownRange.lowerBound,
-                            through: crownRange.upperBound,
-                            by: crownStep,
-                            sensitivity: .medium
-                        )
+                    .onChange(of: editingField) { field in
+                        if field == nil && !showConfirm {
+                            withAnimation {
+                                proxy.scrollTo("confirmButton", anchor: .center)
+                            }
+                        }
                     }
                 }
             }
         }
+        .modifier(CrownRotationModifier(
+            isActive: editingField != nil && !showConfirm && resultMessage == nil,
+            value: guardedCrownBinding,
+            from: crownRange.lowerBound,
+            through: crownRange.upperBound,
+            by: crownStep,
+            sensitivity: .medium
+        ))
         .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
         .onChange(of: protein) { _ in if !showConfirm { playHaptic(Int(protein)) } }
         .onChange(of: fat) { _ in if !showConfirm { playHaptic(Int(fat)) } }
@@ -248,8 +254,9 @@ struct WatchMealView: View {
             }
         }
         .buttonStyle(.borderedProminent)
-        .tint(.yellow)
+        .tint(editingField == nil ? .white : .yellow)
         .disabled(carbs <= 0 && protein <= 0 && fat <= 0)
+        .id("confirmButton")
     }
 
     @ViewBuilder
