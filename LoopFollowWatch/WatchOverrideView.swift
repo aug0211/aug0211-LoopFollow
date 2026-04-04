@@ -50,23 +50,21 @@ struct WatchOverrideView: View {
                         cancelOverride()
                     }
                 } else {
-                    // Active override section (only when one is active)
-                    if bgFetcher.loopStatus?.overrideActive == true {
+                    // Active override section (check both devicestatus and treatments)
+                    if let activeOverride = activeOverrideEntry {
                         Text("Active Override")
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if let text = bgFetcher.loopStatus?.overrideText {
-                            Text(text)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 10)
-                                .background(Color.purple.opacity(0.3))
-                                .cornerRadius(8)
-                        }
+                        Text(activeOverride.name + (activeOverride.percentage.map { String(format: " %.0f%%", $0) } ?? ""))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 10)
+                            .background(Color.purple.opacity(0.3))
+                            .cornerRadius(8)
 
                         Button {
                             showCancelConfirm = true
@@ -120,6 +118,12 @@ struct WatchOverrideView: View {
         }
             }
         }
+    }
+
+    /// Returns the currently active override from treatments, or nil if none active.
+    private var activeOverrideEntry: OverrideEntry? {
+        let now = Date()
+        return bgFetcher.overrideEntries.first { $0.startDate <= now && $0.endDate > now }
     }
 
     private func autoDismiss() {

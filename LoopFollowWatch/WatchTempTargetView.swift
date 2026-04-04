@@ -150,23 +150,21 @@ struct WatchTempTargetView: View {
                         .buttonStyle(.plain)
                     }
                 } else {
-                    // Active temp target section (only when one is active)
-                    if bgFetcher.loopStatus?.tempTargetActive == true {
+                    // Active temp target section (check both devicestatus and treatments)
+                    if let activeTT = activeTempTargetEntry {
                         Text("Active Temp Target")
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if let text = bgFetcher.loopStatus?.tempTargetText {
-                            Text(text)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 10)
-                                .background(Color.green.opacity(0.3))
-                                .cornerRadius(8)
-                        }
+                        Text("\(Int(activeTT.targetBottom))-\(Int(activeTT.targetTop)) mg/dL" + (activeTT.reason.isEmpty ? "" : " (\(activeTT.reason))"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 10)
+                            .background(Color.green.opacity(0.3))
+                            .cornerRadius(8)
 
                         Button {
                             cancelTarget()
@@ -243,6 +241,12 @@ struct WatchTempTargetView: View {
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
+    }
+
+    /// Returns the currently active temp target from treatments, or nil if none active.
+    private var activeTempTargetEntry: TempTargetEntry? {
+        let now = Date()
+        return bgFetcher.tempTargetEntries.first { $0.startDate <= now && $0.endDate > now }
     }
 
     private func autoDismiss() {
