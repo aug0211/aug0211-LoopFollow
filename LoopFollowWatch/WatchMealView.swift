@@ -147,13 +147,13 @@ struct WatchMealView: View {
                 .foregroundColor(.yellow)
 
             if config.mealWithFatProtein {
-                if confirmedProtein > 0 {
-                    Text("\(confirmedProtein)g protein")
+                if confirmedFat > 0 {
+                    Text("\(confirmedFat)g fat")
                         .font(.system(size: 13))
                         .foregroundColor(.orange)
                 }
-                if confirmedFat > 0 {
-                    Text("\(confirmedFat)g fat")
+                if confirmedProtein > 0 {
+                    Text("\(confirmedProtein)g protein")
                         .font(.system(size: 13))
                         .foregroundColor(.orange)
                 }
