@@ -182,47 +182,47 @@ struct CelebrationOverlay: View {
             particles = wave1 + wave2
 
         case .partyEmoji:
-            // Big emoji bouncing in from all edges, two waves
+            // Huge emoji bouncing in from all edges, two waves
             let emojis = ["🎉", "🥳", "🎊", "🪩", "✨", "💫", "⭐️", "🌟", "🎆", "🎇", "🍾", "🥂"]
-            let wave1: [Particle] = (0..<8).map { _ in
+            let wave1: [Particle] = (0..<6).map { _ in
                 let edge = Int.random(in: 0...3)
                 let startX: Double
                 let startY: Double
                 switch edge {
-                case 0: startX = Double.random(in: -100...100); startY = -120
-                case 1: startX = Double.random(in: -100...100); startY = 120
-                case 2: startX = -120; startY = Double.random(in: -80...80)
-                default: startX = 120; startY = Double.random(in: -80...80)
+                case 0: startX = Double.random(in: -100...100); startY = -140
+                case 1: startX = Double.random(in: -100...100); startY = 140
+                case 2: startX = -140; startY = Double.random(in: -80...80)
+                default: startX = 140; startY = Double.random(in: -80...80)
                 }
                 return Particle(
                     x: startX, y: startY,
-                    targetX: Double.random(in: -70...70),
-                    targetY: Double.random(in: -60...60),
-                    size: Double.random(in: 24...36),
-                    rotation: Double.random(in: -45...45),
-                    delay: Double.random(in: 0...0.8),
+                    targetX: Double.random(in: -50...50),
+                    targetY: Double.random(in: -50...50),
+                    size: Double.random(in: 40...56),
+                    rotation: Double.random(in: -30...30),
+                    delay: Double.random(in: 0...0.6),
                     color: .white,
                     emoji: emojis.randomElement()!,
                     wave: 1
                 )
             }
-            let wave2: [Particle] = (0..<6).map { _ in
+            let wave2: [Particle] = (0..<5).map { _ in
                 let edge = Int.random(in: 0...3)
                 let startX: Double
                 let startY: Double
                 switch edge {
-                case 0: startX = Double.random(in: -100...100); startY = -120
-                case 1: startX = Double.random(in: -100...100); startY = 120
-                case 2: startX = -120; startY = Double.random(in: -80...80)
-                default: startX = 120; startY = Double.random(in: -80...80)
+                case 0: startX = Double.random(in: -100...100); startY = -140
+                case 1: startX = Double.random(in: -100...100); startY = 140
+                case 2: startX = -140; startY = Double.random(in: -80...80)
+                default: startX = 140; startY = Double.random(in: -80...80)
                 }
                 return Particle(
                     x: startX, y: startY,
-                    targetX: Double.random(in: -70...70),
-                    targetY: Double.random(in: -60...60),
-                    size: Double.random(in: 28...40),
-                    rotation: Double.random(in: -45...45),
-                    delay: Double.random(in: 0...0.6),
+                    targetX: Double.random(in: -50...50),
+                    targetY: Double.random(in: -50...50),
+                    size: Double.random(in: 44...60),
+                    rotation: Double.random(in: -30...30),
+                    delay: Double.random(in: 0...0.5),
                     color: .white,
                     emoji: emojis.randomElement()!,
                     wave: 2
@@ -322,10 +322,9 @@ struct CelebrationOverlay: View {
                     x: width / 2 + (active ? p.targetX : p.x),
                     y: height / 2 + (active ? p.targetY : p.y)
                 )
-                .scaleEffect(active ? 1.0 : 0.1)
-                .opacity(active ? 0 : 1)
+                .scaleEffect(active ? 1.2 : 0.1)
                 .animation(
-                    .spring(response: 0.7, dampingFraction: 0.5).delay(p.delay),
+                    .spring(response: 0.6, dampingFraction: 0.55).delay(p.delay),
                     value: active
                 )
         }
