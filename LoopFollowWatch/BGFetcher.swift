@@ -537,16 +537,37 @@ class BGFetcher: ObservableObject {
         let target = loopStatus?.currentTarget ?? lookupScheduleValue(targetSchedule) ?? 100
         let iob = loopStatus?.iob ?? 0
         let cob = loopStatus?.cob ?? 0
-        let delta = Double(currentBG?.delta ?? 0)
 
-        let glucoseEffect = (Double(bg) - target) / isf
-        let iobEffect = -iob
+        // Use 15-minute delta: find the BG reading closest to 15 minutes ago
+        let delta: Double = {
+            guard let currentTS = currentBG?.timestamp else { return Double(currentBG?.delta ?? 0) }
+            let target15m = currentTS.addingTimeInterval(-15 * 60)
+            var closest: BGReading?
+            var closestDiff = Double.greatestFiniteMagnitude
+            for reading in bgHistory {
+                let diff = abs(reading.timestamp.timeIntervalSince(target15m))
+                if diff < closestDiff {
+                    closestDiff = diff
+                    closest = reading
+                }
+            }
+            // Only use if within 7.5 minutes of the 15m mark
+            if let prior = closest, let priorBG = prior.bgValue, closestDiff < 7.5 * 60 {
+                return Double(bg - priorBG)
+            }
+            return Double(currentBG?.delta ?? 0)
+        }()
+
+        // Floor-round each component to 0.01 (safety rounding — always rounds down)
+        let glucoseEffect = floor((Double(bg) - target) / isf * 100) / 100
+        let iobEffect = floor(-iob * 100) / 100
         let totalCarbs = cob + pendingCarbs
-        let cobEffect = (cr != nil && cr! > 0) ? totalCarbs / cr! : 0
-        let deltaEffect = delta / isf
+        let cobEffect = (cr != nil && cr! > 0) ? floor(totalCarbs / cr! * 100) / 100 : 0
+        let deltaEffect = floor(delta / isf * 100) / 100
 
         let fullBolus = glucoseEffect + iobEffect + cobEffect + deltaEffect
-        recommendedBolus = max(0, (fullBolus * 20).rounded() / 20) // round to 0.05
+        // Floor-round recommended to nearest 0.05
+        recommendedBolus = max(0, floor(fullBolus * 20) / 20)
 
         bolusCalc = BolusCalculation(
             bg: Double(bg), target: target, isf: isf,
