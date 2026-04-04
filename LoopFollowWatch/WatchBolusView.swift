@@ -6,6 +6,7 @@ import WatchKit
 
 struct WatchBolusView: View {
     let config: WatchConfig
+    @ObservedObject var bgFetcher: BGFetcher
     @Environment(\.dismiss) private var dismiss
     @State private var rawCrown: Double = 0
     @State private var lastHapticAmount: Double = 0
@@ -81,16 +82,12 @@ struct WatchBolusView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Text("Recommended: 0.0U")
+                Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
                     .font(.system(size: 11))
                     .foregroundColor(.blue)
                     .onTapGesture {
-                        // TODO: auto-populate with calculated recommended bolus
+                        rawCrown = min(bgFetcher.recommendedBolus, config.maxBolus) / 0.25
                     }
-
-                Text("Max: \(String(format: "%.1f", config.maxBolus))U")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
 
                 Button("Confirm") {
                     if amount > 0 {

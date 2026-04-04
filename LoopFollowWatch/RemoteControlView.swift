@@ -16,7 +16,7 @@ struct RemoteControlView: View {
         NavigationStack {
             LazyVGrid(columns: columns, spacing: 8) {
                 NavigationLink {
-                    WatchBolusView(config: config)
+                    WatchBolusView(config: config, bgFetcher: bgFetcher)
                 } label: {
                     RemoteTile(icon: "💧", label: "Bolus", color: .blue)
                 }

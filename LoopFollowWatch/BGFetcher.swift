@@ -14,6 +14,7 @@ class BGFetcher: ObservableObject {
     @Published var isReloading = false
     @Published var activeSource: String = "" // "Nightscout" or "Dexcom"
     @Published var statusMatchesScroll: Bool = true
+    @Published var recommendedBolus: Double = 0
 
     // Treatment data for chart display
     @Published var treatments: [Treatment] = []
@@ -24,6 +25,9 @@ class BGFetcher: ObservableObject {
     private var dexSessionToken: String?
     private var profileLoaded = false
     private var basalSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    private var isfSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    private var carbRatioSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    private var targetSchedule: [(timeAsSeconds: Double, value: Double)] = []
     private var profileTimezone: TimeZone = .current
 
     private let dexcomUserAgent = "Dexcom Share/3.0.2.11 CFNetwork/711.2.23 Darwin/14.0.0"
@@ -255,6 +259,7 @@ class BGFetcher: ObservableObject {
         var overrideText: String?
         var predictions: [Double]?
         var predictionStart: Date?
+        var recommendedBolus: Double?
 
         // Timestamp
         let timestamp: Date
@@ -289,6 +294,11 @@ class BGFetcher: ObservableObject {
             predictionStart = timestamp
         }
 
+        // Recommended Bolus
+        if let recBolus = loopRecord["recommendedBolus"] as? Double {
+            recommendedBolus = recBolus
+        }
+
         // Override (top-level in devicestatus for Loop)
         if let overrideData = entry["override"] as? [String: Any],
            let isActive = overrideData["active"] as? Bool, isActive {
@@ -315,13 +325,15 @@ class BGFetcher: ObservableObject {
             ztPredictions: nil, iobPredictions: nil,
             cobPredictions: nil, uamPredictions: nil,
             isOpenAPS: false,
-            tempTargetActive: false, tempTargetText: nil
+            tempTargetActive: false, tempTargetText: nil,
+            recommendedBolus: recommendedBolus, isf: nil, carbRatio: nil, currentTarget: nil
         )
 
         DispatchQueue.main.async {
             self.loopStatus = status
             self.statusMatchesScroll = true
             self.updateScheduledBasal(for: timestamp)
+            self.updateRecommendedBolus()
         }
     }
 
@@ -336,6 +348,9 @@ class BGFetcher: ObservableObject {
         var cobPredictions: [Double]?
         var uamPredictions: [Double]?
         var predictionStart: Date?
+        var isf: Double?
+        var carbRatio: Double?
+        var currentTarget: Double?
 
         let enactedOrSuggested = openapsRecord["suggested"] as? [String: Any]
             ?? openapsRecord["enacted"] as? [String: Any]
@@ -365,6 +380,18 @@ class BGFetcher: ObservableObject {
                let match = regex.firstMatch(in: reason, range: NSRange(location: 0, length: reason.utf16.count)) {
                 let valueString = (reason as NSString).substring(with: match.range(at: 1))
                 cob = Double(valueString)
+            }
+        }
+
+        // ISF, CR, Target (autosens-adjusted from enacted/suggested)
+        isf = enactedOrSuggested?["ISF"] as? Double
+        currentTarget = enactedOrSuggested?["current_target"] as? Double
+        if let reason = enactedOrSuggested?["reason"] as? String {
+            let crPattern = "CR: (\\d+(?:\\.\\d+)?)"
+            if let regex = try? NSRegularExpression(pattern: crPattern),
+               let match = regex.firstMatch(in: reason, range: NSRange(location: 0, length: reason.utf16.count)) {
+                let valueString = (reason as NSString).substring(with: match.range(at: 1))
+                carbRatio = Double(valueString)
             }
         }
 
@@ -413,13 +440,15 @@ class BGFetcher: ObservableObject {
             ztPredictions: ztPredictions, iobPredictions: iobPredictions,
             cobPredictions: cobPredictions, uamPredictions: uamPredictions,
             isOpenAPS: true,
-            tempTargetActive: tempTargetActive, tempTargetText: tempTargetText
+            tempTargetActive: tempTargetActive, tempTargetText: tempTargetText,
+            recommendedBolus: nil, isf: isf, carbRatio: carbRatio, currentTarget: currentTarget
         )
 
         DispatchQueue.main.async {
             self.loopStatus = status
             self.statusMatchesScroll = true
             self.updateScheduledBasal(for: timestamp)
+            self.updateRecommendedBolus()
         }
     }
 
@@ -444,6 +473,52 @@ class BGFetcher: ObservableObject {
         }
 
         DispatchQueue.main.async { self.scheduledBasal = scheduled }
+    }
+
+    private func lookupScheduleValue(_ schedule: [(timeAsSeconds: Double, value: Double)]) -> Double? {
+        guard !schedule.isEmpty else { return nil }
+        var calendar = Calendar.current
+        calendar.timeZone = profileTimezone
+        let components = calendar.dateComponents([.hour, .minute, .second], from: Date())
+        let currentSeconds = Double(components.hour ?? 0) * 3600 + Double(components.minute ?? 0) * 60 + Double(components.second ?? 0)
+
+        var result: Double?
+        for entry in schedule {
+            if currentSeconds >= entry.timeAsSeconds {
+                result = entry.value
+            }
+        }
+        return result ?? schedule.last?.value
+    }
+
+    private func updateRecommendedBolus() {
+        // For Loop: use the pre-calculated recommendedBolus from devicestatus if available
+        if let recBolus = loopStatus?.recommendedBolus {
+            recommendedBolus = max(0, recBolus)
+            return
+        }
+
+        // For OpenAPS (or fallback): calculate from ISF, CR, target
+        guard let bg = currentBG?.bgValue else {
+            recommendedBolus = 0
+            return
+        }
+
+        // Prefer autosens-adjusted values from devicestatus, fall back to profile schedule
+        guard let isf = loopStatus?.isf ?? lookupScheduleValue(isfSchedule), isf > 0 else {
+            recommendedBolus = 0
+            return
+        }
+        let cr = loopStatus?.carbRatio ?? lookupScheduleValue(carbRatioSchedule)
+        let target = loopStatus?.currentTarget ?? lookupScheduleValue(targetSchedule) ?? 100
+
+        let glucoseEffect = (Double(bg) - target) / isf
+        let iobEffect = -(loopStatus?.iob ?? 0)
+        let cobEffect = (cr != nil && cr! > 0) ? (loopStatus?.cob ?? 0) / cr! : 0
+        let deltaEffect = Double(currentBG?.delta ?? 0) / isf
+
+        let fullBolus = glucoseEffect + iobEffect + cobEffect + deltaEffect
+        recommendedBolus = max(0, (fullBolus * 20).rounded() / 20) // round to 0.05
     }
 
     private func fetchProfile(config: WatchConfig) {
@@ -502,6 +577,42 @@ class BGFetcher: ObservableObject {
             }
             schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
             basalSchedule = schedule
+        }
+
+        // Extract ISF schedule from default store
+        if let sensArray = defaultStore?["sens"] as? [[String: Any]] {
+            var schedule: [(timeAsSeconds: Double, value: Double)] = []
+            for entry in sensArray {
+                guard let value = entry["value"] as? Double else { continue }
+                let timeAsSeconds = entry["timeAsSeconds"] as? Double ?? 0
+                schedule.append((timeAsSeconds: timeAsSeconds, value: value))
+            }
+            schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
+            isfSchedule = schedule
+        }
+
+        // Extract carb ratio schedule from default store
+        if let crArray = defaultStore?["carbratio"] as? [[String: Any]] {
+            var schedule: [(timeAsSeconds: Double, value: Double)] = []
+            for entry in crArray {
+                guard let value = entry["value"] as? Double else { continue }
+                let timeAsSeconds = entry["timeAsSeconds"] as? Double ?? 0
+                schedule.append((timeAsSeconds: timeAsSeconds, value: value))
+            }
+            schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
+            carbRatioSchedule = schedule
+        }
+
+        // Extract target BG schedule from default store
+        if let targetArray = defaultStore?["target_low"] as? [[String: Any]] {
+            var schedule: [(timeAsSeconds: Double, value: Double)] = []
+            for entry in targetArray {
+                guard let value = entry["value"] as? Double else { continue }
+                let timeAsSeconds = entry["timeAsSeconds"] as? Double ?? 0
+                schedule.append((timeAsSeconds: timeAsSeconds, value: value))
+            }
+            schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
+            targetSchedule = schedule
         }
 
         // Extract timezone
@@ -563,6 +674,7 @@ class BGFetcher: ObservableObject {
             self.overridePresets = presets
             // Update scheduled basal for current time
             self.updateScheduledBasal(for: Date())
+            self.updateRecommendedBolus()
         }
     }
 

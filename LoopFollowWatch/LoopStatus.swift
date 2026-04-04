@@ -23,4 +23,10 @@ struct LoopStatus {
     // Temp target (from devicestatus or treatments)
     let tempTargetActive: Bool
     let tempTargetText: String?
+
+    // Bolus calculation values from devicestatus
+    let recommendedBolus: Double?   // Loop only — direct from devicestatus
+    let isf: Double?                // OpenAPS — enacted/suggested ISF (autosens-adjusted)
+    let carbRatio: Double?          // OpenAPS — from reason string
+    let currentTarget: Double?      // OpenAPS — enacted/suggested current_target
 }
