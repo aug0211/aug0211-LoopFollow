@@ -99,6 +99,7 @@ struct WatchMealView: View {
                         }
                     }
                 }
+                .focusable(editingField == nil && !showConfirm && resultMessage == nil)
             }
         }
         .modifier(CrownRotationModifier(
