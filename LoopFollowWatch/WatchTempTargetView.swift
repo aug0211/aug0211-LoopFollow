@@ -231,7 +231,7 @@ struct WatchTempTargetView: View {
         }
             }
         }
-        .focusable(mode == .custom && !showConfirm)
+        .focusable()
         .digitalCrownRotation(
             crownBinding,
             from: crownRange.lowerBound,

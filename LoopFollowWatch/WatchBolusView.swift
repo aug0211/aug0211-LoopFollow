@@ -96,7 +96,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0)
             }
         }
-        .focusable(!showConfirm)
+        .focusable()
         .digitalCrownRotation(
             Binding(
                 get: { showConfirm ? 0 : rawCrown },

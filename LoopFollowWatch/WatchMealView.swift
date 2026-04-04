@@ -100,7 +100,7 @@ struct WatchMealView: View {
                 }
             }
         }
-        .focusable(!showConfirm)
+        .focusable()
         .digitalCrownRotation(
             guardedCrownBinding,
             from: crownRange.lowerBound,

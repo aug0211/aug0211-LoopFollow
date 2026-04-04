@@ -84,7 +84,7 @@ struct CrownConfirmView: View {
             .frame(height: 16)
             .multilineTextAlignment(.center)
         }
-        .focusable(tapped && !confirmed)
+        .focusable()
         .digitalCrownRotation(
             $progress,
             from: 0,
