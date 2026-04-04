@@ -4,6 +4,22 @@
 import Combine
 import Foundation
 
+struct BolusCalculation {
+    let bg: Double
+    let target: Double
+    let isf: Double
+    let iob: Double
+    let cob: Double
+    let pendingCarbs: Double
+    let cr: Double
+    let delta: Double
+    let glucoseEffect: Double
+    let iobEffect: Double
+    let cobEffect: Double
+    let deltaEffect: Double
+    let fullBolus: Double
+}
+
 class BGFetcher: ObservableObject {
     @Published var currentBG: BGReading?
     @Published var bgHistory: [BGReading] = []
@@ -15,6 +31,7 @@ class BGFetcher: ObservableObject {
     @Published var activeSource: String = "" // "Nightscout" or "Dexcom"
     @Published var statusMatchesScroll: Bool = true
     @Published var recommendedBolus: Double = 0
+    @Published var bolusCalc: BolusCalculation?
 
     /// Carbs entered locally on the watch (e.g. from meal screen) not yet in remote COB.
     /// Set before navigating to the bolus screen; included in recommended bolus calculation.
@@ -499,31 +516,46 @@ class BGFetcher: ObservableObject {
         // For Loop: use the pre-calculated recommendedBolus from devicestatus if available
         if let recBolus = loopStatus?.recommendedBolus {
             recommendedBolus = max(0, recBolus)
+            bolusCalc = nil
             return
         }
 
         // For OpenAPS (or fallback): calculate from ISF, CR, target
         guard let bg = currentBG?.bgValue else {
             recommendedBolus = 0
+            bolusCalc = nil
             return
         }
 
         // Prefer autosens-adjusted values from devicestatus, fall back to profile schedule
         guard let isf = loopStatus?.isf ?? lookupScheduleValue(isfSchedule), isf > 0 else {
             recommendedBolus = 0
+            bolusCalc = nil
             return
         }
         let cr = loopStatus?.carbRatio ?? lookupScheduleValue(carbRatioSchedule)
         let target = loopStatus?.currentTarget ?? lookupScheduleValue(targetSchedule) ?? 100
+        let iob = loopStatus?.iob ?? 0
+        let cob = loopStatus?.cob ?? 0
+        let delta = Double(currentBG?.delta ?? 0)
 
         let glucoseEffect = (Double(bg) - target) / isf
-        let iobEffect = -(loopStatus?.iob ?? 0)
-        let totalCarbs = (loopStatus?.cob ?? 0) + pendingCarbs
+        let iobEffect = -iob
+        let totalCarbs = cob + pendingCarbs
         let cobEffect = (cr != nil && cr! > 0) ? totalCarbs / cr! : 0
-        let deltaEffect = Double(currentBG?.delta ?? 0) / isf
+        let deltaEffect = delta / isf
 
         let fullBolus = glucoseEffect + iobEffect + cobEffect + deltaEffect
         recommendedBolus = max(0, (fullBolus * 20).rounded() / 20) // round to 0.05
+
+        bolusCalc = BolusCalculation(
+            bg: Double(bg), target: target, isf: isf,
+            iob: iob, cob: cob, pendingCarbs: pendingCarbs,
+            cr: cr ?? 0, delta: delta,
+            glucoseEffect: glucoseEffect, iobEffect: iobEffect,
+            cobEffect: cobEffect, deltaEffect: deltaEffect,
+            fullBolus: fullBolus
+        )
     }
 
     private func fetchProfile(config: WatchConfig) {

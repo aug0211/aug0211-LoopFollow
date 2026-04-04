@@ -24,6 +24,7 @@ struct WatchBolusView: View {
     @State private var showConfirm = false
     @State private var resultMessage: String?
     @State private var isError = false
+    @State private var showCalcDetail = false
 
     /// The displayed amount, snapped to 0.05U increments
     private var amount: Double {
@@ -90,12 +91,24 @@ struct WatchBolusView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
-                    .font(.system(size: 11))
-                    .foregroundColor(.blue)
-                    .onTapGesture {
-                        rawCrown = min(bgFetcher.recommendedBolus, config.maxBolus) / 0.25
+                HStack(spacing: 4) {
+                    Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
+                        .font(.system(size: 11))
+                        .foregroundColor(.blue)
+                        .onTapGesture {
+                            rawCrown = min(bgFetcher.recommendedBolus, config.maxBolus) / 0.25
+                        }
+                    if bgFetcher.bolusCalc != nil {
+                        Button {
+                            showCalcDetail = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12))
+                                .foregroundColor(.blue.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
                     }
+                }
 
                 Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                     confirmedAmount = amount
@@ -106,7 +119,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 10)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
@@ -122,16 +135,19 @@ struct WatchBolusView: View {
                 WKInterfaceDevice.current().play(.click)
             }
         }
+        .sheet(isPresented: $showCalcDetail) {
+            if let calc = bgFetcher.bolusCalc {
+                BolusCalcDetailView(calc: calc, recommended: bgFetcher.recommendedBolus)
+            }
+        }
     }
 
     @ViewBuilder
     private var confirmSummary: some View {
         VStack(spacing: 4) {
-            if confirmedAmount > 0 {
-                Label(String(format: "%.2f U", confirmedAmount), systemImage: "drop.fill")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.blue)
-            }
+            Label(String(format: "%.2f U", confirmedAmount), systemImage: "drop.fill")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(confirmedAmount > 0 ? .blue : .secondary)
             if let meal = pendingMeal {
                 HStack(spacing: 8) {
                     Label("\(meal.carbs)g", systemImage: "fork.knife")
@@ -219,5 +235,91 @@ struct WatchBolusView: View {
                 isError = true
             }
         }
+    }
+}
+
+private struct BolusCalcDetailView: View {
+    let calc: BolusCalculation
+    let recommended: Double
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Bolus Calculation")
+                    .font(.system(size: 14, weight: .bold))
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                calcRow(
+                    label: "GLUCOSE",
+                    detail: "(\(fmtInt(calc.bg)) − \(fmtInt(calc.target))) / \(fmtInt(calc.isf))",
+                    result: calc.glucoseEffect
+                )
+
+                calcRow(
+                    label: "IOB",
+                    detail: "−1 × \(fmt(calc.iob))",
+                    result: calc.iobEffect
+                )
+
+                let totalCarbs = calc.cob + calc.pendingCarbs
+                calcRow(
+                    label: "COB",
+                    detail: "(\(fmtInt(calc.cob)) + \(fmtInt(calc.pendingCarbs))) / \(fmtInt(calc.cr))",
+                    result: calc.cobEffect
+                )
+
+                calcRow(
+                    label: "DELTA",
+                    detail: "\(fmtInt(calc.delta)) / \(fmtInt(calc.isf))",
+                    result: calc.deltaEffect
+                )
+
+                Divider()
+
+                HStack {
+                    Text("Full Bolus")
+                        .font(.system(size: 11, weight: .semibold))
+                    Spacer()
+                    Text(fmt(calc.fullBolus))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(calc.fullBolus >= 0 ? .green : .red)
+                }
+
+                HStack {
+                    Text("Recommended")
+                        .font(.system(size: 11, weight: .semibold))
+                    Spacer()
+                    Text("\(fmt(recommended)) U")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func calcRow(label: String, detail: String, result: Double) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.secondary)
+            HStack {
+                Text(detail)
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Spacer()
+                Text(fmt(result))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(result >= 0 ? .green : .red)
+            }
+        }
+    }
+
+    private func fmt(_ v: Double) -> String { String(format: "%.2f", v) }
+    private func fmtInt(_ v: Double) -> String {
+        v == v.rounded() ? String(format: "%.0f", v) : String(format: "%.1f", v)
     }
 }
