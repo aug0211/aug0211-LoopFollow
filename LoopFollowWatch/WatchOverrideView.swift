@@ -127,7 +127,7 @@ struct WatchOverrideView: View {
     }
 
     private func autoDismiss() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             dismiss()
         }
     }

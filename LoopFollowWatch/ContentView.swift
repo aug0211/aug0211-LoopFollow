@@ -254,6 +254,11 @@ struct ContentView: View {
             formatter.dateFormat = "h:mm a"
             return formatter.string(from: reading.timestamp)
         }
-        return reading.minAgoText
+        // Use `now` state so SwiftUI re-evaluates every second
+        let totalSeconds = Int(now.timeIntervalSince(reading.timestamp))
+        if totalSeconds < 5 { return "now" }
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return "\(minutes)m \(seconds)s"
     }
 }

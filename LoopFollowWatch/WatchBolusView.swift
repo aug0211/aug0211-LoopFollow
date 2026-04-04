@@ -39,10 +39,12 @@ struct WatchBolusView: View {
                     sendBolus()
                 }
             } else {
-                Text("💧 Bolus")
-                    .font(.system(size: 16, weight: .semibold))
+                HStack {
+                    Text("💧 Bolus")
+                        .font(.system(size: 16, weight: .semibold))
 
-                HStack(spacing: 8) {
+                    Spacer()
+
                     Button {
                         rawCrown = max(rawCrown - 1.0, 0)
                         WKInterfaceDevice.current().play(.click)
@@ -55,12 +57,6 @@ struct WatchBolusView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-
-                    Text(String(format: "%.2f U", amount))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(.blue)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
 
                     Button {
                         rawCrown = min(rawCrown + 1.0, config.maxBolus / 0.25)
@@ -75,6 +71,12 @@ struct WatchBolusView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                Text(String(format: "%.2f U", amount))
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundColor(.blue)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 Text("Max: \(String(format: "%.1f", config.maxBolus))U")
                     .font(.system(size: 11))
@@ -114,7 +116,7 @@ struct WatchBolusView: View {
     }
 
     private func autoDismiss() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             dismiss()
         }
     }

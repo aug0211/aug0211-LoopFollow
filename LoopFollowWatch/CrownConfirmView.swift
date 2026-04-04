@@ -60,7 +60,8 @@ struct CrownConfirmView: View {
                         }
                     }
                 }
-                .frame(width: 70, height: 70)
+                .frame(width: 80, height: 80)
+                .padding(.horizontal, 8)
             }
             .buttonStyle(.plain)
             .disabled(tapped || confirmed)
