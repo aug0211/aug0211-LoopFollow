@@ -126,10 +126,10 @@ struct WatchBolusView: View {
 
     @ViewBuilder
     private var confirmSummary: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             if confirmedAmount > 0 {
-                Text(String(format: "%.2f U", confirmedAmount))
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                Label(String(format: "%.2f U", confirmedAmount), systemImage: "drop.fill")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.blue)
             }
             if let meal = pendingMeal {
