@@ -188,7 +188,8 @@ struct WatchBolusView: View {
     }
 
     private func autoDismiss() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        let delay = showCelebration ? CelebrationOverlay.displayDuration : 3.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             if let popToRoot = popToRoot {
                 popToRoot()
             } else {
