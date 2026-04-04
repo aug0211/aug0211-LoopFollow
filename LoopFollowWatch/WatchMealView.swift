@@ -7,6 +7,7 @@ import WatchKit
 struct WatchMealView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
+    var popToRoot: (() -> Void)?
     @State private var carbs: Double = 0
     @State private var protein: Double = 0
     @State private var fat: Double = 0
@@ -125,7 +126,7 @@ struct WatchMealView: View {
         .onChange(of: fat) { _ in playHaptic(Int(fat)) }
         .onChange(of: entryTimeOffset) { _ in playHaptic(Int(entryTimeOffset)) }
         .navigationDestination(isPresented: $showBolusStep) {
-            WatchBolusView(config: config, bgFetcher: bgFetcher, pendingMeal: pendingMealData)
+            WatchBolusView(config: config, bgFetcher: bgFetcher, pendingMeal: pendingMealData, popToRoot: popToRoot)
         }
         .onChange(of: showBolusStep) { active in
             if !active {

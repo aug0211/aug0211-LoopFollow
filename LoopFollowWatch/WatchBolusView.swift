@@ -16,6 +16,7 @@ struct WatchBolusView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
     var pendingMeal: PendingMealData?
+    var popToRoot: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var rawCrown: Double = 0
     @State private var lastHapticAmount: Double = 0
@@ -41,9 +42,21 @@ struct WatchBolusView: View {
                     .multilineTextAlignment(.center)
                 Spacer()
             } else if showConfirm {
-                Text(String(format: "%.2f U", confirmedAmount))
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.blue)
+                if let meal = pendingMeal {
+                    HStack(spacing: 4) {
+                        Text("\(meal.carbs)c")
+                        if let f = meal.fat, f > 0 { Text("\(f)f") }
+                        if let p = meal.protein, p > 0 { Text("\(p)p") }
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.yellow)
+                }
+
+                if confirmedAmount > 0 {
+                    Text(String(format: "%.2f U", confirmedAmount))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.blue)
+                }
 
                 CrownConfirmView(label: confirmedAmount > 0 ? "to deliver" : "to send meal") {
                     sendBolusAndMeal()
@@ -127,7 +140,11 @@ struct WatchBolusView: View {
 
     private func autoDismiss() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            dismiss()
+            if let popToRoot = popToRoot {
+                popToRoot()
+            } else {
+                dismiss()
+            }
         }
     }
 
