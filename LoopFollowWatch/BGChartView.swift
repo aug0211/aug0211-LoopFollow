@@ -147,7 +147,7 @@ struct BGChartView: View {
                     .symbolSize(30)
                     .foregroundStyle(.blue)
                     .annotation(position: .top, spacing: 1) {
-                        Text(String(format: "%gU", treatment.value))
+                        Text(String(format: "%g", treatment.value))
                             .font(.system(size: 7, weight: .medium))
                             .foregroundColor(.white)
                     }
@@ -163,7 +163,7 @@ struct BGChartView: View {
                     .symbolSize(30)
                     .foregroundStyle(.yellow)
                     .annotation(position: .top, spacing: 1) {
-                        Text("\(Int(treatment.value))g")
+                        Text("\(Int(treatment.value))")
                             .font(.system(size: 7, weight: .medium))
                             .foregroundColor(.white)
                     }
