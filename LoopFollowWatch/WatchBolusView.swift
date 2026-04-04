@@ -141,6 +141,18 @@ struct WatchBolusView: View {
                 BolusCalcDetailView(calc: calc, recommended: bgFetcher.recommendedBolus)
             }
         }
+        .navigationBarBackButtonHidden(showConfirm)
+        .toolbar {
+            if showConfirm {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        showConfirm = false
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
