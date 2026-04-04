@@ -62,9 +62,8 @@ struct CelebrationOverlay: View {
     // MARK: - Randomization
 
     /// Returns true roughly every 5–15 sends (≈10% chance per send).
-    /// TODO: Revert to `Int.random(in: 1...10) == 1` after testing
     static func shouldCelebrate() -> Bool {
-        return true
+        return Int.random(in: 1...10) == 1
     }
 
     /// How long to show the celebration before dismissing (longer than normal 3s).
