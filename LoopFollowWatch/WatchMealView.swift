@@ -90,22 +90,31 @@ struct WatchMealView: View {
                     Spacer()
                 }
             } else {
-                ScrollView {
-                    VStack(spacing: 4) {
-                        if showConfirm {
-                            confirmView
-                        } else {
-                            entryView
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            if showConfirm {
+                                confirmView
+                            } else {
+                                entryView
+                            }
+                        }
+                        .modifier(CrownRotationModifier(
+                            isActive: editingField != nil && !showConfirm && resultMessage == nil,
+                            value: guardedCrownBinding,
+                            from: crownRange.lowerBound,
+                            through: crownRange.upperBound,
+                            by: crownStep,
+                            sensitivity: .medium
+                        ))
+                    }
+                    .onChange(of: editingField) { newValue in
+                        if newValue == nil {
+                            withAnimation {
+                                proxy.scrollTo("confirmButton", anchor: .bottom)
+                            }
                         }
                     }
-                    .modifier(CrownRotationModifier(
-                        isActive: editingField != nil && !showConfirm && resultMessage == nil,
-                        value: guardedCrownBinding,
-                        from: crownRange.lowerBound,
-                        through: crownRange.upperBound,
-                        by: crownStep,
-                        sensitivity: .medium
-                    ))
                 }
             }
         }
@@ -249,6 +258,7 @@ struct WatchMealView: View {
         .buttonStyle(.borderedProminent)
         .tint(.yellow)
         .disabled(carbs <= 0 && protein <= 0 && fat <= 0)
+        .id("confirmButton")
     }
 
     @ViewBuilder
