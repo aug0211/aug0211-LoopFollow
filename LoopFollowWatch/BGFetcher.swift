@@ -552,8 +552,8 @@ class BGFetcher: ObservableObject {
                 }
             }
             // Only use if within 7.5 minutes of the 15m mark
-            if let prior = closest, let priorBG = prior.bgValue, closestDiff < 7.5 * 60 {
-                return Double(bg - priorBG)
+            if let prior = closest, closestDiff < 7.5 * 60 {
+                return Double(bg - prior.bgValue)
             }
             return Double(currentBG?.delta ?? 0)
         }()
