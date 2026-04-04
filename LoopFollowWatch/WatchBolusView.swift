@@ -81,6 +81,13 @@ struct WatchBolusView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
+                Text("Recommended: 0.0U")
+                    .font(.system(size: 11))
+                    .foregroundColor(.blue)
+                    .onTapGesture {
+                        // TODO: auto-populate with calculated recommended bolus
+                    }
+
                 Text("Max: \(String(format: "%.1f", config.maxBolus))U")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
