@@ -48,26 +48,28 @@ struct WatchBolusView: View {
                         WKInterfaceDevice.current().play(.click)
                     } label: {
                         Text("−")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.blue)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 32, height: 32)
                             .background(Color.blue.opacity(0.3))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
 
                     Text(String(format: "%.2f U", amount))
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundColor(.blue)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
 
                     Button {
                         rawCrown = min(rawCrown + 1.0, config.maxBolus / 0.25)
                         WKInterfaceDevice.current().play(.click)
                     } label: {
                         Text("+")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.blue)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 32, height: 32)
                             .background(Color.blue.opacity(0.3))
                             .clipShape(Circle())
                     }
