@@ -214,7 +214,7 @@ struct BGChartView: View {
             }
         }
         .focusable()
-        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .high, isContinuous: false, isHapticFeedbackEnabled: false)
+        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: false)
         .onChange(of: timeOffset) { newValue in
             let snapped = newValue.rounded()
             if snapped != lastHapticOffset {
