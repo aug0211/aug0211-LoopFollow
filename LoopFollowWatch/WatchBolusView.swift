@@ -73,10 +73,10 @@ struct WatchBolusView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 20)
 
                 Text(String(format: "%.2f U", amount))
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
