@@ -22,7 +22,7 @@ struct WatchMealView: View {
     @State private var confirmedProtein: Int = 0
     @State private var confirmedFat: Int = 0
     @State private var confirmedTimeOffset: Double = 0
-    @FocusState private var scrollAnchorFocused: Bool
+    @FocusState private var crownFocused: Bool
 
     enum EditField {
         case carbs, protein, fat, time
@@ -90,7 +90,30 @@ struct WatchMealView: View {
                         .multilineTextAlignment(.center)
                     Spacer()
                 }
+            } else if editingField != nil && !showConfirm {
+                // ── Tile-editing mode ──
+                // No ScrollView here. Crown controls the selected field value.
+                // .digitalCrownRotation() is ONLY in this branch, so it never
+                // poisons the ScrollView branch's native crown scrolling.
+                VStack(spacing: 4) {
+                    entryView
+                }
+                .focusable()
+                .focused($crownFocused)
+                .digitalCrownRotation(
+                    guardedCrownBinding,
+                    from: crownRange.lowerBound,
+                    through: crownRange.upperBound,
+                    by: crownStep,
+                    sensitivity: .medium,
+                    isContinuous: false,
+                    isHapticFeedbackEnabled: false
+                )
+                .onAppear { crownFocused = true }
             } else {
+                // ── Browse / confirm mode ──
+                // Plain ScrollView, ZERO crown modifiers anywhere.
+                // Native watchOS crown scrolling works unimpeded.
                 ScrollView {
                     VStack(spacing: 4) {
                         if showConfirm {
@@ -98,29 +121,13 @@ struct WatchMealView: View {
                         } else {
                             entryView
                         }
-
-                        // Invisible focus anchor inside ScrollView.
-                        // When focused, the ScrollView becomes the active
-                        // crown scroll responder.
-                        Color.clear
-                            .frame(height: 0)
-                            .focusable(editingField == nil && !showConfirm)
-                            .focused($scrollAnchorFocused)
                     }
                 }
             }
         }
-        .modifier(CrownRotationModifier(
-            isActive: editingField != nil && !showConfirm && resultMessage == nil,
-            value: guardedCrownBinding,
-            from: crownRange.lowerBound,
-            through: crownRange.upperBound,
-            by: crownStep,
-            sensitivity: .medium
-        ))
         .onChange(of: editingField) { field in
-            if field == nil && !showConfirm {
-                scrollAnchorFocused = true
+            if field != nil && !showConfirm {
+                crownFocused = true
             }
         }
         .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
