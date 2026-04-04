@@ -231,7 +231,7 @@ struct WatchTempTargetView: View {
         }
             }
         }
-        .focusable()
+        .focusable(mode == .custom && !showConfirm && resultMessage == nil)
         .digitalCrownRotation(
             crownBinding,
             from: crownRange.lowerBound,
@@ -239,7 +239,7 @@ struct WatchTempTargetView: View {
             by: crownStep,
             sensitivity: .medium,
             isContinuous: false,
-            isHapticFeedbackEnabled: true
+            isHapticFeedbackEnabled: false
         )
     }
 
