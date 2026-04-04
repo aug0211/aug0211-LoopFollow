@@ -572,15 +572,16 @@ class BGFetcher: ObservableObject {
         var components = URLComponents(string: config.nsURL)
         components?.path = "/api/v1/treatments.json"
 
-        let cutoff = Date().addingTimeInterval(-24 * 3600)
+        let cutoff = Date().addingTimeInterval(-25 * 3600)
         let formatter = ISO8601DateFormatter()
 
         var queryItems = [URLQueryItem]()
         if !config.nsToken.isEmpty {
             queryItems.append(URLQueryItem(name: "token", value: config.nsToken))
         }
-        queryItems.append(URLQueryItem(name: "count", value: "1000"))
         queryItems.append(URLQueryItem(name: "find[created_at][$gte]", value: formatter.string(from: cutoff)))
+        let futureLimit = Date().addingTimeInterval(6 * 3600)
+        queryItems.append(URLQueryItem(name: "find[created_at][$lte]", value: formatter.string(from: futureLimit)))
         components?.queryItems = queryItems
 
         guard let url = components?.url else { return }
