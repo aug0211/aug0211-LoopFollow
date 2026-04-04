@@ -132,52 +132,59 @@ struct WatchBolusView: View {
     }
 
     private func sendBolusAndMeal() {
-        // If there's pending meal data, send it first
-        if let meal = pendingMeal {
-            let mealProtein = (config.mealWithFatProtein && meal.protein != nil && meal.protein! > 0) ? meal.protein : nil
-            let mealFat = (config.mealWithFatProtein && meal.fat != nil && meal.fat! > 0) ? meal.fat : nil
-            let mealTime = abs(meal.timeOffset) >= 1 ? Date().addingTimeInterval(meal.timeOffset * 60) : nil
-
-            WatchRemoteService.sendMeal(
-                carbs: meal.carbs,
-                protein: mealProtein,
-                fat: mealFat,
-                entryTime: mealTime,
-                config: config
-            ) { success, error in
-                if success {
-                    if confirmedAmount > 0 {
-                        sendBolus()
-                    } else {
-                        resultMessage = "Meal sent!"
-                        WatchRemoteService.postLocalNotification(
-                            title: "Meal Sent",
-                            body: "\(meal.carbs)g carbs logged"
-                        )
-                        autoDismiss()
-                    }
-                } else {
-                    resultMessage = error ?? "Failed"
-                    isError = true
-                }
-            }
-        } else if confirmedAmount > 0 {
+        if confirmedAmount > 0 {
+            // Send bolus first — if carbs arrived before the bolus, Trio could
+            // auto-dose on the carbs and stack with our remote bolus.
             sendBolus()
+        } else if let meal = pendingMeal {
+            // Skip (0U) — send meal only
+            sendMeal(meal)
         }
     }
 
     private func sendBolus() {
         WatchRemoteService.sendBolus(amount: confirmedAmount, config: config) { success, error in
             if success {
-                let mealNote = pendingMeal != nil ? " + \(pendingMeal!.carbs)g carbs" : ""
-                resultMessage = "Bolus sent!"
+                if let meal = pendingMeal {
+                    // Bolus succeeded — now safe to send carbs
+                    sendMeal(meal)
+                } else {
+                    resultMessage = "Bolus sent!"
+                    WatchRemoteService.postLocalNotification(
+                        title: "Bolus Sent",
+                        body: String(format: "%.2fU bolus command sent", confirmedAmount)
+                    )
+                    autoDismiss()
+                }
+            } else {
+                resultMessage = error ?? "Failed"
+                isError = true
+            }
+        }
+    }
+
+    private func sendMeal(_ meal: PendingMealData) {
+        let mealProtein = (config.mealWithFatProtein && meal.protein != nil && meal.protein! > 0) ? meal.protein : nil
+        let mealFat = (config.mealWithFatProtein && meal.fat != nil && meal.fat! > 0) ? meal.fat : nil
+        let mealTime = abs(meal.timeOffset) >= 1 ? Date().addingTimeInterval(meal.timeOffset * 60) : nil
+
+        WatchRemoteService.sendMeal(
+            carbs: meal.carbs,
+            protein: mealProtein,
+            fat: mealFat,
+            entryTime: mealTime,
+            config: config
+        ) { success, error in
+            if success {
+                let bolusNote = confirmedAmount > 0 ? String(format: " + %.2fU bolus", confirmedAmount) : ""
+                resultMessage = "Meal sent!"
                 WatchRemoteService.postLocalNotification(
-                    title: "Bolus Sent",
-                    body: String(format: "%.2fU bolus command sent", confirmedAmount) + mealNote
+                    title: confirmedAmount > 0 ? "Bolus + Meal Sent" : "Meal Sent",
+                    body: "\(meal.carbs)g carbs logged" + bolusNote
                 )
                 autoDismiss()
             } else {
-                resultMessage = error ?? "Failed"
+                resultMessage = error ?? "Meal failed"
                 isError = true
             }
         }
