@@ -40,11 +40,6 @@ struct WatchBolusView: View {
                 }
             } else {
                 HStack {
-                    Text("💧 Bolus")
-                        .font(.system(size: 16, weight: .semibold))
-
-                    Spacer()
-
                     Button {
                         rawCrown = max(rawCrown - 1.0, 0)
                         WKInterfaceDevice.current().play(.click)
@@ -57,6 +52,13 @@ struct WatchBolusView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Text("💧 Bolus")
+                        .font(.system(size: 16, weight: .semibold))
+
+                    Spacer()
 
                     Button {
                         rawCrown = min(rawCrown + 1.0, config.maxBolus / 0.25)
@@ -73,7 +75,7 @@ struct WatchBolusView: View {
                 }
 
                 Text(String(format: "%.2f U", amount))
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)

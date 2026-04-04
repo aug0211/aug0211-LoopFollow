@@ -579,7 +579,7 @@ class BGFetcher: ObservableObject {
         if !config.nsToken.isEmpty {
             queryItems.append(URLQueryItem(name: "token", value: config.nsToken))
         }
-        queryItems.append(URLQueryItem(name: "count", value: "100"))
+        queryItems.append(URLQueryItem(name: "count", value: "1000"))
         queryItems.append(URLQueryItem(name: "find[created_at][$gte]", value: formatter.string(from: cutoff)))
         components?.queryItems = queryItems
 
