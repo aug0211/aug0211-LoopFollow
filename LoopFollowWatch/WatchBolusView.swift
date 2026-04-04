@@ -145,7 +145,7 @@ struct WatchBolusView: View {
                             .foregroundColor(.orange)
                     }
                 }
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             }
