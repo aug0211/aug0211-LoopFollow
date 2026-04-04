@@ -495,7 +495,7 @@ class BGFetcher: ObservableObject {
         return result ?? schedule.last?.value
     }
 
-    private func updateRecommendedBolus() {
+    func updateRecommendedBolus() {
         // For Loop: use the pre-calculated recommendedBolus from devicestatus if available
         if let recBolus = loopStatus?.recommendedBolus {
             recommendedBolus = max(0, recBolus)

@@ -6,22 +6,14 @@ import WatchKit
 
 struct WatchMealView: View {
     let config: WatchConfig
-    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var bgFetcher: BGFetcher
     @State private var carbs: Double = 0
     @State private var protein: Double = 0
     @State private var fat: Double = 0
     @State private var entryTimeOffset: Double = 0 // minutes offset from now (-240 to +240)
     @State private var editingField: EditField? = .carbs
     @State private var lastHapticValue: Int = 0
-    @State private var showConfirm = false
-    @State private var resultMessage: String?
-    @State private var isError = false
-
-    // Snapshot values locked in when user taps Confirm
-    @State private var confirmedCarbs: Int = 0
-    @State private var confirmedProtein: Int = 0
-    @State private var confirmedFat: Int = 0
-    @State private var confirmedTimeOffset: Double = 0
+    @State private var showBolusStep = false
     @FocusState private var crownFocused: Bool
 
     enum EditField {
@@ -36,12 +28,11 @@ struct WatchMealView: View {
         return formatter.string(from: entryTime)
     }
 
-    /// Crown binding that is completely disabled when in confirm mode.
-    /// This prevents accidental value changes during the CrownConfirmView scroll.
+    /// Crown binding for the active editing field.
     private var guardedCrownBinding: Binding<Double> {
         Binding(
             get: {
-                guard !showConfirm, let field = editingField else { return 0 }
+                guard let field = editingField else { return 0 }
                 switch field {
                 case .carbs: return carbs
                 case .protein: return protein
@@ -50,7 +41,7 @@ struct WatchMealView: View {
                 }
             },
             set: { newValue in
-                guard !showConfirm, let field = editingField else { return }
+                guard let field = editingField else { return }
                 switch field {
                 case .carbs: carbs = newValue
                 case .protein: protein = newValue
@@ -62,7 +53,7 @@ struct WatchMealView: View {
     }
 
     private var crownRange: ClosedRange<Double> {
-        guard !showConfirm, let field = editingField else { return 0...1 }
+        guard let field = editingField else { return 0...1 }
         switch field {
         case .carbs: return 0...config.maxCarbs
         case .protein: return 0...config.maxProtein
@@ -79,18 +70,18 @@ struct WatchMealView: View {
         }
     }
 
+    private var pendingMealData: PendingMealData {
+        PendingMealData(
+            carbs: Int(carbs),
+            protein: Int(protein) > 0 ? Int(protein) : nil,
+            fat: Int(fat) > 0 ? Int(fat) : nil,
+            timeOffset: entryTimeOffset
+        )
+    }
+
     var body: some View {
         Group {
-            if let result = resultMessage {
-                VStack {
-                    Spacer()
-                    Text(result)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(isError ? .red : .green)
-                        .multilineTextAlignment(.center)
-                    Spacer()
-                }
-            } else if editingField != nil && !showConfirm {
+            if editingField != nil && !showBolusStep {
                 // ── Tile-editing mode ──
                 // ScrollView for identical layout, but crown modifiers on the
                 // wrapper outside it. .digitalCrownRotation() is ONLY in this
@@ -113,69 +104,35 @@ struct WatchMealView: View {
                     isHapticFeedbackEnabled: false
                 )
                 .onAppear { crownFocused = true }
-            } else {
-                // ── Browse / confirm mode ──
+            } else if !showBolusStep {
+                // ── Browse mode ──
                 // Plain ScrollView, ZERO crown modifiers anywhere.
                 // Native watchOS crown scrolling works unimpeded.
                 ScrollView {
                     VStack(spacing: 4) {
-                        if showConfirm {
-                            confirmView
-                        } else {
-                            entryView
-                        }
+                        entryView
                     }
                 }
             }
         }
         .onChange(of: editingField) { field in
-            if field != nil && !showConfirm {
+            if field != nil && !showBolusStep {
                 crownFocused = true
             }
         }
-        .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
-        .onChange(of: protein) { _ in if !showConfirm { playHaptic(Int(protein)) } }
-        .onChange(of: fat) { _ in if !showConfirm { playHaptic(Int(fat)) } }
-        .onChange(of: entryTimeOffset) { _ in if !showConfirm { playHaptic(Int(entryTimeOffset)) } }
-    }
-
-    @ViewBuilder
-    private var confirmView: some View {
-        VStack(spacing: 2) {
-            Text("\(confirmedCarbs)g carbs")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.yellow)
-
-            if config.mealWithFatProtein {
-                if confirmedFat > 0 {
-                    Text("\(confirmedFat)g fat")
-                        .font(.system(size: 13))
-                        .foregroundColor(.orange)
-                }
-                if confirmedProtein > 0 {
-                    Text("\(confirmedProtein)g protein")
-                        .font(.system(size: 13))
-                        .foregroundColor(.orange)
-                }
-            }
-
-            if abs(confirmedTimeOffset) >= 1 {
-                let confirmedTime = Date().addingTimeInterval(confirmedTimeOffset * 60)
-                let formatter = DateFormatter()
-                Text("at \(formattedTime(confirmedTime, formatter: formatter))")
-                    .font(.system(size: 12))
-                    .foregroundColor(.blue)
+        .onChange(of: carbs) { _ in playHaptic(Int(carbs)) }
+        .onChange(of: protein) { _ in playHaptic(Int(protein)) }
+        .onChange(of: fat) { _ in playHaptic(Int(fat)) }
+        .onChange(of: entryTimeOffset) { _ in playHaptic(Int(entryTimeOffset)) }
+        .navigationDestination(isPresented: $showBolusStep) {
+            WatchBolusView(config: config, bgFetcher: bgFetcher, pendingMeal: pendingMealData)
+        }
+        .onChange(of: showBolusStep) { active in
+            if !active {
+                bgFetcher.pendingCarbs = 0
+                bgFetcher.updateRecommendedBolus()
             }
         }
-
-        CrownConfirmView(label: "to send meal") {
-            sendMeal()
-        }
-    }
-
-    private func formattedTime(_ date: Date, formatter: DateFormatter) -> String {
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
     }
 
     private let gridColumns = [
@@ -255,13 +212,11 @@ struct WatchMealView: View {
             mealTile(label: "Time", value: entryTimeText, field: .time)
         }
 
-        Button("Confirm") {
+        Button("Continue") {
             if carbs > 0 || protein > 0 || fat > 0 {
-                confirmedCarbs = Int(carbs)
-                confirmedProtein = Int(protein)
-                confirmedFat = Int(fat)
-                confirmedTimeOffset = entryTimeOffset
-                showConfirm = true
+                bgFetcher.pendingCarbs = carbs
+                bgFetcher.updateRecommendedBolus()
+                showBolusStep = true
             }
         }
         .buttonStyle(.borderedProminent)
@@ -304,38 +259,6 @@ struct WatchMealView: View {
         if newValue != lastHapticValue {
             lastHapticValue = newValue
             WKInterfaceDevice.current().play(.click)
-        }
-    }
-
-    private func autoDismiss() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            dismiss()
-        }
-    }
-
-    private func sendMeal() {
-        let mealProtein = config.mealWithFatProtein && confirmedProtein > 0 ? confirmedProtein : nil
-        let mealFat = config.mealWithFatProtein && confirmedFat > 0 ? confirmedFat : nil
-        let mealTime = abs(confirmedTimeOffset) >= 1 ? Date().addingTimeInterval(confirmedTimeOffset * 60) : nil
-
-        WatchRemoteService.sendMeal(
-            carbs: confirmedCarbs,
-            protein: mealProtein,
-            fat: mealFat,
-            entryTime: mealTime,
-            config: config
-        ) { success, error in
-            if success {
-                resultMessage = "Meal sent!"
-                WatchRemoteService.postLocalNotification(
-                    title: "Meal Sent",
-                    body: "\(confirmedCarbs)g carbs logged"
-                )
-                autoDismiss()
-            } else {
-                resultMessage = error ?? "Failed"
-                isError = true
-            }
         }
     }
 }

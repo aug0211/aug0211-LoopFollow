@@ -23,7 +23,7 @@ struct RemoteControlView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    WatchMealView(config: config)
+                    WatchMealView(config: config, bgFetcher: bgFetcher)
                 } label: {
                     RemoteTile(icon: "🍽️", label: "Meal", color: .yellow)
                 }
