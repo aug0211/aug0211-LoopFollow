@@ -558,9 +558,9 @@ class BGFetcher: ObservableObject {
             return Double(currentBG?.delta ?? 0)
         }()
 
-        // Floor-round each component to 0.01 (safety rounding — always rounds down)
+        // Floor-round division results to 0.01 (safety rounding — always rounds down)
         let glucoseEffect = floor((Double(bg) - target) / isf * 100) / 100
-        let iobEffect = floor(-iob * 100) / 100
+        let iobEffect = -iob // no rounding — already a concrete value
         let totalCarbs = cob + pendingCarbs
         let cobEffect = (cr != nil && cr! > 0) ? floor(totalCarbs / cr! * 100) / 100 : 0
         let deltaEffect = floor(delta / isf * 100) / 100

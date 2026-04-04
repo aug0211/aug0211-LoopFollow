@@ -90,7 +90,7 @@ struct WatchBolusView: View {
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .padding(.bottom, -2)
+                    .padding(.bottom, -4)
 
                 HStack(spacing: 5) {
                     Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
@@ -120,7 +120,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 10)
+        .padding(.top, 14)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
