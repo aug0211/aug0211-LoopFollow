@@ -11,7 +11,7 @@ struct WatchMealView: View {
     @State private var protein: Double = 0
     @State private var fat: Double = 0
     @State private var entryTimeOffset: Double = 0 // minutes offset from now (-240 to +240)
-    @State private var editingField: EditField = .carbs
+    @State private var editingField: EditField? = .carbs
     @State private var lastHapticValue: Int = 0
     @State private var showConfirm = false
     @State private var resultMessage: String?
@@ -40,8 +40,8 @@ struct WatchMealView: View {
     private var guardedCrownBinding: Binding<Double> {
         Binding(
             get: {
-                guard !showConfirm else { return 0 }
-                switch editingField {
+                guard !showConfirm, let field = editingField else { return 0 }
+                switch field {
                 case .carbs: return carbs
                 case .protein: return protein
                 case .fat: return fat
@@ -49,8 +49,8 @@ struct WatchMealView: View {
                 }
             },
             set: { newValue in
-                guard !showConfirm else { return }
-                switch editingField {
+                guard !showConfirm, let field = editingField else { return }
+                switch field {
                 case .carbs: carbs = newValue
                 case .protein: protein = newValue
                 case .fat: fat = newValue
@@ -61,8 +61,8 @@ struct WatchMealView: View {
     }
 
     private var crownRange: ClosedRange<Double> {
-        guard !showConfirm else { return 0...1 }
-        switch editingField {
+        guard !showConfirm, let field = editingField else { return 0...1 }
+        switch field {
         case .carbs: return 0...config.maxCarbs
         case .protein: return 0...config.maxProtein
         case .fat: return 0...config.maxFat
@@ -71,7 +71,8 @@ struct WatchMealView: View {
     }
 
     private var crownStep: Double {
-        switch editingField {
+        guard let field = editingField else { return 1 }
+        switch field {
         case .time: return 5
         default: return 1
         }
@@ -101,7 +102,7 @@ struct WatchMealView: View {
             }
         }
         .modifier(CrownRotationModifier(
-            isActive: !showConfirm && resultMessage == nil,
+            isActive: editingField != nil && !showConfirm && resultMessage == nil,
             value: guardedCrownBinding,
             from: crownRange.lowerBound,
             through: crownRange.upperBound,
@@ -159,7 +160,8 @@ struct WatchMealView: View {
     ]
 
     private var activeFieldLabel: String {
-        switch editingField {
+        guard let field = editingField else { return "" }
+        switch field {
         case .carbs: return "Carbs"
         case .fat: return "Fat"
         case .protein: return "Protein"
@@ -168,7 +170,8 @@ struct WatchMealView: View {
     }
 
     private func adjustActiveField(by delta: Double) {
-        switch editingField {
+        guard let field = editingField else { return }
+        switch field {
         case .carbs: carbs = min(max(carbs + delta, 0), config.maxCarbs)
         case .fat: fat = min(max(fat + delta, 0), config.maxFat)
         case .protein: protein = min(max(protein + delta, 0), config.maxProtein)
@@ -197,7 +200,8 @@ struct WatchMealView: View {
             mealTile(label: "Time", value: entryTimeText, field: .time)
         }
 
-        // Shared +/- bar for the active field
+        // Shared +/- bar for the active field (hidden when no tile selected)
+        if editingField != nil {
         HStack(spacing: 12) {
             Button {
                 adjustActiveField(by: -stepSize)
@@ -227,6 +231,7 @@ struct WatchMealView: View {
             }
             .buttonStyle(.plain)
         }
+        }
 
         Text("Tap a tile, then scroll crown")
             .font(.system(size: 9))
@@ -250,7 +255,7 @@ struct WatchMealView: View {
     private func mealTile(label: String, value: String, field: EditField) -> some View {
         let isActive = editingField == field
         Button {
-            editingField = field
+            editingField = isActive ? nil : field
         } label: {
             VStack(spacing: 2) {
                 Text(value)
