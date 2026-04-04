@@ -14,7 +14,7 @@ struct BGChartView: View {
     let config: WatchConfig
     @Binding var timeOffset: Double
     @State private var lastHapticOffset: Double = 0
-    @State private var zoomHours: Double = 3
+    @State private var zoomHours: Double = 2
     @AppStorage("showTreatments") private var showTreatments: Bool = false
     @FocusState private var chartFocused: Bool
 
