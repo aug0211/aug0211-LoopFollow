@@ -22,7 +22,7 @@ struct WatchMealView: View {
     @State private var confirmedProtein: Int = 0
     @State private var confirmedFat: Int = 0
     @State private var confirmedTimeOffset: Double = 0
-    @FocusState private var scrollFocused: Bool
+    @FocusState private var scrollAnchorFocused: Bool
 
     enum EditField {
         case carbs, protein, fat, time
@@ -98,10 +98,16 @@ struct WatchMealView: View {
                         } else {
                             entryView
                         }
+
+                        // Invisible focus anchor inside ScrollView.
+                        // When focused, the ScrollView becomes the active
+                        // crown scroll responder.
+                        Color.clear
+                            .frame(height: 0)
+                            .focusable(editingField == nil && !showConfirm)
+                            .focused($scrollAnchorFocused)
                     }
                 }
-                .focusable(editingField == nil && !showConfirm)
-                .focused($scrollFocused)
             }
         }
         .modifier(CrownRotationModifier(
@@ -114,7 +120,7 @@ struct WatchMealView: View {
         ))
         .onChange(of: editingField) { field in
             if field == nil && !showConfirm {
-                scrollFocused = true
+                scrollAnchorFocused = true
             }
         }
         .onChange(of: carbs) { _ in if !showConfirm { playHaptic(Int(carbs)) } }
