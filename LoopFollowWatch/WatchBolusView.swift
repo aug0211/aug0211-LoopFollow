@@ -90,10 +90,11 @@ struct WatchBolusView: View {
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .padding(.bottom, -2)
 
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
-                        .font(.system(size: 11))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.blue)
                         .onTapGesture {
                             rawCrown = min(bgFetcher.recommendedBolus, config.maxBolus) / 0.25
@@ -103,7 +104,7 @@ struct WatchBolusView: View {
                             showCalcDetail = true
                         } label: {
                             Image(systemName: "info.circle")
-                                .font(.system(size: 12))
+                                .font(.system(size: 15))
                                 .foregroundColor(.blue.opacity(0.7))
                         }
                         .buttonStyle(.plain)
