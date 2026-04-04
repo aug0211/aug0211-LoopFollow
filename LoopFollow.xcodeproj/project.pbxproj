@@ -2361,6 +2361,7 @@
 				INFOPLIST_FILE = LoopFollowWatch/Info.plist;
 				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp";
+				PRODUCT_MODULE_NAME = LoopFollowWatch;
 				PRODUCT_NAME = LoopFollowWatch;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -2385,6 +2386,7 @@
 				INFOPLIST_FILE = LoopFollowWatch/Info.plist;
 				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp";
+				PRODUCT_MODULE_NAME = LoopFollowWatch;
 				PRODUCT_NAME = LoopFollowWatch;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -2626,6 +2628,7 @@
 				INFOPLIST_FILE = LoopFollowWidgets/Info.plist;
 				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp.widgets";
+				PRODUCT_MODULE_NAME = LoopFollowWidgets;
 				PRODUCT_NAME = LoopFollowWidgets;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -2649,6 +2652,7 @@
 				INFOPLIST_FILE = LoopFollowWidgets/Info.plist;
 				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp.widgets";
+				PRODUCT_MODULE_NAME = LoopFollowWidgets;
 				PRODUCT_NAME = LoopFollowWidgets;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
