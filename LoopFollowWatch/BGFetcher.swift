@@ -16,6 +16,10 @@ class BGFetcher: ObservableObject {
     @Published var statusMatchesScroll: Bool = true
     @Published var recommendedBolus: Double = 0
 
+    /// Carbs entered locally on the watch (e.g. from meal screen) not yet in remote COB.
+    /// Set before navigating to the bolus screen; included in recommended bolus calculation.
+    var pendingCarbs: Double = 0
+
     // Treatment data for chart display
     @Published var treatments: [Treatment] = []
     @Published var tempTargetEntries: [TempTargetEntry] = []
@@ -514,7 +518,8 @@ class BGFetcher: ObservableObject {
 
         let glucoseEffect = (Double(bg) - target) / isf
         let iobEffect = -(loopStatus?.iob ?? 0)
-        let cobEffect = (cr != nil && cr! > 0) ? (loopStatus?.cob ?? 0) / cr! : 0
+        let totalCarbs = (loopStatus?.cob ?? 0) + pendingCarbs
+        let cobEffect = (cr != nil && cr! > 0) ? totalCarbs / cr! : 0
         let deltaEffect = Double(currentBG?.delta ?? 0) / isf
 
         let fullBolus = glucoseEffect + iobEffect + cobEffect + deltaEffect
