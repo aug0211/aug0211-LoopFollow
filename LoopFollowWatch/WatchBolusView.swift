@@ -236,12 +236,19 @@ struct WatchBolusView: View {
             config: config
         ) { success, error in
             if success {
-                let bolusNote = confirmedAmount > 0 ? String(format: " + %.2fU bolus", confirmedAmount) : ""
-                resultMessage = "Meal sent!"
-                WatchRemoteService.postLocalNotification(
-                    title: confirmedAmount > 0 ? "Bolus + Meal Sent" : "Meal Sent",
-                    body: "\(meal.carbs)g carbs logged" + bolusNote
-                )
+                if confirmedAmount > 0 {
+                    resultMessage = "Bolus + Meal\nsent!"
+                    WatchRemoteService.postLocalNotification(
+                        title: "Bolus + Meal Sent",
+                        body: String(format: "%.2fU bolus + %dg carbs", confirmedAmount, meal.carbs)
+                    )
+                } else {
+                    resultMessage = "Meal sent!"
+                    WatchRemoteService.postLocalNotification(
+                        title: "Meal Sent",
+                        body: "\(meal.carbs)g carbs logged"
+                    )
+                }
                 autoDismiss()
             } else {
                 resultMessage = error ?? "Meal failed"
