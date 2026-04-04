@@ -1,9 +1,40 @@
 // LoopFollow
 // RectangularComplicationView.swift
+//
+// Reusable BG display view for both accessoryRectangular complication and
+// future Live Activity usage. All layout is driven by WidgetData; rendering
+// adapts to widgetRenderingMode for color vs. accented/vibrant contexts.
 
 import SwiftUI
 import WidgetKit
 
+// MARK: - Public Complication View (used by Widget + future Live Activity)
+
+/// The primary BG display: sparkline graph (left ~65%) + stats panel (right ~35%).
+/// Accepts `WidgetData` and a reference date for staleness calculation, making it
+/// reusable from both the widget timeline and a Live Activity `ActivityConfiguration`.
+struct BGComplicationContent: View {
+    let data: WidgetData
+    /// The time to use for "now" when computing staleness and graph window.
+    /// For widgets this is the entry's displayDate; for Live Activities it's Date().
+    let displayDate: Date
+    let useColor: Bool
+
+    var body: some View {
+        HStack(spacing: 3) {
+            SparklineView(history: data.history, displayDate: displayDate, useColor: useColor)
+                .frame(maxWidth: .infinity)
+
+            StatsPanel(data: data, displayDate: displayDate, useColor: useColor)
+                .frame(width: 52)
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+/// Thin wrapper that reads `BGEntry` and the widget rendering mode, then delegates
+/// to `BGComplicationContent`. Kept separate so `BGComplicationContent` can also be
+/// used directly in a Live Activity without any WidgetKit dependency.
 struct RectangularComplicationView: View {
     let entry: BGEntry
     @Environment(\.widgetRenderingMode) var renderingMode
@@ -14,16 +45,11 @@ struct RectangularComplicationView: View {
 
     var body: some View {
         if let data = entry.data {
-            HStack(spacing: 3) {
-                // Left ~65%: Sparkline graph
-                SparklineView(history: data.history, useColor: useColor)
-                    .frame(maxWidth: .infinity)
-
-                // Right ~35%: Stats panel
-                StatsPanel(data: data, useColor: useColor)
-                    .frame(width: 52)
-            }
-            .padding(.horizontal, 2)
+            BGComplicationContent(
+                data: data,
+                displayDate: entry.displayDate,
+                useColor: useColor
+            )
         } else {
             Text("No Data")
                 .font(.system(size: 12))
@@ -36,15 +62,14 @@ struct RectangularComplicationView: View {
 
 private struct SparklineView: View {
     let history: [WidgetBGPoint]
+    let displayDate: Date
     let useColor: Bool
 
     // BG range thresholds (mg/dL)
-    private let lowUrgent = 55
     private let low = 70
     private let lowWarn = 80
     private let highWarn = 170
     private let high = 180
-    private let highUrgent = 250
 
     // Graph Y-axis range
     private let yMin: Double = 40
@@ -55,8 +80,7 @@ private struct SparklineView: View {
             let w = geo.size.width
             let h = geo.size.height
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
-            let now = Date()
-            let threeHoursAgo = now.addingTimeInterval(-3 * 3600)
+            let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
 
             ZStack {
                 // Dashed reference lines at 70 and 180
@@ -79,7 +103,7 @@ private struct SparklineView: View {
 
                 // BG dots
                 ForEach(sorted, id: \.timestamp) { point in
-                    let x = xPosition(for: point.timestamp, start: threeHoursAgo, end: now, width: w)
+                    let x = xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: w)
                     let y = yPosition(for: Double(point.value), height: h)
                     Circle()
                         .fill(dotColor(for: point.value))
@@ -100,7 +124,7 @@ private struct SparklineView: View {
     private func yPosition(for value: Double, height: Double) -> Double {
         let clamped = min(max(value, yMin), yMax)
         let fraction = (clamped - yMin) / (yMax - yMin)
-        return height * (1 - fraction) // invert: higher BG = higher on screen
+        return height * (1 - fraction)
     }
 
     private func dotColor(for bg: Int) -> Color {
@@ -115,6 +139,7 @@ private struct SparklineView: View {
 
 private struct StatsPanel: View {
     let data: WidgetData
+    let displayDate: Date
     let useColor: Bool
 
     var body: some View {
@@ -205,9 +230,8 @@ private struct StatsPanel: View {
     }
 
     private var stalenessText: String {
-        let minutes = Int(Date().timeIntervalSince(data.bgTimestamp) / 60)
+        let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
         if minutes < 1 { return "now" }
-        if minutes <= 5 { return "\(minutes)m" }
         return "\(minutes)m"
     }
 

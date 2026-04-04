@@ -4,7 +4,7 @@
 
 import Foundation
 
-struct WidgetBGPoint: Codable {
+struct WidgetBGPoint: Codable, Hashable {
     let value: Int      // mg/dL
     let timestamp: Date
 }

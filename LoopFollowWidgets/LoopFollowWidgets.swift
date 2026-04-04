@@ -22,5 +22,6 @@ struct BGComplicationWidget: Widget {
 struct LoopFollowWidgetBundle: WidgetBundle {
     var body: some Widget {
         BGComplicationWidget()
+        BGLiveActivityWidget()
     }
 }

@@ -518,6 +518,10 @@ class BGFetcher: ObservableObject {
         )
         data.save()
         WidgetCenter.shared.reloadAllTimelines()
+
+        // Re-arm the background refresh chain so the complication keeps updating
+        // even after the app goes to background.
+        ExtensionDelegate.scheduleBackgroundRefresh()
     }
 
     private func lookupScheduleValue(_ schedule: [(timeAsSeconds: Double, value: Double)]) -> Double? {
