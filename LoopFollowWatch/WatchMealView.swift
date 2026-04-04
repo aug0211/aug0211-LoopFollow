@@ -252,24 +252,20 @@ struct WatchMealView: View {
             mealTile(label: "Time", value: entryTimeText, field: .time)
         }
 
-        if editingField != nil {
-            Text("Tap a tile, then scroll crown")
-                .font(.system(size: 9))
-                .foregroundColor(.secondary)
-        } else {
-            Button("Confirm") {
-                if carbs > 0 || protein > 0 || fat > 0 {
-                    confirmedCarbs = Int(carbs)
-                    confirmedProtein = Int(protein)
-                    confirmedFat = Int(fat)
-                    confirmedTimeOffset = entryTimeOffset
-                    showConfirm = true
-                }
+        Button("Confirm") {
+            if carbs > 0 || protein > 0 || fat > 0 {
+                confirmedCarbs = Int(carbs)
+                confirmedProtein = Int(protein)
+                confirmedFat = Int(fat)
+                confirmedTimeOffset = entryTimeOffset
+                showConfirm = true
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.yellow)
-            .disabled(carbs <= 0 && protein <= 0 && fat <= 0)
         }
+        .buttonStyle(.borderedProminent)
+        .tint(.yellow)
+        .disabled(carbs <= 0 && protein <= 0 && fat <= 0)
+        .opacity(editingField == nil ? 1 : 0)
+        .allowsHitTesting(editingField == nil)
     }
 
     @ViewBuilder
