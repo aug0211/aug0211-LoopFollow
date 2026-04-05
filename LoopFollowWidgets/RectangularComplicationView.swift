@@ -304,7 +304,7 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 54, weight: .regular))
+                .font(.system(size: 64, weight: .regular))
                 .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
@@ -331,6 +331,7 @@ private struct StatsPanel: View {
                 Text(stalenessText)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(isStale ? .secondary : .primary)
+                    .padding(.top, 1)
             }
         }
     }
