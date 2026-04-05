@@ -96,11 +96,11 @@ struct WatchBolusView: View {
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .padding(.bottom, -4)
+                    .padding(.vertical, -6)
 
-                HStack(spacing: 5) {
-                    Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
-                        .font(.system(size: 14, weight: .medium))
+                HStack(spacing: 6) {
+                    Text("Rec: \(String(format: "%g", bgFetcher.recommendedBolus))U")
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
                         .onTapGesture {
                             rawCrown = min(bgFetcher.recommendedBolus, config.maxBolus) / 0.25
@@ -110,8 +110,9 @@ struct WatchBolusView: View {
                             showCalcDetail = true
                         } label: {
                             Image(systemName: "info.circle")
-                                .font(.system(size: 15))
-                                .foregroundColor(.blue.opacity(0.7))
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue.opacity(0.8))
+                                .frame(width: 36, height: 36)
                         }
                         .buttonStyle(.plain)
                     }
@@ -126,7 +127,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 6)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
