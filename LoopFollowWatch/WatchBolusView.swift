@@ -98,7 +98,7 @@ struct WatchBolusView: View {
                     .minimumScaleFactor(0.7)
 
                 HStack(spacing: 6) {
-                    Text("Calculated: \(String(format: "%g", bgFetcher.recommendedBolus))U")
+                    Text("Calculated: \(String(format: "%.2f", bgFetcher.recommendedBolus))U")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
                         .onTapGesture {
