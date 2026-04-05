@@ -28,8 +28,8 @@ struct BGComplicationContent: View {
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: .clear, location: 0.30),
-                        .init(color: .white, location: 0.72)
+                        .init(color: .clear, location: 0.39),
+                        .init(color: .white, location: 0.80)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
