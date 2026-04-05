@@ -101,7 +101,7 @@ private struct SparklineView: View {
         let start = lo - (lo % step) + step
         var ticks: [Int] = []
         var v = start
-        while v <= hi && ticks.count < 4 {
+        while v <= hi && ticks.count < 5 {
             ticks.append(v)
             v += step
         }
@@ -294,7 +294,7 @@ private struct StatsPanel: View {
             // Big BG value
             Text(bgText)
                 .font(.system(size: 48, weight: .regular))
-                .foregroundColor(isStale ? .secondary : .primary)
+                .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
                 .overlay {
