@@ -17,21 +17,21 @@ struct RemoteControlView: View {
         NavigationStack {
             LazyVGrid(columns: columns, spacing: 8) {
                 Button {
-                    router.showBolus = true
+                    router.activeDestination = .bolus
                 } label: {
                     RemoteTile(icon: "💧", label: "Bolus", color: .blue)
                 }
                 .buttonStyle(.plain)
 
                 Button {
-                    router.showMeal = true
+                    router.activeDestination = .meal
                 } label: {
                     RemoteTile(icon: "🍽️", label: "Meal", color: .yellow)
                 }
                 .buttonStyle(.plain)
 
                 Button {
-                    router.showOverride = true
+                    router.activeDestination = .override
                 } label: {
                     RemoteTile(icon: "⚡", label: "Override", color: .purple)
                 }
@@ -46,22 +46,23 @@ struct RemoteControlView: View {
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
-            .navigationDestination(isPresented: $router.showBolus) {
-                WatchBolusView(config: config, bgFetcher: bgFetcher, popToRoot: { router.showBolus = false })
-            }
-            .navigationDestination(isPresented: $router.showMeal) {
-                WatchMealView(config: config, bgFetcher: bgFetcher, popToRoot: { router.showMeal = false })
-            }
-            .navigationDestination(isPresented: $router.showOverride) {
-                WatchOverrideView(config: config, bgFetcher: bgFetcher)
-            }
-        }
-        .onAppear {
-            router.consumePendingDestination()
-        }
-        .onChange(of: router.pendingDestination) { newValue in
-            if newValue != nil {
-                router.consumePendingDestination()
+            .navigationDestination(item: $router.activeDestination) { destination in
+                switch destination {
+                case .bolus:
+                    WatchBolusView(
+                        config: config,
+                        bgFetcher: bgFetcher,
+                        popToRoot: { router.activeDestination = nil }
+                    )
+                case .meal:
+                    WatchMealView(
+                        config: config,
+                        bgFetcher: bgFetcher,
+                        popToRoot: { router.activeDestination = nil }
+                    )
+                case .override:
+                    WatchOverrideView(config: config, bgFetcher: bgFetcher)
+                }
             }
         }
     }

@@ -257,7 +257,7 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 44, weight: .medium))
+                .font(.system(size: 48, weight: .medium))
                 .foregroundColor(.primary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)

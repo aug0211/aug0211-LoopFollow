@@ -6,56 +6,42 @@
 
 import SwiftUI
 
-enum DeepLinkDestination {
+enum DeepLinkDestination: Hashable {
     case bolus, meal, override
 }
 
 class NavigationRouter: ObservableObject {
     /// 0 = ContentView (BG display), 1 = RemoteControlView
     @Published var activeTab: Int = 0
-    @Published var showBolus: Bool = false
-    @Published var showMeal: Bool = false
-    @Published var showOverride: Bool = false
 
-    /// Set before switching tabs so RemoteControlView can navigate immediately on appear.
-    @Published var pendingDestination: DeepLinkDestination?
+    /// The currently presented (or about-to-be-presented) destination inside RemoteControlView's NavigationStack.
+    /// Setting this to a non-nil value pushes the corresponding screen; setting it to nil pops back to the grid.
+    @Published var activeDestination: DeepLinkDestination?
 
     /// Parse a deep link URL and navigate to the appropriate screen.
     /// URLs: loopfollow://open (main graph), loopfollow://bolus, loopfollow://meal, loopfollow://override
     func handle(_ url: URL) {
         guard url.scheme == "loopfollow" else { return }
 
-        // Reset any active navigation
-        showBolus = false
-        showMeal = false
-        showOverride = false
-        pendingDestination = nil
+        // Clear any active navigation first
+        activeDestination = nil
 
         switch url.host {
-        case "bolus":
-            pendingDestination = .bolus
-            activeTab = 1
-        case "meal":
-            pendingDestination = .meal
-            activeTab = 1
-        case "override":
-            pendingDestination = .override
-            activeTab = 1
+        case "bolus":    navigateTo(.bolus)
+        case "meal":     navigateTo(.meal)
+        case "override": navigateTo(.override)
         default:
             // "open" or unknown — stay on main graph (tab 0)
             activeTab = 0
         }
     }
 
-    /// Called by RemoteControlView on appear to consume a pending deep link.
-    func consumePendingDestination() {
-        guard let destination = pendingDestination else { return }
-        pendingDestination = nil
-
-        switch destination {
-        case .bolus:    showBolus = true
-        case .meal:     showMeal = true
-        case .override: showOverride = true
+    /// Switch to the Remote tab, then push the destination after a brief delay
+    /// so the tab switch can settle before the NavigationStack push fires.
+    private func navigateTo(_ dest: DeepLinkDestination) {
+        activeTab = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.activeDestination = dest
         }
     }
 }

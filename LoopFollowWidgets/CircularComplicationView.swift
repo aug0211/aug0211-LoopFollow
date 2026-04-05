@@ -4,6 +4,7 @@
 // Round complication for modular watch faces (accessoryCircular).
 // Layout: staleness on top, BG center, delta + trend below.
 // No color — transparent background, white/primary text.
+// When reading is >15 min stale, all text turns gray with strikethrough on BG.
 
 import SwiftUI
 import WidgetKit
@@ -13,6 +14,8 @@ struct CircularComplicationView: View {
 
     var body: some View {
         if let data = entry.data {
+            let isStale = entry.displayDate.timeIntervalSince(data.bgTimestamp) > 15 * 60
+
             ZStack {
                 AccessoryWidgetBackground()
 
@@ -20,13 +23,15 @@ struct CircularComplicationView: View {
                     // Staleness — top
                     Text(stalenessText(data, displayDate: entry.displayDate))
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(stalenessColor(data, displayDate: entry.displayDate))
+                        .foregroundColor(isStale ? .secondary : stalenessColor(data, displayDate: entry.displayDate))
+                        .strikethrough(isStale, color: .secondary)
                         .lineLimit(1)
 
                     // BG value — center, biggest
                     Text(bgText(data))
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(isStale ? .secondary : .primary)
+                        .strikethrough(isStale, color: .secondary)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
 
@@ -39,6 +44,7 @@ struct CircularComplicationView: View {
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
+                    .strikethrough(isStale, color: .secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 }
@@ -78,7 +84,6 @@ struct CircularComplicationView: View {
 
     private func stalenessColor(_ data: WidgetData, displayDate: Date) -> Color {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if minutes >= 16 { return .red }
         if minutes >= 6 { return .secondary }
         return .primary
     }
