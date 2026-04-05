@@ -4,7 +4,7 @@
 // Round complication for modular watch faces (accessoryCircular).
 // Layout: staleness on top, BG center, delta + trend below.
 // No color — transparent background, white/primary text.
-// When reading is >15 min stale, all text turns gray with strikethrough on BG.
+// When reading is >15 min stale, all text turns gray with strikethrough.
 
 import SwiftUI
 import WidgetKit
@@ -29,7 +29,7 @@ struct CircularComplicationView: View {
 
                     // BG value — center, biggest
                     Text(bgText(data))
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 22, weight: .medium))
                         .foregroundColor(isStale ? .secondary : .primary)
                         .strikethrough(isStale, color: .secondary)
                         .minimumScaleFactor(0.6)
@@ -38,12 +38,13 @@ struct CircularComplicationView: View {
                     // Trend arrow + delta — bottom
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text(data.direction)
+                            .baselineOffset(-1)
                         if let d = data.delta {
                             Text(deltaText(d, units: data.units))
                         }
                     }
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isStale ? .secondary : .primary)
                     .strikethrough(isStale, color: .secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)

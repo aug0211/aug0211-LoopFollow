@@ -253,12 +253,17 @@ private struct StatsPanel: View {
     let data: WidgetData
     let displayDate: Date
 
+    private var isStale: Bool {
+        displayDate.timeIntervalSince(data.bgTimestamp) > 15 * 60
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
                 .font(.system(size: 48, weight: .regular))
-                .foregroundColor(.primary)
+                .foregroundColor(isStale ? .secondary : .primary)
+                .strikethrough(isStale, color: .secondary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
 
@@ -266,17 +271,20 @@ private struct StatsPanel: View {
             VStack(alignment: .leading, spacing: -2) {
                 Text(data.direction)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(isStale ? .secondary : .primary)
+                    .strikethrough(isStale, color: .secondary)
 
                 if let d = data.delta {
                     Text(deltaText(d))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(isStale ? .secondary : .primary)
+                        .strikethrough(isStale, color: .secondary)
                 }
 
                 Text(stalenessText)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(stalenessColor)
+                    .foregroundColor(isStale ? .secondary : stalenessColor)
+                    .strikethrough(isStale, color: .secondary)
             }
         }
     }
