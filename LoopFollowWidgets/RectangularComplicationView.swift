@@ -109,7 +109,7 @@ private struct SparklineView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let rightInset: CGFloat = 6  // keep sparkline clear of y-axis labels
+            let rightInset: CGFloat = 12  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
