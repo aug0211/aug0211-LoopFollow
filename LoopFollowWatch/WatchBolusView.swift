@@ -92,11 +92,10 @@ struct WatchBolusView: View {
                 .padding(.horizontal, 20)
 
                 Text(String(format: "%.2f U", amount))
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .font(.system(size: 60, weight: .bold, design: .rounded))
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .padding(.top, -4)
 
                 HStack(spacing: 6) {
                     Text("Calculated: \(String(format: "%g", bgFetcher.recommendedBolus))U")
@@ -128,7 +127,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 20)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
