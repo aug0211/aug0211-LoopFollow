@@ -27,13 +27,20 @@ struct WidgetData: Codable {
 
     private static let storageKey = "widgetData"
 
+    /// App Group shared between the watch app and widget extension.
+    static let appGroupID = "group.loopfollow.shared"
+
+    private static var sharedDefaults: UserDefaults {
+        UserDefaults(suiteName: appGroupID) ?? .standard
+    }
+
     func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
+        Self.sharedDefaults.set(data, forKey: Self.storageKey)
     }
 
     static func load() -> WidgetData? {
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+        guard let data = sharedDefaults.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode(WidgetData.self, from: data)
         else { return nil }
         return decoded
