@@ -2,8 +2,8 @@
 // RectangularComplicationView.swift
 //
 // Reusable BG display view for both accessoryRectangular complication and
-// future Live Activity usage. Text overlays the left side of a full-width
-// SweetDreams-style filled-area sparkline with smooth Catmull-Rom curves.
+// future Live Activity usage. Full colored background (green/red/yellow based
+// on BG range) with white text and sparkline overlaid — SweetDreams style.
 
 import SwiftUI
 import WidgetKit
@@ -11,20 +11,42 @@ import WidgetKit
 // MARK: - Public Complication View (used by Widget + future Live Activity)
 
 /// Full-width filled-area sparkline with text stats overlaid on the left.
-/// The graph fades from transparent (left, behind text) to opaque (right).
+/// In color mode: entire background is the BG range color, all content is white.
 struct BGComplicationContent: View {
     let data: WidgetData
     let displayDate: Date
     let useColor: Bool
 
+    /// BG range color: <70 red, 70-180 green, >180 yellow
+    private var bgRangeColor: Color {
+        let bg = data.bgValue
+        if bg < 70 { return .red }
+        if bg > 180 { return .yellow }
+        return .green
+    }
+
     var body: some View {
         ZStack(alignment: .leading) {
+            // Colored background fill (color mode only)
+            if useColor {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                bgRangeColor.opacity(0.95),
+                                bgRangeColor.opacity(0.75)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+
             // Full-width sparkline — fades in from left to right
             SparklineView(
                 history: data.history,
                 displayDate: displayDate,
-                useColor: useColor,
-                currentBG: data.bgValue
+                useColor: useColor
             )
             .mask(
                 LinearGradient(
@@ -39,15 +61,14 @@ struct BGComplicationContent: View {
 
             // Text overlay on the left
             StatsPanel(data: data, displayDate: displayDate, useColor: useColor)
-                .padding(.leading, 2)
+                .padding(.leading, 4)
         }
         .padding(.horizontal, 2)
     }
 }
 
 /// Thin wrapper that reads `BGEntry` and the widget rendering mode, then delegates
-/// to `BGComplicationContent`. Kept separate so `BGComplicationContent` can also be
-/// used directly in a Live Activity without any WidgetKit dependency.
+/// to `BGComplicationContent`.
 struct RectangularComplicationView: View {
     let entry: BGEntry
     @Environment(\.widgetRenderingMode) var renderingMode
@@ -71,13 +92,12 @@ struct RectangularComplicationView: View {
     }
 }
 
-// MARK: - Sparkline Graph (SweetDreams-style filled area with Catmull-Rom curves)
+// MARK: - Sparkline Graph (filled area with Catmull-Rom curves)
 
 private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
     let useColor: Bool
-    let currentBG: Int
 
     // Graph Y-axis range
     private let yMin: Double = 40
@@ -85,14 +105,6 @@ private struct SparklineView: View {
 
     /// Y-axis labels shown on the right edge
     private let yLabels: [Int] = [80, 120, 180]
-
-    /// BG range color: <70 red, 70-180 green, >180 yellow
-    private var graphColor: Color {
-        guard useColor else { return .primary }
-        if currentBG < 70 { return .red }
-        if currentBG > 180 { return .yellow }
-        return .green
-    }
 
     var body: some View {
         GeometryReader { geo in
@@ -111,15 +123,13 @@ private struct SparklineView: View {
 
             ZStack {
                 if screenPoints.count >= 2 {
-                    // Filled area with gradient (3D glow effect)
+                    // Filled area with gradient
                     buildFillPath(points: screenPoints, height: h)
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    graphColor.opacity(0.5),
-                                    graphColor.opacity(0.2),
-                                    graphColor.opacity(0.02)
-                                ],
+                                colors: useColor
+                                    ? [Color.white.opacity(0.3), Color.white.opacity(0.05)]
+                                    : [Color.primary.opacity(0.3), Color.primary.opacity(0.05)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -128,7 +138,7 @@ private struct SparklineView: View {
                     // Smooth line on top
                     buildCurvePath(points: screenPoints)
                         .stroke(
-                            graphColor,
+                            useColor ? Color.white : Color.primary,
                             style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
                         )
                 }
@@ -138,7 +148,7 @@ private struct SparklineView: View {
                     let y = yPosition(for: Double(value), height: h)
                     Text("\(value)")
                         .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(.secondary.opacity(0.7))
+                        .foregroundColor(useColor ? .white.opacity(0.7) : .secondary.opacity(0.7))
                         .position(x: w - 10, y: y)
                 }
             }
@@ -147,7 +157,6 @@ private struct SparklineView: View {
 
     // MARK: - Catmull-Rom curve path
 
-    /// Builds a smooth Catmull-Rom curve through the given points.
     private func buildCurvePath(points: [CGPoint]) -> Path {
         Path { path in
             guard points.count >= 2 else { return }
@@ -164,7 +173,6 @@ private struct SparklineView: View {
                 let p2 = points[min(i + 1, points.count - 1)]
                 let p3 = points[min(i + 2, points.count - 1)]
 
-                // Catmull-Rom → cubic bezier control points
                 let cp1 = CGPoint(
                     x: p1.x + (p2.x - p0.x) / 6.0,
                     y: p1.y + (p2.y - p0.y) / 6.0
@@ -179,7 +187,6 @@ private struct SparklineView: View {
         }
     }
 
-    /// Builds the filled area: Catmull-Rom curve closed down to the bottom edge.
     private func buildFillPath(points: [CGPoint], height: Double) -> Path {
         Path { path in
             guard let first = points.first, let last = points.last else { return }
@@ -207,7 +214,6 @@ private struct SparklineView: View {
                 }
             }
 
-            // Close down to bottom edge
             path.addLine(to: CGPoint(x: last.x, y: height))
             path.addLine(to: CGPoint(x: first.x, y: height))
             path.closeSubpath()
@@ -242,20 +248,20 @@ private struct StatsPanel: View {
             // Line 1: BG value + trend arrow
             HStack(spacing: 2) {
                 Text(bgText)
-                    .font(.system(size: 26, weight: .heavy, design: .rounded))
-                    .foregroundColor(bgColor)
+                    .font(.system(size: 26, weight: .heavy))
+                    .foregroundColor(useColor ? .white : .primary)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 Text(data.direction)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(bgColor)
+                    .foregroundColor(useColor ? .white : .primary)
             }
 
             // Line 2: Delta + staleness
             HStack(spacing: 3) {
                 if let d = data.delta {
                     Text(deltaText(d))
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(useColor ? .white : .primary)
                 }
                 Text(stalenessText)
@@ -269,13 +275,13 @@ private struct StatsPanel: View {
             HStack(spacing: 3) {
                 if let iob = data.iob {
                     Text(String(format: "%.1fU", iob))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundColor(useColor ? .cyan : .primary)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(useColor ? .white : .primary)
                 }
                 if let cob = data.cob {
                     Text(String(format: "%.0fg", cob))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundColor(useColor ? .yellow : .primary)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(useColor ? .white : .primary)
                 }
             }
             .lineLimit(1)
@@ -287,12 +293,12 @@ private struct StatsPanel: View {
                 let diff = rate - scheduled
                 HStack(spacing: 1) {
                     Text(String(format: "%.2fU", rate))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundColor(useColor ? basalColor(diff: diff) : .primary)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(useColor ? .white : .primary)
                     if abs(diff) >= 0.005 {
                         Text(String(format: "%+.2f", diff))
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(useColor ? basalColor(diff: diff) : .secondary)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(useColor ? .white.opacity(0.7) : .secondary)
                     }
                 }
                 .lineLimit(1)
@@ -306,14 +312,6 @@ private struct StatsPanel: View {
             return String(format: "%.1f", Double(data.bgValue) * 0.0555)
         }
         return "\(data.bgValue)"
-    }
-
-    private var bgColor: Color {
-        guard useColor else { return .primary }
-        let bg = data.bgValue
-        if bg < 70 || bg > 180 { return .red }
-        if bg < 80 || bg > 170 { return .yellow }
-        return .green
     }
 
     private func deltaText(_ delta: Int) -> String {
@@ -332,8 +330,8 @@ private struct StatsPanel: View {
 
     private var stalenessColor: Color {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if minutes >= 16 { return .red }
-        if minutes >= 6 { return .secondary }
+        if minutes >= 16 { return useColor ? .white.opacity(0.5) : .red }
+        if minutes >= 6 { return useColor ? .white.opacity(0.7) : .secondary }
         return useColor ? .white : .primary
     }
 
