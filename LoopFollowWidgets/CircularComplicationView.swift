@@ -36,7 +36,7 @@ struct CircularComplicationView: View {
                         .lineLimit(1)
 
                     // Trend arrow + delta — bottom
-                    HStack(spacing: 1) {
+                    HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text(data.direction)
                         if let d = data.delta {
                             Text(deltaText(d, units: data.units))

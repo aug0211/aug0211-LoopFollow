@@ -81,7 +81,7 @@ private struct SparklineView: View {
         let values = history.map { Double($0.value) }
         let lo = values.min()!
         let hi = values.max()!
-        let padding = max((hi - lo) * 0.15, 10)
+        let padding = max((hi - lo) * 0.05, 5)
         return (floor((lo - padding) / 10) * 10, ceil((hi + padding) / 10) * 10)
     }
 
@@ -109,7 +109,7 @@ private struct SparklineView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let rightInset: CGFloat = 24  // keep sparkline clear of y-axis labels
+            let rightInset: CGFloat = 6  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
@@ -257,7 +257,7 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 48, weight: .medium))
+                .font(.system(size: 48, weight: .regular))
                 .foregroundColor(.primary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
