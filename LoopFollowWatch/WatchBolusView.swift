@@ -54,6 +54,8 @@ struct WatchBolusView: View {
                 CrownConfirmView(label: confirmedAmount > 0 ? "to deliver" : "to send meal") {
                     sendBolusAndMeal()
                 }
+
+                Spacer()
             } else {
                 HStack {
                     Button {
