@@ -45,6 +45,7 @@ struct ContentView: View {
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
                     }
+                    .padding(.bottom, 30)
                 }
             } else {
                 VStack(spacing: 8) {
