@@ -22,6 +22,7 @@
 		BB0100000000000B000000AA /* LoopFollowWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BB01000000000001000000AA /* LoopFollowWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BB0100000000000F000000AA /* PhoneSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100000000000E000000AA /* PhoneSessionManager.swift */; };
 		CC01000000000001000000AA /* LoopFollowWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CC01000000000002000000AA /* LoopFollowWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CC01000000000030000000AA /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC01000000000031000000AA /* WidgetData.swift */; };
 		DD0247592DB2E89600FCADF6 /* AlarmCondition.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0247582DB2E89600FCADF6 /* AlarmCondition.swift */; };
 		DD0247712DB4337700FCADF6 /* BuildExpireCondition.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD02475B2DB2E8FB00FCADF6 /* BuildExpireCondition.swift */; };
 		DD0650A92DCA8A10004D3B41 /* AlarmBGSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0650A82DCA8A10004D3B41 /* AlarmBGSection.swift */; };
@@ -457,6 +458,7 @@
 		BB01000000000001000000AA /* LoopFollowWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LoopFollowWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC01000000000002000000AA /* LoopFollowWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LoopFollowWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0100000000000E000000AA /* PhoneSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSessionManager.swift; sourceTree = "<group>"; };
+		CC01000000000031000000AA /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WidgetData.swift; path = LoopFollowWatch/WidgetData.swift; sourceTree = SOURCE_ROOT; };
 		DD0247582DB2E89600FCADF6 /* AlarmCondition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmCondition.swift; sourceTree = "<group>"; };
 		DD02475B2DB2E8FB00FCADF6 /* BuildExpireCondition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildExpireCondition.swift; sourceTree = "<group>"; };
 		DD0650A82DCA8A10004D3B41 /* AlarmBGSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmBGSection.swift; sourceTree = "<group>"; };
@@ -837,6 +839,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				WidgetData.swift,
 			);
 			target = BB01000000000003000000AA /* LoopFollowWatch */;
 		};
@@ -2030,6 +2033,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC01000000000030000000AA /* WidgetData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
