@@ -84,20 +84,24 @@ private struct SparklineView: View {
         return (lo - 5, hi + 5)
     }
 
-    /// Generate up to 4 "nice" ticks within the dynamic range.
+    /// Generate up to 4 "nice" ticks within the actual BG data range.
     private var yTicks: [Int] {
-        let range = dataRange
-        let span = range.max - range.min
-        // Choose step: prefer 20, use 40 if range is large, 10 if very small
+        guard !history.isEmpty else { return [] }
+        let values = history.map { $0.value }
+        let lo = values.min()!
+        let hi = values.max()!
+        let span = hi - lo
+        // Choose step based on data span
         let step: Int
-        if span <= 40 { step = 10 }
+        if span <= 20 { step = 5 }
+        else if span <= 50 { step = 10 }
         else if span <= 100 { step = 20 }
         else { step = 40 }
 
-        let start = Int(range.min) - (Int(range.min) % step) + step
+        let start = lo - (lo % step) + step
         var ticks: [Int] = []
         var v = start
-        while v < Int(range.max) && ticks.count < 4 {
+        while v <= hi && ticks.count < 4 {
             ticks.append(v)
             v += step
         }
@@ -108,7 +112,7 @@ private struct SparklineView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let rightInset: CGFloat = 6  // keep sparkline clear of y-axis labels
+            let rightInset: CGFloat = 8  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
