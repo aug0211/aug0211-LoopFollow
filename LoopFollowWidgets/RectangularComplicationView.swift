@@ -90,36 +90,24 @@ private struct SparklineView: View {
         return (lo - 2, hi + 2)
     }
 
-    /// Generate up to 4 "nice" ticks strictly within the graph's visible range.
+    /// Generate ticks: show actual visible min and max BG as debug labels.
     private var yTicks: [Int] {
-        let range = dataRange
-        let lo = Int(ceil(range.min))
-        let hi = Int(floor(range.max))
-        let span = hi - lo
-        guard span > 0 else { return [] }
-
-        let step: Int
-        if span <= 20 { step = 5 }
-        else if span <= 50 { step = 10 }
-        else if span <= 100 { step = 20 }
-        else { step = 40 }
-
-        // First tick at the next multiple of step above lo
-        let start = lo + (step - (lo % step)) % step
-        var ticks: [Int] = []
-        var v = start
-        while v <= hi && ticks.count < 4 {
-            ticks.append(v)
-            v += step
-        }
-        return ticks
+        let visible = visibleHistory
+        guard !visible.isEmpty else { return [] }
+        let values = visible.map { $0.value }
+        let lo = values.min()!
+        let hi = values.max()!
+        // Show the actual min and max so we can verify
+        if lo == hi { return [lo] }
+        let mid = (lo + hi) / 2
+        return [lo, mid, hi]
     }
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let rightInset: CGFloat = 11  // keep sparkline clear of y-axis labels
+            let rightInset: CGFloat = 14  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
@@ -316,17 +304,17 @@ private struct StatsPanel: View {
             VStack(alignment: .leading, spacing: -2) {
                 Text(data.direction)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundColor(isStale ? .secondary : .primary)
 
                 if let d = data.delta {
                     Text(deltaText(d))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.secondary.opacity(0.6))
+                        .foregroundColor(isStale ? .secondary : .primary)
                 }
 
                 Text(stalenessText)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundColor(isStale ? .secondary : .primary)
             }
         }
     }
