@@ -73,9 +73,9 @@ struct WatchMealView: View {
 
     private var pendingMealData: PendingMealData {
         PendingMealData(
-            carbs: Int(carbs),
-            protein: Int(protein) > 0 ? Int(protein) : nil,
-            fat: Int(fat) > 0 ? Int(fat) : nil,
+            carbs: Int(carbs.rounded()),
+            protein: Int(protein.rounded()) > 0 ? Int(protein.rounded()) : nil,
+            fat: Int(fat.rounded()) > 0 ? Int(fat.rounded()) : nil,
             timeOffset: entryTimeOffset
         )
     }
@@ -121,9 +121,9 @@ struct WatchMealView: View {
                 crownFocused = true
             }
         }
-        .onChange(of: carbs) { _ in playHaptic(Int(carbs)) }
-        .onChange(of: protein) { _ in playHaptic(Int(protein)) }
-        .onChange(of: fat) { _ in playHaptic(Int(fat)) }
+        .onChange(of: carbs) { _ in playHaptic(Int(carbs.rounded())) }
+        .onChange(of: protein) { _ in playHaptic(Int(protein.rounded())) }
+        .onChange(of: fat) { _ in playHaptic(Int(fat.rounded())) }
         .onChange(of: entryTimeOffset) { _ in playHaptic(Int(entryTimeOffset)) }
         .navigationDestination(isPresented: $showBolusStep) {
             WatchBolusView(config: config, bgFetcher: bgFetcher, pendingMeal: pendingMealData, popToRoot: popToRoot)
@@ -203,11 +203,11 @@ struct WatchMealView: View {
         .padding(.horizontal, 20)
 
         LazyVGrid(columns: gridColumns, spacing: 8) {
-            mealTile(label: "Carbs", value: "\(Int(carbs))g", field: .carbs)
+            mealTile(label: "Carbs", value: "\(Int(carbs.rounded()))g", field: .carbs)
 
             if config.mealWithFatProtein {
-                mealTile(label: "Fat", value: "\(Int(fat))g", field: .fat)
-                mealTile(label: "Protein", value: "\(Int(protein))g", field: .protein)
+                mealTile(label: "Fat", value: "\(Int(fat.rounded()))g", field: .fat)
+                mealTile(label: "Protein", value: "\(Int(protein.rounded()))g", field: .protein)
             }
 
             mealTile(label: "Time", value: entryTimeText, field: .time)
@@ -215,7 +215,7 @@ struct WatchMealView: View {
 
         Button("Continue") {
             if carbs > 0 || protein > 0 || fat > 0 {
-                bgFetcher.pendingCarbs = Double(Int(carbs))
+                bgFetcher.pendingCarbs = Double(Int(carbs.rounded()))
                 bgFetcher.updateRecommendedBolus()
                 showBolusStep = true
             }
