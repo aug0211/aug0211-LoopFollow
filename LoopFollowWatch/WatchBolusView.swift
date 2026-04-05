@@ -71,7 +71,7 @@ struct WatchBolusView: View {
 
                     Spacer()
 
-                    Text("💧 Bolus")
+                    Text("Bolus")
                         .font(.system(size: 16, weight: .semibold))
 
                     Spacer()
@@ -96,10 +96,10 @@ struct WatchBolusView: View {
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .padding(.vertical, -6)
+                    .padding(.top, -8)
 
                 HStack(spacing: 6) {
-                    Text("Rec: \(String(format: "%g", bgFetcher.recommendedBolus))U")
+                    Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
                         .onTapGesture {
@@ -117,6 +117,7 @@ struct WatchBolusView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.top, 2)
 
                 Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                     confirmedAmount = amount
@@ -127,7 +128,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 6)
+        .padding(.top, 14)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
