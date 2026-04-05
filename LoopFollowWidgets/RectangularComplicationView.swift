@@ -311,9 +311,6 @@ private struct StatsPanel: View {
     }
 
     private var stalenessColor: Color {
-        let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if minutes >= 16 { return .red }
-        if minutes >= 6 { return .secondary }
         return .primary
     }
 }
