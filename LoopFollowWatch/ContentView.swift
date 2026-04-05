@@ -44,8 +44,8 @@ struct ContentView: View {
                         Text("Loading...")
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
+                            .offset(y: -20)
                     }
-                    .padding(.bottom, 30)
                 }
             } else {
                 VStack(spacing: 8) {
