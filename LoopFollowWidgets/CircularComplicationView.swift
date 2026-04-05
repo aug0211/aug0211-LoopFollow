@@ -14,7 +14,7 @@ struct CircularComplicationView: View {
 
     var body: some View {
         if let data = entry.data {
-            let isStale = entry.displayDate.timeIntervalSince(data.bgTimestamp) > 15 * 60
+            let isStale = entry.displayDate.timeIntervalSince(data.bgTimestamp) >= 15 * 60
 
             ZStack {
                 AccessoryWidgetBackground()
@@ -24,14 +24,14 @@ struct CircularComplicationView: View {
                     Text(stalenessText(data, displayDate: entry.displayDate))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(isStale ? .secondary : stalenessColor(data, displayDate: entry.displayDate))
-                        .strikethrough(isStale, color: .secondary)
+                        .strikethrough(isStale)
                         .lineLimit(1)
 
                     // BG value — center, biggest
                     Text(bgText(data))
                         .font(.system(size: 22, weight: .medium))
                         .foregroundColor(isStale ? .secondary : .primary)
-                        .strikethrough(isStale, color: .secondary)
+                        .strikethrough(isStale)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
 
@@ -45,7 +45,7 @@ struct CircularComplicationView: View {
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(isStale ? .secondary : .primary)
-                    .strikethrough(isStale, color: .secondary)
+                    .strikethrough(isStale)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 }
