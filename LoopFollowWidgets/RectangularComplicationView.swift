@@ -75,14 +75,13 @@ private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
 
-    /// Compute Y-axis range dynamically from actual data with padding.
+    /// Compute Y-axis range dynamically from actual data with 5-point padding.
     private var dataRange: (min: Double, max: Double) {
         guard !history.isEmpty else { return (40, 300) }
         let values = history.map { Double($0.value) }
         let lo = values.min()!
         let hi = values.max()!
-        let padding = max((hi - lo) * 0.05, 5)
-        return (floor((lo - padding) / 10) * 10, ceil((hi + padding) / 10) * 10)
+        return (lo - 5, hi + 5)
     }
 
     /// Generate up to 4 "nice" ticks within the dynamic range.
