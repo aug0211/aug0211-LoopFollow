@@ -81,7 +81,7 @@ private struct SparklineView: View {
         let values = history.map { Double($0.value) }
         let lo = values.min()!
         let hi = values.max()!
-        return (lo - 5, hi + 5)
+        return (lo - 2, hi + 2)
     }
 
     /// Generate up to 4 "nice" ticks within the actual BG data range.
@@ -112,7 +112,7 @@ private struct SparklineView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let rightInset: CGFloat = 8  // keep sparkline clear of y-axis labels
+            let rightInset: CGFloat = 10  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
