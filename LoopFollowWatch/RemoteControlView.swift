@@ -7,7 +7,6 @@ struct RemoteControlView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
     @ObservedObject var router: NavigationRouter
-    @State private var showOverride = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -32,7 +31,7 @@ struct RemoteControlView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    showOverride = true
+                    router.showOverride = true
                 } label: {
                     RemoteTile(icon: "⚡", label: "Override", color: .purple)
                 }
@@ -53,18 +52,16 @@ struct RemoteControlView: View {
             .navigationDestination(isPresented: $router.showMeal) {
                 WatchMealView(config: config, bgFetcher: bgFetcher, popToRoot: { router.showMeal = false })
             }
-            .navigationDestination(isPresented: $showOverride) {
+            .navigationDestination(isPresented: $router.showOverride) {
                 WatchOverrideView(config: config, bgFetcher: bgFetcher)
             }
         }
         .onAppear {
-            // Consume any pending deep link immediately — no pit-stop at the grid
             router.consumePendingDestination()
         }
-        .onChange(of: router.showOverride) { newValue in
-            if newValue {
-                showOverride = true
-                router.showOverride = false
+        .onChange(of: router.pendingDestination) { newValue in
+            if newValue != nil {
+                router.consumePendingDestination()
             }
         }
     }

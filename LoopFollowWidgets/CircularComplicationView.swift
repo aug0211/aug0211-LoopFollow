@@ -25,7 +25,7 @@ struct CircularComplicationView: View {
 
                     // BG value — center, biggest
                     Text(bgText(data))
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(.primary)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)

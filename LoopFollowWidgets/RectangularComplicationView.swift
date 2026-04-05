@@ -109,15 +109,17 @@ private struct SparklineView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
+            let rightInset: CGFloat = 24  // keep sparkline clear of y-axis labels
+            let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
             let yMin = dataRange.min
             let yMax = dataRange.max
 
-            // Convert BG points to screen coordinates
+            // Convert BG points to screen coordinates (within sparkline area)
             let screenPoints: [CGPoint] = sorted.map { point in
                 CGPoint(
-                    x: xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: w),
+                    x: xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: sparkW),
                     y: yPosition(for: Double(point.value), yMin: yMin, yMax: yMax, height: h)
                 )
             }
@@ -255,7 +257,7 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 40, weight: .medium))
+                .font(.system(size: 44, weight: .medium))
                 .foregroundColor(.primary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
