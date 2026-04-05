@@ -32,13 +32,14 @@ struct ActionTimelineProvider: TimelineProvider {
 
 struct ActionShortcutView: View {
     let systemImage: String
+    var color: Color = .primary
 
     var body: some View {
         ZStack {
             AccessoryWidgetBackground()
             Image(systemName: systemImage)
                 .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(.primary)
+                .foregroundColor(color)
         }
     }
 }
@@ -50,7 +51,7 @@ struct BolusShortcutWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ActionTimelineProvider()) { _ in
-            ActionShortcutView(systemImage: "drop.fill")
+            ActionShortcutView(systemImage: "drop.fill", color: .blue)
                 .containerBackground(.fill.tertiary, for: .widget)
                 .widgetURL(URL(string: "loopfollow://bolus"))
         }
@@ -67,7 +68,7 @@ struct MealShortcutWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ActionTimelineProvider()) { _ in
-            ActionShortcutView(systemImage: "fork.knife")
+            ActionShortcutView(systemImage: "fork.knife", color: .yellow)
                 .containerBackground(.fill.tertiary, for: .widget)
                 .widgetURL(URL(string: "loopfollow://meal"))
         }
@@ -84,7 +85,7 @@ struct OverrideShortcutWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ActionTimelineProvider()) { _ in
-            ActionShortcutView(systemImage: "bolt.fill")
+            ActionShortcutView(systemImage: "bolt.fill", color: .purple)
                 .containerBackground(.fill.tertiary, for: .widget)
                 .widgetURL(URL(string: "loopfollow://override"))
         }
