@@ -39,6 +39,9 @@ struct BGComplicationWidget: Widget {
 struct LoopFollowWidgetBundle: WidgetBundle {
     var body: some Widget {
         BGComplicationWidget()
+        BolusShortcutWidget()
+        MealShortcutWidget()
+        OverrideShortcutWidget()
         #if os(iOS)
         BGLiveActivityWidget()
         #endif

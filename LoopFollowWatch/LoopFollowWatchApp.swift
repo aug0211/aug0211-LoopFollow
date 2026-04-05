@@ -92,18 +92,24 @@ struct LoopFollowWatchApp: App {
 
     @StateObject private var sessionManager = WatchSessionManager.shared
     @StateObject private var bgFetcher = BGFetcher()
+    @StateObject private var router = NavigationRouter()
 
     var body: some Scene {
         WindowGroup {
-            TabView {
+            TabView(selection: $router.activeTab) {
                 ContentView(sessionManager: sessionManager, bgFetcher: bgFetcher)
                     .edgesIgnoringSafeArea(.vertical)
+                    .tag(0)
 
                 if let config = sessionManager.config, config.remoteEnabled {
-                    RemoteControlView(config: config, bgFetcher: bgFetcher)
+                    RemoteControlView(config: config, bgFetcher: bgFetcher, router: router)
+                        .tag(1)
                 }
             }
             .tabViewStyle(.page)
+            .onOpenURL { url in
+                router.handle(url)
+            }
             .onChange(of: sessionManager.config) { newConfig in
                 if let config = newConfig, config.hasAnySource {
                     bgFetcher.start(config: config)

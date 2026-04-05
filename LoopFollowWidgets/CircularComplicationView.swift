@@ -2,40 +2,19 @@
 // CircularComplicationView.swift
 //
 // Round complication for modular watch faces (accessoryCircular).
-// Dark tinted background (green/red/yellow based on BG range), all white text.
 // Layout: staleness on top, BG center, delta + trend below.
+// No color — transparent background, white/primary text.
 
 import SwiftUI
 import WidgetKit
 
 struct CircularComplicationView: View {
     let entry: BGEntry
-    @Environment(\.widgetRenderingMode) var renderingMode
-
-    private var useColor: Bool {
-        renderingMode == .fullColor
-    }
 
     var body: some View {
         if let data = entry.data {
             ZStack {
-                if useColor {
-                    // Dark tinted circle background
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    bgRangeColorLight(for: data.bgValue),
-                                    bgRangeColor(for: data.bgValue)
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 30
-                            )
-                        )
-                } else {
-                    AccessoryWidgetBackground()
-                }
+                AccessoryWidgetBackground()
 
                 VStack(spacing: -4) {
                     // Staleness — top
@@ -46,8 +25,8 @@ struct CircularComplicationView: View {
 
                     // BG value — center, biggest
                     Text(bgText(data))
-                        .font(.system(size: 22, weight: .heavy))
-                        .foregroundColor(useColor ? .white : .primary)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.primary)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
 
@@ -59,7 +38,7 @@ struct CircularComplicationView: View {
                         }
                     }
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(useColor ? .white.opacity(0.9) : .secondary)
+                    .foregroundColor(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 }
@@ -99,14 +78,8 @@ struct CircularComplicationView: View {
 
     private func stalenessColor(_ data: WidgetData, displayDate: Date) -> Color {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if useColor {
-            if minutes >= 16 { return .white.opacity(0.5) }
-            if minutes >= 6 { return .white.opacity(0.7) }
-            return .white
-        } else {
-            if minutes >= 16 { return .red }
-            if minutes >= 6 { return .secondary }
-            return .primary
-        }
+        if minutes >= 16 { return .red }
+        if minutes >= 6 { return .secondary }
+        return .primary
     }
 }

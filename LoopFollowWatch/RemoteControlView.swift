@@ -6,8 +6,8 @@ import SwiftUI
 struct RemoteControlView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
-    @State private var showBolus = false
-    @State private var showMeal = false
+    @ObservedObject var router: NavigationRouter
+    @State private var showOverride = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -18,21 +18,21 @@ struct RemoteControlView: View {
         NavigationStack {
             LazyVGrid(columns: columns, spacing: 8) {
                 Button {
-                    showBolus = true
+                    router.showBolus = true
                 } label: {
                     RemoteTile(icon: "💧", label: "Bolus", color: .blue)
                 }
                 .buttonStyle(.plain)
 
                 Button {
-                    showMeal = true
+                    router.showMeal = true
                 } label: {
                     RemoteTile(icon: "🍽️", label: "Meal", color: .yellow)
                 }
                 .buttonStyle(.plain)
 
-                NavigationLink {
-                    WatchOverrideView(config: config, bgFetcher: bgFetcher)
+                Button {
+                    showOverride = true
                 } label: {
                     RemoteTile(icon: "⚡", label: "Override", color: .purple)
                 }
@@ -47,11 +47,20 @@ struct RemoteControlView: View {
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
-            .navigationDestination(isPresented: $showBolus) {
-                WatchBolusView(config: config, bgFetcher: bgFetcher, popToRoot: { showBolus = false })
+            .navigationDestination(isPresented: $router.showBolus) {
+                WatchBolusView(config: config, bgFetcher: bgFetcher, popToRoot: { router.showBolus = false })
             }
-            .navigationDestination(isPresented: $showMeal) {
-                WatchMealView(config: config, bgFetcher: bgFetcher, popToRoot: { showMeal = false })
+            .navigationDestination(isPresented: $router.showMeal) {
+                WatchMealView(config: config, bgFetcher: bgFetcher, popToRoot: { router.showMeal = false })
+            }
+            .navigationDestination(isPresented: $showOverride) {
+                WatchOverrideView(config: config, bgFetcher: bgFetcher)
+            }
+        }
+        .onChange(of: router.showOverride) { newValue in
+            if newValue {
+                showOverride = true
+                router.showOverride = false
             }
         }
     }

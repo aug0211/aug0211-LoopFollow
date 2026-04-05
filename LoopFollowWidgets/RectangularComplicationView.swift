@@ -2,33 +2,16 @@
 // RectangularComplicationView.swift
 //
 // Reusable BG display view for both accessoryRectangular complication and
-// future Live Activity usage. Dark tinted background (green/red/yellow based
-// on BG range) with white text and sparkline overlaid.
+// future Live Activity usage. Text overlays left side, sparkline fades in
+// from left to right with progressive line thickness. No background color.
 
 import SwiftUI
 import WidgetKit
 
-// MARK: - Shared BG range color palette (very dark, muted tints)
-
-/// Returns a very dark, muted color based on BG range.
-/// Near-black with a subtle color tint — not vibrant.
-func bgRangeColor(for bg: Int) -> Color {
-    if bg < 70 { return Color(red: 0.18, green: 0.04, blue: 0.04) }
-    if bg > 180 { return Color(red: 0.16, green: 0.14, blue: 0.02) }
-    return Color(red: 0.04, green: 0.14, blue: 0.04)
-}
-
-/// Slightly lighter variant for gradient top edge.
-func bgRangeColorLight(for bg: Int) -> Color {
-    if bg < 70 { return Color(red: 0.24, green: 0.06, blue: 0.06) }
-    if bg > 180 { return Color(red: 0.22, green: 0.18, blue: 0.04) }
-    return Color(red: 0.06, green: 0.20, blue: 0.06)
-}
-
 // MARK: - Public Complication View (used by Widget + future Live Activity)
 
-/// Full-width filled-area sparkline with text stats overlaid on the left.
-/// In color mode: dark tinted background, all content white.
+/// Full-width sparkline with text stats overlaid on the left.
+/// Graph fades in aggressively; line thickens and brightens from left to right.
 struct BGComplicationContent: View {
     let data: WidgetData
     let displayDate: Date
@@ -36,32 +19,17 @@ struct BGComplicationContent: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Dark tinted background (color mode only)
-            if useColor {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                bgRangeColorLight(for: data.bgValue),
-                                bgRangeColor(for: data.bgValue)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            }
-
-            // Full-width sparkline — fades in from left to right
+            // Full-width sparkline — aggressive left fade
             SparklineView(
                 history: data.history,
-                displayDate: displayDate,
-                useColor: useColor
+                displayDate: displayDate
             )
             .mask(
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: .white, location: 0.55)
+                        .init(color: .clear, location: 0.25),
+                        .init(color: .white, location: 0.65)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -69,7 +37,7 @@ struct BGComplicationContent: View {
             )
 
             // Text overlay on the left
-            StatsPanel(data: data, displayDate: displayDate, useColor: useColor)
+            StatsPanel(data: data, displayDate: displayDate)
                 .padding(.leading, 4)
         }
         .padding(.horizontal, 2)
@@ -101,20 +69,40 @@ struct RectangularComplicationView: View {
     }
 }
 
-// MARK: - Sparkline Graph (filled area with Catmull-Rom curves)
+// MARK: - Sparkline Graph (progressive line with Catmull-Rom curves)
 
 private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
-    let useColor: Bool
 
-    // Graph Y-axis range
-    private let yMin: Double = 40
-    private let yMax: Double = 300
+    /// Compute Y-axis range dynamically from actual data with padding.
+    private var dataRange: (min: Double, max: Double) {
+        guard !history.isEmpty else { return (40, 300) }
+        let values = history.map { Double($0.value) }
+        let lo = values.min()!
+        let hi = values.max()!
+        let padding = max((hi - lo) * 0.15, 10)
+        return (floor((lo - padding) / 10) * 10, ceil((hi + padding) / 10) * 10)
+    }
 
-    /// Generate Y-axis ticks every 20 mg/dL across the displayable range.
+    /// Generate up to 6 "nice" ticks within the dynamic range.
     private var yTicks: [Int] {
-        stride(from: 60, through: 280, by: 20).map { $0 }
+        let range = dataRange
+        let span = range.max - range.min
+        // Choose step: prefer 10, use 20 if range is large, 5 if very small
+        let step: Int
+        if span <= 40 { step = 5 }
+        else if span <= 80 { step = 10 }
+        else { step = 20 }
+
+        let start = Int(range.min) - (Int(range.min) % step) + step
+        var ticks: [Int] = []
+        var v = start
+        while v < Int(range.max) && ticks.count < 6 {
+            ticks.append(v)
+            v += step
+        }
+        return ticks
     }
 
     var body: some View {
@@ -123,35 +111,32 @@ private struct SparklineView: View {
             let h = geo.size.height
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
+            let yMin = dataRange.min
+            let yMax = dataRange.max
 
             // Convert BG points to screen coordinates
             let screenPoints: [CGPoint] = sorted.map { point in
                 CGPoint(
                     x: xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: w),
-                    y: yPosition(for: Double(point.value), height: h)
+                    y: yPosition(for: Double(point.value), yMin: yMin, yMax: yMax, height: h)
                 )
             }
-
-            let lineColor: Color = useColor ? .white.opacity(0.15) : .secondary.opacity(0.15)
-            let labelColor: Color = useColor ? .white.opacity(0.5) : .secondary.opacity(0.7)
 
             ZStack {
                 // Dotted horizontal reference lines + Y-axis labels
                 ForEach(yTicks, id: \.self) { value in
-                    let y = yPosition(for: Double(value), height: h)
+                    let y = yPosition(for: Double(value), yMin: yMin, yMax: yMax, height: h)
 
-                    // Dotted line across full width
                     Path { path in
                         path.move(to: CGPoint(x: 0, y: y))
                         path.addLine(to: CGPoint(x: w, y: y))
                     }
                     .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
-                    .foregroundColor(lineColor)
+                    .foregroundColor(.secondary.opacity(0.2))
 
-                    // Label on right edge
                     Text("\(value)")
                         .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(labelColor)
+                        .foregroundColor(.secondary.opacity(0.6))
                         .frame(width: 22, alignment: .trailing)
                         .position(x: w - 13, y: y)
                 }
@@ -161,57 +146,55 @@ private struct SparklineView: View {
                     buildFillPath(points: screenPoints, height: h)
                         .fill(
                             LinearGradient(
-                                colors: useColor
-                                    ? [Color.white.opacity(0.25), Color.white.opacity(0.03)]
-                                    : [Color.primary.opacity(0.25), Color.primary.opacity(0.03)],
+                                colors: [Color.primary.opacity(0.2), Color.primary.opacity(0.02)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
 
-                    // Smooth line on top
-                    buildCurvePath(points: screenPoints)
-                        .stroke(
-                            useColor ? Color.white : Color.primary,
-                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
-                        )
+                    // Progressive line — each segment drawn with increasing width + opacity
+                    ForEach(0..<(screenPoints.count - 1), id: \.self) { i in
+                        let t = Double(i) / Double(max(screenPoints.count - 2, 1))
+                        let lineWidth = 0.3 + t * 1.7
+                        let opacity = min(t * 1.4, 1.0)
+
+                        buildSingleSegment(points: screenPoints, index: i)
+                            .stroke(
+                                Color.primary.opacity(opacity),
+                                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+                            )
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Catmull-Rom curve path
+    // MARK: - Path builders
 
-    private func buildCurvePath(points: [CGPoint]) -> Path {
+    /// Builds a single Catmull-Rom curve segment from points[index] to points[index+1].
+    private func buildSingleSegment(points: [CGPoint], index: Int) -> Path {
         Path { path in
-            guard points.count >= 2 else { return }
-            path.move(to: points[0])
+            let i = index
+            let p0 = points[max(i - 1, 0)]
+            let p1 = points[i]
+            let p2 = points[min(i + 1, points.count - 1)]
+            let p3 = points[min(i + 2, points.count - 1)]
 
-            if points.count == 2 {
-                path.addLine(to: points[1])
-                return
-            }
+            let cp1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6.0,
+                y: p1.y + (p2.y - p0.y) / 6.0
+            )
+            let cp2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6.0,
+                y: p2.y - (p3.y - p1.y) / 6.0
+            )
 
-            for i in 0..<(points.count - 1) {
-                let p0 = points[max(i - 1, 0)]
-                let p1 = points[i]
-                let p2 = points[min(i + 1, points.count - 1)]
-                let p3 = points[min(i + 2, points.count - 1)]
-
-                let cp1 = CGPoint(
-                    x: p1.x + (p2.x - p0.x) / 6.0,
-                    y: p1.y + (p2.y - p0.y) / 6.0
-                )
-                let cp2 = CGPoint(
-                    x: p2.x - (p3.x - p1.x) / 6.0,
-                    y: p2.y - (p3.y - p1.y) / 6.0
-                )
-
-                path.addCurve(to: p2, control1: cp1, control2: cp2)
-            }
+            path.move(to: p1)
+            path.addCurve(to: p2, control1: cp1, control2: cp2)
         }
     }
 
+    /// Builds the filled area: Catmull-Rom curve closed down to the bottom edge.
     private func buildFillPath(points: [CGPoint], height: Double) -> Path {
         Path { path in
             guard let first = points.first, let last = points.last else { return }
@@ -254,7 +237,8 @@ private struct SparklineView: View {
         return max(0, min(width, (elapsed / total) * width))
     }
 
-    private func yPosition(for value: Double, height: Double) -> Double {
+    private func yPosition(for value: Double, yMin: Double, yMax: Double, height: Double) -> Double {
+        guard yMax > yMin else { return height / 2 }
         let clamped = min(max(value, yMin), yMax)
         let fraction = (clamped - yMin) / (yMax - yMin)
         return height * (1 - fraction)
@@ -266,7 +250,6 @@ private struct SparklineView: View {
 private struct StatsPanel: View {
     let data: WidgetData
     let displayDate: Date
-    let useColor: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -274,12 +257,12 @@ private struct StatsPanel: View {
             HStack(spacing: 2) {
                 Text(bgText)
                     .font(.system(size: 26, weight: .heavy))
-                    .foregroundColor(useColor ? .white : .primary)
+                    .foregroundColor(.primary)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 Text(data.direction)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(useColor ? .white : .primary)
+                    .foregroundColor(.primary)
             }
 
             // Line 2: Delta + staleness
@@ -287,7 +270,7 @@ private struct StatsPanel: View {
                 if let d = data.delta {
                     Text(deltaText(d))
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(useColor ? .white : .primary)
+                        .foregroundColor(.primary)
                 }
                 Text(stalenessText)
                     .font(.system(size: 13, weight: .semibold))
@@ -301,12 +284,12 @@ private struct StatsPanel: View {
                 if let iob = data.iob {
                     Text(String(format: "%.1fU", iob))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(useColor ? .white : .primary)
+                        .foregroundColor(.primary)
                 }
                 if let cob = data.cob {
                     Text(String(format: "%.0fg", cob))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(useColor ? .white : .primary)
+                        .foregroundColor(.primary)
                 }
             }
             .lineLimit(1)
@@ -319,11 +302,11 @@ private struct StatsPanel: View {
                 HStack(spacing: 1) {
                     Text(String(format: "%.2fU", rate))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(useColor ? .white : .primary)
+                        .foregroundColor(.primary)
                     if abs(diff) >= 0.005 {
                         Text(String(format: "%+.2f", diff))
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(useColor ? .white.opacity(0.7) : .secondary)
+                            .foregroundColor(.secondary)
                     }
                 }
                 .lineLimit(1)
@@ -355,8 +338,8 @@ private struct StatsPanel: View {
 
     private var stalenessColor: Color {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if minutes >= 16 { return useColor ? .white.opacity(0.5) : .red }
-        if minutes >= 6 { return useColor ? .white.opacity(0.7) : .secondary }
-        return useColor ? .white : .primary
+        if minutes >= 16 { return .red }
+        if minutes >= 6 { return .secondary }
+        return .primary
     }
 }
