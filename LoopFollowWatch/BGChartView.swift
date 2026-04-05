@@ -92,7 +92,7 @@ struct BGChartView: View {
             baseBG = 150
         }
         // Offset above by ~40 mg/dL so carbs clear bolus triangles + their text
-        return convertBG(baseBG + 40)
+        return convertBG(baseBG + 65)
     }
 
     var body: some View {
