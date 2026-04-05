@@ -50,7 +50,6 @@ struct WatchBolusView: View {
                 }
             } else if showConfirm {
                 confirmSummary
-                    .padding(.top, -16)
 
                 CrownConfirmView(label: confirmedAmount > 0 ? "to deliver" : "to send meal") {
                     sendBolusAndMeal()
@@ -91,6 +90,7 @@ struct WatchBolusView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 16)
 
                 Text(String(format: "%.2f U", amount))
                     .font(.system(size: 60, weight: .bold, design: .rounded))
@@ -129,7 +129,6 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 16)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
