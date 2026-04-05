@@ -35,7 +35,7 @@ struct WatchBolusView: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 0) {
             if let result = resultMessage {
                 ZStack {
                     VStack {
@@ -116,7 +116,6 @@ struct WatchBolusView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.top, -2)
 
                 Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                     confirmedAmount = amount
@@ -127,7 +126,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 20)
+        .padding(.top, 14)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
