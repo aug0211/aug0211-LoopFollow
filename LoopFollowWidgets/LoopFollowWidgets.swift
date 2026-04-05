@@ -42,6 +42,7 @@ struct LoopFollowWidgetBundle: WidgetBundle {
         BolusShortcutWidget()
         MealShortcutWidget()
         OverrideShortcutWidget()
+        TempTargetShortcutWidget()
         #if os(iOS)
         BGLiveActivityWidget()
         #endif

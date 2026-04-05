@@ -37,8 +37,8 @@ struct RemoteControlView: View {
                 }
                 .buttonStyle(.plain)
 
-                NavigationLink {
-                    WatchTempTargetView(config: config, bgFetcher: bgFetcher)
+                Button {
+                    router.activeDestination = .tempTarget
                 } label: {
                     RemoteTile(icon: "target", label: "Temp", color: .pink)
                 }
@@ -62,6 +62,8 @@ struct RemoteControlView: View {
                     )
                 case .override:
                     WatchOverrideView(config: config, bgFetcher: bgFetcher)
+                case .tempTarget:
+                    WatchTempTargetView(config: config, bgFetcher: bgFetcher)
                 }
             }
         }

@@ -1,8 +1,8 @@
 // LoopFollow
 // ActionShortcutWidgets.swift
 //
-// Three static circular complications for quick actions:
-// Bolus (drop), Meal (fork & knife), Override (lightning bolt).
+// Four static circular complications for quick actions:
+// Bolus (drop), Meal (fork & knife), Override (lightning bolt), Temp Target (target).
 // Each deep links to the corresponding screen in the watch app.
 
 import SwiftUI
@@ -91,6 +91,23 @@ struct OverrideShortcutWidget: Widget {
         }
         .configurationDisplayName("Override")
         .description("Quick access to override selection.")
+        .supportedFamilies([.accessoryCircular])
+    }
+}
+
+// MARK: - Temp Target Shortcut
+
+struct TempTargetShortcutWidget: Widget {
+    let kind = "TempTargetShortcut"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: ActionTimelineProvider()) { _ in
+            ActionShortcutView(systemImage: "target", color: .pink)
+                .containerBackground(.fill.tertiary, for: .widget)
+                .widgetURL(URL(string: "loopfollow://temptarget"))
+        }
+        .configurationDisplayName("Temp Target")
+        .description("Quick access to temp target selection.")
         .supportedFamilies([.accessoryCircular])
     }
 }
