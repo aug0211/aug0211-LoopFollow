@@ -19,28 +19,28 @@ struct RemoteControlView: View {
                 Button {
                     router.activeDestination = .bolus
                 } label: {
-                    RemoteTile(icon: "💧", label: "Bolus", color: .blue)
+                    RemoteTile(icon: "drop.fill", label: "Bolus", color: .blue)
                 }
                 .buttonStyle(.plain)
 
                 Button {
                     router.activeDestination = .meal
                 } label: {
-                    RemoteTile(icon: "🍽️", label: "Meal", color: .yellow)
+                    RemoteTile(icon: "fork.knife", label: "Meal", color: .yellow)
                 }
                 .buttonStyle(.plain)
 
                 Button {
                     router.activeDestination = .override
                 } label: {
-                    RemoteTile(icon: "⚡", label: "Override", color: .purple)
+                    RemoteTile(icon: "bolt.fill", label: "Override", color: .purple)
                 }
                 .buttonStyle(.plain)
 
                 NavigationLink {
                     WatchTempTargetView(config: config, bgFetcher: bgFetcher)
                 } label: {
-                    RemoteTile(icon: "🎯", label: "Temp", color: .pink)
+                    RemoteTile(icon: "target", label: "Temp", color: .pink)
                 }
                 .buttonStyle(.plain)
             }
@@ -75,8 +75,9 @@ private struct RemoteTile: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(icon)
-                .font(.system(size: 30))
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(.white)
             Text(label)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
