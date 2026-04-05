@@ -3,15 +3,15 @@
 //
 // Reusable BG display view for both accessoryRectangular complication and
 // future Live Activity usage. Text overlays the left side of a full-width
-// sparkline graph; graph dots fade in from left to right behind the text.
+// filled-area sparkline graph that fades in from left to right.
 
 import SwiftUI
 import WidgetKit
 
 // MARK: - Public Complication View (used by Widget + future Live Activity)
 
-/// Full-width sparkline graph with text stats overlaid on the left.
-/// Graph dots fade from transparent (left, behind text) to opaque (right).
+/// Full-width filled-area sparkline with text stats overlaid on the left.
+/// The graph fades from transparent (left, behind text) to opaque (right).
 struct BGComplicationContent: View {
     let data: WidgetData
     let displayDate: Date
@@ -19,12 +19,21 @@ struct BGComplicationContent: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Full-width sparkline — dots fade in from left to right
+            // Full-width sparkline — fades in from left to right
             SparklineView(
                 history: data.history,
                 displayDate: displayDate,
-                useColor: useColor,
-                fadeLeftFraction: 0.45
+                useColor: useColor
+            )
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .white, location: 0.45)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
             )
 
             // Text overlay on the left
@@ -61,21 +70,12 @@ struct RectangularComplicationView: View {
     }
 }
 
-// MARK: - Sparkline Graph
+// MARK: - Sparkline Graph (filled-area style)
 
 private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
     let useColor: Bool
-    /// Fraction of the width (0–1) over which dots fade from transparent to opaque.
-    /// 0 = no fade, 0.45 = left 45% fades in.
-    var fadeLeftFraction: CGFloat = 0
-
-    // BG range thresholds (mg/dL)
-    private let low = 70
-    private let lowWarn = 80
-    private let highWarn = 170
-    private let high = 180
 
     // Graph Y-axis range
     private let yMin: Double = 40
@@ -88,46 +88,71 @@ private struct SparklineView: View {
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
 
-            ZStack {
-                // Dashed reference lines at 70 and 180
-                let y70 = yPosition(for: 70, height: h)
-                let y180 = yPosition(for: 180, height: h)
+            if sorted.count >= 2 {
+                // Build line path through BG points
+                let linePath = buildLinePath(points: sorted, start: threeHoursAgo, width: w, height: h)
 
-                Path { path in
-                    path.move(to: CGPoint(x: 0, y: y70))
-                    path.addLine(to: CGPoint(x: w, y: y70))
-                }
-                .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                .foregroundColor(useColor ? .yellow.opacity(0.5) : .secondary.opacity(0.4))
+                // Filled area: close the line path down to the bottom
+                let fillPath = buildFillPath(points: sorted, start: threeHoursAgo, width: w, height: h)
 
-                Path { path in
-                    path.move(to: CGPoint(x: 0, y: y180))
-                    path.addLine(to: CGPoint(x: w, y: y180))
-                }
-                .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                .foregroundColor(useColor ? .yellow.opacity(0.5) : .secondary.opacity(0.4))
+                ZStack {
+                    // Filled area with gradient
+                    fillPath
+                        .fill(
+                            LinearGradient(
+                                colors: useColor
+                                    ? [Color.green.opacity(0.4), Color.green.opacity(0.05)]
+                                    : [Color.primary.opacity(0.3), Color.primary.opacity(0.05)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
 
-                // BG dots with left-to-right fade
-                ForEach(sorted, id: \.timestamp) { point in
-                    let x = xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: w)
-                    let y = yPosition(for: Double(point.value), height: h)
-                    let opacity = dotOpacity(xFraction: x / max(w, 1))
-                    Circle()
-                        .fill(dotColor(for: point.value))
-                        .frame(width: 3.5, height: 3.5)
-                        .opacity(opacity)
-                        .position(x: x, y: y)
+                    // Line on top
+                    linePath
+                        .stroke(
+                            useColor ? Color.green : Color.primary,
+                            style: StrokeStyle(lineWidth: 1.5, lineJoin: .round)
+                        )
                 }
             }
         }
     }
 
-    /// Returns opacity for a dot based on its horizontal position.
-    /// Dots in the left fade zone ramp from 0 → 1; dots past it are fully opaque.
-    private func dotOpacity(xFraction: CGFloat) -> Double {
-        guard fadeLeftFraction > 0 else { return 1.0 }
-        if xFraction >= fadeLeftFraction { return 1.0 }
-        return Double(xFraction / fadeLeftFraction)
+    private func buildLinePath(points: [WidgetBGPoint], start: Date, width: Double, height: Double) -> Path {
+        Path { path in
+            for (i, point) in points.enumerated() {
+                let x = xPosition(for: point.timestamp, start: start, end: displayDate, width: width)
+                let y = yPosition(for: Double(point.value), height: height)
+                if i == 0 {
+                    path.move(to: CGPoint(x: x, y: y))
+                } else {
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+            }
+        }
+    }
+
+    private func buildFillPath(points: [WidgetBGPoint], start: Date, width: Double, height: Double) -> Path {
+        Path { path in
+            guard let first = points.first, let last = points.last else { return }
+
+            let firstX = xPosition(for: first.timestamp, start: start, end: displayDate, width: width)
+            let firstY = yPosition(for: Double(first.value), height: height)
+            path.move(to: CGPoint(x: firstX, y: firstY))
+
+            for i in 1..<points.count {
+                let x = xPosition(for: points[i].timestamp, start: start, end: displayDate, width: width)
+                let y = yPosition(for: Double(points[i].value), height: height)
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+
+            // Close down to bottom edge and back
+            let lastX = xPosition(for: last.timestamp, start: start, end: displayDate, width: width)
+            path.addLine(to: CGPoint(x: lastX, y: height))
+            path.addLine(to: CGPoint(x: firstX, y: height))
+            path.closeSubpath()
+        }
     }
 
     private func xPosition(for date: Date, start: Date, end: Date, width: Double) -> Double {
@@ -141,13 +166,6 @@ private struct SparklineView: View {
         let clamped = min(max(value, yMin), yMax)
         let fraction = (clamped - yMin) / (yMax - yMin)
         return height * (1 - fraction)
-    }
-
-    private func dotColor(for bg: Int) -> Color {
-        guard useColor else { return .primary }
-        if bg < low || bg > high { return .red }
-        if bg < lowWarn || bg > highWarn { return .yellow }
-        return .green
     }
 }
 
@@ -163,12 +181,12 @@ private struct StatsPanel: View {
             // Line 1: BG value + trend arrow
             HStack(spacing: 2) {
                 Text(bgText)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(size: 26, weight: .heavy, design: .rounded))
                     .foregroundColor(bgColor)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 Text(data.direction)
-                    .font(.system(size: 14))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundColor(bgColor)
             }
 
@@ -176,11 +194,11 @@ private struct StatsPanel: View {
             HStack(spacing: 3) {
                 if let d = data.delta {
                     Text(deltaText(d))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundColor(useColor ? .white : .primary)
                 }
                 Text(stalenessText)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(stalenessColor)
             }
             .lineLimit(1)
@@ -190,12 +208,12 @@ private struct StatsPanel: View {
             HStack(spacing: 3) {
                 if let iob = data.iob {
                     Text(String(format: "%.1fU", iob))
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(useColor ? .cyan : .primary)
                 }
                 if let cob = data.cob {
                     Text(String(format: "%.0fg", cob))
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(useColor ? .yellow : .primary)
                 }
             }
@@ -208,11 +226,11 @@ private struct StatsPanel: View {
                 let diff = rate - scheduled
                 HStack(spacing: 1) {
                     Text(String(format: "%.2fU", rate))
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(useColor ? basalColor(diff: diff) : .primary)
                     if abs(diff) >= 0.005 {
                         Text(String(format: "%+.2f", diff))
-                            .font(.system(size: 10, design: .rounded))
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundColor(useColor ? basalColor(diff: diff) : .secondary)
                     }
                 }

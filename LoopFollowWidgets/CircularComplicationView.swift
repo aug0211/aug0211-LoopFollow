@@ -20,16 +20,16 @@ struct CircularComplicationView: View {
             ZStack {
                 AccessoryWidgetBackground()
 
-                VStack(spacing: 0) {
+                VStack(spacing: -2) {
                     // Staleness — top
                     Text(stalenessText(data, displayDate: entry.displayDate))
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(stalenessColor(data, displayDate: entry.displayDate))
                         .lineLimit(1)
 
                     // BG value — center, biggest
                     Text(bgText(data))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .heavy, design: .rounded))
                         .foregroundColor(bgColor(data))
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
@@ -41,7 +41,7 @@ struct CircularComplicationView: View {
                             Text(deltaText(d, units: data.units))
                         }
                     }
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundColor(useColor ? .white.opacity(0.9) : .secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
