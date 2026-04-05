@@ -2,39 +2,48 @@
 // RectangularComplicationView.swift
 //
 // Reusable BG display view for both accessoryRectangular complication and
-// future Live Activity usage. Full colored background (green/red/yellow based
-// on BG range) with white text and sparkline overlaid — SweetDreams style.
+// future Live Activity usage. Dark tinted background (green/red/yellow based
+// on BG range) with white text and sparkline overlaid.
 
 import SwiftUI
 import WidgetKit
 
+// MARK: - Shared BG range color palette (very dark, muted tints)
+
+/// Returns a very dark, muted color based on BG range.
+/// Near-black with a subtle color tint — not vibrant.
+func bgRangeColor(for bg: Int) -> Color {
+    if bg < 70 { return Color(red: 0.18, green: 0.04, blue: 0.04) }
+    if bg > 180 { return Color(red: 0.16, green: 0.14, blue: 0.02) }
+    return Color(red: 0.04, green: 0.14, blue: 0.04)
+}
+
+/// Slightly lighter variant for gradient top edge.
+func bgRangeColorLight(for bg: Int) -> Color {
+    if bg < 70 { return Color(red: 0.24, green: 0.06, blue: 0.06) }
+    if bg > 180 { return Color(red: 0.22, green: 0.18, blue: 0.04) }
+    return Color(red: 0.06, green: 0.20, blue: 0.06)
+}
+
 // MARK: - Public Complication View (used by Widget + future Live Activity)
 
 /// Full-width filled-area sparkline with text stats overlaid on the left.
-/// In color mode: entire background is the BG range color, all content is white.
+/// In color mode: dark tinted background, all content white.
 struct BGComplicationContent: View {
     let data: WidgetData
     let displayDate: Date
     let useColor: Bool
 
-    /// BG range color: <70 red, 70-180 green, >180 yellow
-    private var bgRangeColor: Color {
-        let bg = data.bgValue
-        if bg < 70 { return .red }
-        if bg > 180 { return .yellow }
-        return .green
-    }
-
     var body: some View {
         ZStack(alignment: .leading) {
-            // Colored background fill (color mode only)
+            // Dark tinted background (color mode only)
             if useColor {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [
-                                bgRangeColor.opacity(0.95),
-                                bgRangeColor.opacity(0.75)
+                                bgRangeColorLight(for: data.bgValue),
+                                bgRangeColor(for: data.bgValue)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -52,7 +61,7 @@ struct BGComplicationContent: View {
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: .white, location: 0.45)
+                        .init(color: .white, location: 0.55)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
@@ -103,8 +112,10 @@ private struct SparklineView: View {
     private let yMin: Double = 40
     private let yMax: Double = 300
 
-    /// Y-axis labels shown on the right edge
-    private let yLabels: [Int] = [80, 120, 180]
+    /// Generate Y-axis ticks every 20 mg/dL across the displayable range.
+    private var yTicks: [Int] {
+        stride(from: 60, through: 280, by: 20).map { $0 }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -121,15 +132,38 @@ private struct SparklineView: View {
                 )
             }
 
+            let lineColor: Color = useColor ? .white.opacity(0.15) : .secondary.opacity(0.15)
+            let labelColor: Color = useColor ? .white.opacity(0.5) : .secondary.opacity(0.7)
+
             ZStack {
+                // Dotted horizontal reference lines + Y-axis labels
+                ForEach(yTicks, id: \.self) { value in
+                    let y = yPosition(for: Double(value), height: h)
+
+                    // Dotted line across full width
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: w, y: y))
+                    }
+                    .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                    .foregroundColor(lineColor)
+
+                    // Label on right edge
+                    Text("\(value)")
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(labelColor)
+                        .frame(width: 22, alignment: .trailing)
+                        .position(x: w - 13, y: y)
+                }
+
                 if screenPoints.count >= 2 {
                     // Filled area with gradient
                     buildFillPath(points: screenPoints, height: h)
                         .fill(
                             LinearGradient(
                                 colors: useColor
-                                    ? [Color.white.opacity(0.3), Color.white.opacity(0.05)]
-                                    : [Color.primary.opacity(0.3), Color.primary.opacity(0.05)],
+                                    ? [Color.white.opacity(0.25), Color.white.opacity(0.03)]
+                                    : [Color.primary.opacity(0.25), Color.primary.opacity(0.03)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -141,15 +175,6 @@ private struct SparklineView: View {
                             useColor ? Color.white : Color.primary,
                             style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
                         )
-                }
-
-                // Y-axis reference labels on right edge
-                ForEach(yLabels, id: \.self) { value in
-                    let y = yPosition(for: Double(value), height: h)
-                    Text("\(value)")
-                        .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(useColor ? .white.opacity(0.7) : .secondary.opacity(0.7))
-                        .position(x: w - 10, y: y)
                 }
             }
         }
@@ -333,11 +358,5 @@ private struct StatsPanel: View {
         if minutes >= 16 { return useColor ? .white.opacity(0.5) : .red }
         if minutes >= 6 { return useColor ? .white.opacity(0.7) : .secondary }
         return useColor ? .white : .primary
-    }
-
-    private func basalColor(diff: Double) -> Color {
-        if diff > 0.005 { return .orange }
-        if diff < -0.005 { return .blue }
-        return .green
     }
 }

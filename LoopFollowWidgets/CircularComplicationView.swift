@@ -2,7 +2,8 @@
 // CircularComplicationView.swift
 //
 // Round complication for modular watch faces (accessoryCircular).
-// Layout: staleness on top, BG prominently in the center, delta + trend below.
+// Dark tinted background (green/red/yellow based on BG range), all white text.
+// Layout: staleness on top, BG center, delta + trend below.
 
 import SwiftUI
 import WidgetKit
@@ -18,7 +19,23 @@ struct CircularComplicationView: View {
     var body: some View {
         if let data = entry.data {
             ZStack {
-                AccessoryWidgetBackground()
+                if useColor {
+                    // Dark tinted circle background
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    bgRangeColorLight(for: data.bgValue),
+                                    bgRangeColor(for: data.bgValue)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 30
+                            )
+                        )
+                } else {
+                    AccessoryWidgetBackground()
+                }
 
                 VStack(spacing: -4) {
                     // Staleness — top
@@ -30,7 +47,7 @@ struct CircularComplicationView: View {
                     // BG value — center, biggest
                     Text(bgText(data))
                         .font(.system(size: 22, weight: .heavy))
-                        .foregroundColor(bgColor(data))
+                        .foregroundColor(useColor ? .white : .primary)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
 
@@ -66,14 +83,6 @@ struct CircularComplicationView: View {
         return "\(data.bgValue)"
     }
 
-    private func bgColor(_ data: WidgetData) -> Color {
-        guard useColor else { return .primary }
-        let bg = data.bgValue
-        if bg < 70 || bg > 180 { return .red }
-        if bg < 80 || bg > 170 { return .yellow }
-        return .green
-    }
-
     private func deltaText(_ delta: Int, units: String) -> String {
         if units == "mmol/L" {
             let mmol = Double(delta) * 0.0555
@@ -90,8 +99,14 @@ struct CircularComplicationView: View {
 
     private func stalenessColor(_ data: WidgetData, displayDate: Date) -> Color {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if minutes >= 16 { return .red }
-        if minutes >= 6 { return .secondary }
-        return useColor ? .white : .primary
+        if useColor {
+            if minutes >= 16 { return .white.opacity(0.5) }
+            if minutes >= 6 { return .white.opacity(0.7) }
+            return .white
+        } else {
+            if minutes >= 16 { return .red }
+            if minutes >= 6 { return .secondary }
+            return .primary
+        }
     }
 }
