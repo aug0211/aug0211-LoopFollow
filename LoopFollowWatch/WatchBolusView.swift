@@ -50,7 +50,7 @@ struct WatchBolusView: View {
                 }
             } else if showConfirm {
                 confirmSummary
-                    .padding(.top, -12)
+                    .padding(.top, -16)
 
                 CrownConfirmView(label: confirmedAmount > 0 ? "to deliver" : "to send meal") {
                     sendBolusAndMeal()
