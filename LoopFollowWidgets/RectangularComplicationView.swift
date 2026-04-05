@@ -120,6 +120,9 @@ private struct SparklineView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
+            let topInset: CGFloat = 6     // room for top y-axis label
+            let bottomInset: CGFloat = 4  // room for bottom y-axis label
+            let chartH = h - topInset - bottomInset
             let rightInset: CGFloat = 14  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
@@ -131,14 +134,14 @@ private struct SparklineView: View {
             let screenPoints: [CGPoint] = sorted.map { point in
                 CGPoint(
                     x: xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: sparkW),
-                    y: yPosition(for: Double(point.value), yMin: yMin, yMax: yMax, height: h)
+                    y: topInset + yPosition(for: Double(point.value), yMin: yMin, yMax: yMax, height: chartH)
                 )
             }
 
             ZStack {
                 // Dotted horizontal reference lines + Y-axis labels
                 ForEach(yTicks, id: \.self) { value in
-                    let y = yPosition(for: Double(value), yMin: yMin, yMax: yMax, height: h)
+                    let y = topInset + yPosition(for: Double(value), yMin: yMin, yMax: yMax, height: chartH)
 
                     Path { path in
                         path.move(to: CGPoint(x: 0, y: y))
@@ -164,7 +167,7 @@ private struct SparklineView: View {
                         let segColor = bgDynamicColor(midBG)
 
                         // Fill slice under this segment
-                        buildSegmentFill(points: screenPoints, index: i, height: h)
+                        buildSegmentFill(points: screenPoints, index: i, height: topInset + chartH)
                             .fill(
                                 LinearGradient(
                                     colors: [segColor.opacity(0.55), segColor.opacity(0.03)],
