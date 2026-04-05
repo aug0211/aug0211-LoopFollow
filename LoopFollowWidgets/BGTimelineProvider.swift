@@ -3,7 +3,7 @@
 //
 // Aggressive refresh strategy for near-real-time BG complication updates:
 //
-// 1. MULTI-ENTRY TIMELINE: Generate 12 entries (one per 5min for 1 hour) from a
+// 1. MULTI-ENTRY TIMELINE: Generate 60 entries (one per minute for 1 hour) from a
 //    single data snapshot. Each entry has its own `date` so WidgetKit displays
 //    them at the correct time — the staleness counter advances naturally without
 //    needing a reload. These cost zero budget; only timeline *reloads* count.
@@ -51,19 +51,19 @@ struct BGTimelineProvider: TimelineProvider {
         let data = WidgetData.load()
         let now = Date()
 
-        // Generate entries every 5 minutes for the next hour.
+        // Generate entries every minute for the next hour.
         // Each entry carries a different `displayDate` so the staleness text
         // advances correctly without burning a reload.
         var entries: [BGEntry] = []
-        for i in 0..<12 {
-            let entryDate = now.addingTimeInterval(Double(i) * 300) // every 5 min
+        for i in 0..<60 {
+            let entryDate = now.addingTimeInterval(Double(i) * 60) // every 1 min
             entries.append(BGEntry(date: entryDate, data: data, displayDate: entryDate))
         }
 
         // After the last pre-generated entry, ask for a fresh timeline.
         // This acts as a safety net — most reloads will come from the app
         // calling reloadAllTimelines() on new BG data or from background refresh.
-        let expiry = now.addingTimeInterval(12 * 300) // 1 hour
+        let expiry = now.addingTimeInterval(60 * 60) // 1 hour
         let timeline = Timeline(entries: entries, policy: .after(expiry))
         completion(timeline)
     }

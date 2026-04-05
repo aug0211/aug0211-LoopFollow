@@ -93,10 +93,9 @@ struct CircularComplicationView: View {
     }
 
     private func stalenessColor(_ data: WidgetData, displayDate: Date) -> Color {
-        guard useColor else { return .secondary }
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
-        if minutes > 10 { return .red }
-        if minutes > 5 { return .yellow }
-        return .secondary
+        if minutes >= 16 { return .red }
+        if minutes >= 6 { return .secondary }
+        return useColor ? .white : .primary
     }
 }

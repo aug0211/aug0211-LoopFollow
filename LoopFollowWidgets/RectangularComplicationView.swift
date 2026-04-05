@@ -165,7 +165,7 @@ private struct StatsPanel: View {
                 }
                 Text(stalenessText)
                     .font(.system(size: 9))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(stalenessColor)
             }
             .lineLimit(1)
             .minimumScaleFactor(0.7)
@@ -233,6 +233,13 @@ private struct StatsPanel: View {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
         if minutes < 1 { return "now" }
         return "\(minutes)m"
+    }
+
+    private var stalenessColor: Color {
+        let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
+        if minutes >= 16 { return .red }
+        if minutes >= 6 { return .secondary }
+        return useColor ? .white : .primary
     }
 
     private func basalColor(diff: Double) -> Color {
