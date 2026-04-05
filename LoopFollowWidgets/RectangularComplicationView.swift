@@ -304,7 +304,7 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 48, weight: .regular))
+                .font(.system(size: 54, weight: .regular))
                 .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
@@ -319,17 +319,17 @@ private struct StatsPanel: View {
             // Trend arrow + delta stacked vertically to the right of BG
             VStack(alignment: .leading, spacing: -2) {
                 Text(data.direction)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(isStale ? .secondary : .primary)
 
                 if let d = data.delta {
                     Text(deltaText(d))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(isStale ? .secondary : .primary)
                 }
 
                 Text(stalenessText)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isStale ? .secondary : .primary)
             }
         }
