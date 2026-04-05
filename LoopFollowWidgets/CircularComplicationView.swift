@@ -2,8 +2,7 @@
 // CircularComplicationView.swift
 //
 // Round complication for modular watch faces (accessoryCircular).
-// Shows BG prominently in the center with delta, trend arrow, and
-// staleness around it.
+// Layout: staleness on top, BG prominently in the center, delta + trend below.
 
 import SwiftUI
 import WidgetKit
@@ -19,36 +18,33 @@ struct CircularComplicationView: View {
     var body: some View {
         if let data = entry.data {
             ZStack {
-                // Background gauge ring — shows staleness visually
-                // Full ring = fresh (< 1 min), depletes as reading ages
                 AccessoryWidgetBackground()
 
                 VStack(spacing: 0) {
-                    // BG value — prominent
+                    // Staleness — top
+                    Text(stalenessText(data, displayDate: entry.displayDate))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(stalenessColor(data, displayDate: entry.displayDate))
+                        .lineLimit(1)
+
+                    // BG value — center, biggest
                     Text(bgText(data))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(bgColor(data))
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
 
-                    // Delta + trend arrow
+                    // Trend arrow + delta — bottom
                     HStack(spacing: 1) {
+                        Text(data.direction)
                         if let d = data.delta {
                             Text(deltaText(d, units: data.units))
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
                         }
-                        Text(data.direction)
-                            .font(.system(size: 9))
                     }
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(useColor ? .white.opacity(0.9) : .secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-
-                    // Staleness
-                    Text(stalenessText(data, displayDate: entry.displayDate))
-                        .font(.system(size: 8, weight: .regular, design: .rounded))
-                        .foregroundColor(stalenessColor(data, displayDate: entry.displayDate))
-                        .lineLimit(1)
                 }
             }
         } else {

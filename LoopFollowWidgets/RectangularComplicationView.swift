@@ -2,31 +2,34 @@
 // RectangularComplicationView.swift
 //
 // Reusable BG display view for both accessoryRectangular complication and
-// future Live Activity usage. All layout is driven by WidgetData; rendering
-// adapts to widgetRenderingMode for color vs. accented/vibrant contexts.
+// future Live Activity usage. Text overlays the left side of a full-width
+// sparkline graph; graph dots fade in from left to right behind the text.
 
 import SwiftUI
 import WidgetKit
 
 // MARK: - Public Complication View (used by Widget + future Live Activity)
 
-/// The primary BG display: sparkline graph (left ~65%) + stats panel (right ~35%).
-/// Accepts `WidgetData` and a reference date for staleness calculation, making it
-/// reusable from both the widget timeline and a Live Activity `ActivityConfiguration`.
+/// Full-width sparkline graph with text stats overlaid on the left.
+/// Graph dots fade from transparent (left, behind text) to opaque (right).
 struct BGComplicationContent: View {
     let data: WidgetData
-    /// The time to use for "now" when computing staleness and graph window.
-    /// For widgets this is the entry's displayDate; for Live Activities it's Date().
     let displayDate: Date
     let useColor: Bool
 
     var body: some View {
-        HStack(spacing: 3) {
-            SparklineView(history: data.history, displayDate: displayDate, useColor: useColor)
-                .frame(maxWidth: .infinity)
+        ZStack(alignment: .leading) {
+            // Full-width sparkline — dots fade in from left to right
+            SparklineView(
+                history: data.history,
+                displayDate: displayDate,
+                useColor: useColor,
+                fadeLeftFraction: 0.45
+            )
 
+            // Text overlay on the left
             StatsPanel(data: data, displayDate: displayDate, useColor: useColor)
-                .frame(width: 52)
+                .padding(.leading, 2)
         }
         .padding(.horizontal, 2)
     }
@@ -64,6 +67,9 @@ private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
     let useColor: Bool
+    /// Fraction of the width (0–1) over which dots fade from transparent to opaque.
+    /// 0 = no fade, 0.45 = left 45% fades in.
+    var fadeLeftFraction: CGFloat = 0
 
     // BG range thresholds (mg/dL)
     private let low = 70
@@ -101,17 +107,27 @@ private struct SparklineView: View {
                 .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
                 .foregroundColor(useColor ? .yellow.opacity(0.5) : .secondary.opacity(0.4))
 
-                // BG dots
+                // BG dots with left-to-right fade
                 ForEach(sorted, id: \.timestamp) { point in
                     let x = xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: w)
                     let y = yPosition(for: Double(point.value), height: h)
+                    let opacity = dotOpacity(xFraction: x / max(w, 1))
                     Circle()
                         .fill(dotColor(for: point.value))
                         .frame(width: 3.5, height: 3.5)
+                        .opacity(opacity)
                         .position(x: x, y: y)
                 }
             }
         }
+    }
+
+    /// Returns opacity for a dot based on its horizontal position.
+    /// Dots in the left fade zone ramp from 0 → 1; dots past it are fully opaque.
+    private func dotOpacity(xFraction: CGFloat) -> Double {
+        guard fadeLeftFraction > 0 else { return 1.0 }
+        if xFraction >= fadeLeftFraction { return 1.0 }
+        return Double(xFraction / fadeLeftFraction)
     }
 
     private func xPosition(for date: Date, start: Date, end: Date, width: Double) -> Double {
@@ -135,7 +151,7 @@ private struct SparklineView: View {
     }
 }
 
-// MARK: - Stats Panel
+// MARK: - Stats Panel (overlays left side of graph)
 
 private struct StatsPanel: View {
     let data: WidgetData
@@ -143,28 +159,28 @@ private struct StatsPanel: View {
     let useColor: Bool
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 1) {
+        VStack(alignment: .leading, spacing: 1) {
             // Line 1: BG value + trend arrow
-            HStack(spacing: 1) {
+            HStack(spacing: 2) {
                 Text(bgText)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(bgColor)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
                 Text(data.direction)
-                    .font(.system(size: 11))
+                    .font(.system(size: 14))
                     .foregroundColor(bgColor)
             }
 
             // Line 2: Delta + staleness
-            HStack(spacing: 2) {
+            HStack(spacing: 3) {
                 if let d = data.delta {
                     Text(deltaText(d))
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(useColor ? .white : .primary)
                 }
                 Text(stalenessText)
-                    .font(.system(size: 9))
+                    .font(.system(size: 11))
                     .foregroundColor(stalenessColor)
             }
             .lineLimit(1)
@@ -174,12 +190,12 @@ private struct StatsPanel: View {
             HStack(spacing: 3) {
                 if let iob = data.iob {
                     Text(String(format: "%.1fU", iob))
-                        .font(.system(size: 9, design: .rounded))
+                        .font(.system(size: 11, design: .rounded))
                         .foregroundColor(useColor ? .cyan : .primary)
                 }
                 if let cob = data.cob {
                     Text(String(format: "%.0fg", cob))
-                        .font(.system(size: 9, design: .rounded))
+                        .font(.system(size: 11, design: .rounded))
                         .foregroundColor(useColor ? .yellow : .primary)
                 }
             }
@@ -192,11 +208,11 @@ private struct StatsPanel: View {
                 let diff = rate - scheduled
                 HStack(spacing: 1) {
                     Text(String(format: "%.2fU", rate))
-                        .font(.system(size: 9, design: .rounded))
+                        .font(.system(size: 11, design: .rounded))
                         .foregroundColor(useColor ? basalColor(diff: diff) : .primary)
                     if abs(diff) >= 0.005 {
                         Text(String(format: "%+.2f", diff))
-                            .font(.system(size: 8, design: .rounded))
+                            .font(.system(size: 10, design: .rounded))
                             .foregroundColor(useColor ? basalColor(diff: diff) : .secondary)
                     }
                 }
