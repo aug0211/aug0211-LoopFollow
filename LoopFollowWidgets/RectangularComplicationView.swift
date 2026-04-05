@@ -155,14 +155,16 @@ private struct SparklineView: View {
                         )
 
                     // Progressive line — each segment drawn with increasing width + opacity
+                    // Color each segment based on the midpoint BG value (ROYGBIV spectrum)
                     ForEach(0..<(screenPoints.count - 1), id: \.self) { i in
                         let t = Double(i) / Double(max(screenPoints.count - 2, 1))
                         let lineWidth = 0.3 + t * 1.7
                         let opacity = min(t * 1.4, 1.0)
+                        let midBG = Double(sorted[i].value + sorted[i + 1].value) / 2.0
 
                         buildSingleSegment(points: screenPoints, index: i)
                             .stroke(
-                                Color.primary.opacity(opacity),
+                                bgDynamicColor(midBG).opacity(opacity),
                                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt, lineJoin: .round)
                             )
                     }
