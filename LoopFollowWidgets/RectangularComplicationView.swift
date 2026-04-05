@@ -324,12 +324,12 @@ private struct StatsPanel: View {
 
                 if let d = data.delta {
                     Text(deltaText(d))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(isStale ? .secondary : .primary)
                 }
 
                 Text(stalenessText)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(isStale ? .secondary : .primary)
             }
         }
