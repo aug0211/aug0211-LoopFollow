@@ -3,7 +3,7 @@
 //
 // Reusable BG display view for both accessoryRectangular complication and
 // future Live Activity usage. Text overlays the left side of a full-width
-// filled-area sparkline graph that fades in from left to right.
+// SweetDreams-style filled-area sparkline with smooth Catmull-Rom curves.
 
 import SwiftUI
 import WidgetKit
@@ -23,7 +23,8 @@ struct BGComplicationContent: View {
             SparklineView(
                 history: data.history,
                 displayDate: displayDate,
-                useColor: useColor
+                useColor: useColor,
+                currentBG: data.bgValue
             )
             .mask(
                 LinearGradient(
@@ -70,16 +71,28 @@ struct RectangularComplicationView: View {
     }
 }
 
-// MARK: - Sparkline Graph (filled-area style)
+// MARK: - Sparkline Graph (SweetDreams-style filled area with Catmull-Rom curves)
 
 private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
     let useColor: Bool
+    let currentBG: Int
 
     // Graph Y-axis range
     private let yMin: Double = 40
     private let yMax: Double = 300
+
+    /// Y-axis labels shown on the right edge
+    private let yLabels: [Int] = [80, 120, 180]
+
+    /// BG range color: <70 red, 70-180 green, >180 yellow
+    private var graphColor: Color {
+        guard useColor else { return .primary }
+        if currentBG < 70 { return .red }
+        if currentBG > 180 { return .yellow }
+        return .green
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -88,72 +101,120 @@ private struct SparklineView: View {
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
 
-            if sorted.count >= 2 {
-                // Build line path through BG points
-                let linePath = buildLinePath(points: sorted, start: threeHoursAgo, width: w, height: h)
+            // Convert BG points to screen coordinates
+            let screenPoints: [CGPoint] = sorted.map { point in
+                CGPoint(
+                    x: xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: w),
+                    y: yPosition(for: Double(point.value), height: h)
+                )
+            }
 
-                // Filled area: close the line path down to the bottom
-                let fillPath = buildFillPath(points: sorted, start: threeHoursAgo, width: w, height: h)
-
-                ZStack {
-                    // Filled area with gradient
-                    fillPath
+            ZStack {
+                if screenPoints.count >= 2 {
+                    // Filled area with gradient (3D glow effect)
+                    buildFillPath(points: screenPoints, height: h)
                         .fill(
                             LinearGradient(
-                                colors: useColor
-                                    ? [Color.green.opacity(0.4), Color.green.opacity(0.05)]
-                                    : [Color.primary.opacity(0.3), Color.primary.opacity(0.05)],
+                                colors: [
+                                    graphColor.opacity(0.5),
+                                    graphColor.opacity(0.2),
+                                    graphColor.opacity(0.02)
+                                ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
 
-                    // Line on top
-                    linePath
+                    // Smooth line on top
+                    buildCurvePath(points: screenPoints)
                         .stroke(
-                            useColor ? Color.green : Color.primary,
-                            style: StrokeStyle(lineWidth: 1.5, lineJoin: .round)
+                            graphColor,
+                            style: StrokeStyle(lineWidth: 1.5, lineJoin: .round, lineCap: .round)
                         )
                 }
-            }
-        }
-    }
 
-    private func buildLinePath(points: [WidgetBGPoint], start: Date, width: Double, height: Double) -> Path {
-        Path { path in
-            for (i, point) in points.enumerated() {
-                let x = xPosition(for: point.timestamp, start: start, end: displayDate, width: width)
-                let y = yPosition(for: Double(point.value), height: height)
-                if i == 0 {
-                    path.move(to: CGPoint(x: x, y: y))
-                } else {
-                    path.addLine(to: CGPoint(x: x, y: y))
+                // Y-axis reference labels on right edge
+                ForEach(yLabels, id: \.self) { value in
+                    let y = yPosition(for: Double(value), height: h)
+                    Text("\(value)")
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.7))
+                        .position(x: w - 10, y: y)
                 }
             }
         }
     }
 
-    private func buildFillPath(points: [WidgetBGPoint], start: Date, width: Double, height: Double) -> Path {
+    // MARK: - Catmull-Rom curve path
+
+    /// Builds a smooth Catmull-Rom curve through the given points.
+    private func buildCurvePath(points: [CGPoint]) -> Path {
         Path { path in
-            guard let first = points.first, let last = points.last else { return }
+            guard points.count >= 2 else { return }
+            path.move(to: points[0])
 
-            let firstX = xPosition(for: first.timestamp, start: start, end: displayDate, width: width)
-            let firstY = yPosition(for: Double(first.value), height: height)
-            path.move(to: CGPoint(x: firstX, y: firstY))
-
-            for i in 1..<points.count {
-                let x = xPosition(for: points[i].timestamp, start: start, end: displayDate, width: width)
-                let y = yPosition(for: Double(points[i].value), height: height)
-                path.addLine(to: CGPoint(x: x, y: y))
+            if points.count == 2 {
+                path.addLine(to: points[1])
+                return
             }
 
-            // Close down to bottom edge and back
-            let lastX = xPosition(for: last.timestamp, start: start, end: displayDate, width: width)
-            path.addLine(to: CGPoint(x: lastX, y: height))
-            path.addLine(to: CGPoint(x: firstX, y: height))
+            for i in 0..<(points.count - 1) {
+                let p0 = points[max(i - 1, 0)]
+                let p1 = points[i]
+                let p2 = points[min(i + 1, points.count - 1)]
+                let p3 = points[min(i + 2, points.count - 1)]
+
+                // Catmull-Rom → cubic bezier control points
+                let cp1 = CGPoint(
+                    x: p1.x + (p2.x - p0.x) / 6.0,
+                    y: p1.y + (p2.y - p0.y) / 6.0
+                )
+                let cp2 = CGPoint(
+                    x: p2.x - (p3.x - p1.x) / 6.0,
+                    y: p2.y - (p3.y - p1.y) / 6.0
+                )
+
+                path.addCurve(to: p2, control1: cp1, control2: cp2)
+            }
+        }
+    }
+
+    /// Builds the filled area: Catmull-Rom curve closed down to the bottom edge.
+    private func buildFillPath(points: [CGPoint], height: Double) -> Path {
+        Path { path in
+            guard let first = points.first, let last = points.last else { return }
+            path.move(to: first)
+
+            if points.count == 2 {
+                path.addLine(to: last)
+            } else {
+                for i in 0..<(points.count - 1) {
+                    let p0 = points[max(i - 1, 0)]
+                    let p1 = points[i]
+                    let p2 = points[min(i + 1, points.count - 1)]
+                    let p3 = points[min(i + 2, points.count - 1)]
+
+                    let cp1 = CGPoint(
+                        x: p1.x + (p2.x - p0.x) / 6.0,
+                        y: p1.y + (p2.y - p0.y) / 6.0
+                    )
+                    let cp2 = CGPoint(
+                        x: p2.x - (p3.x - p1.x) / 6.0,
+                        y: p2.y - (p3.y - p1.y) / 6.0
+                    )
+
+                    path.addCurve(to: p2, control1: cp1, control2: cp2)
+                }
+            }
+
+            // Close down to bottom edge
+            path.addLine(to: CGPoint(x: last.x, y: height))
+            path.addLine(to: CGPoint(x: first.x, y: height))
             path.closeSubpath()
         }
     }
+
+    // MARK: - Coordinate helpers
 
     private func xPosition(for date: Date, start: Date, end: Date, width: Double) -> Double {
         let total = end.timeIntervalSince(start)
