@@ -129,7 +129,7 @@ private struct SparklineView: View {
                     buildCurvePath(points: screenPoints)
                         .stroke(
                             graphColor,
-                            style: StrokeStyle(lineWidth: 1.5, lineJoin: .round, lineCap: .round)
+                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
                         )
                 }
 
