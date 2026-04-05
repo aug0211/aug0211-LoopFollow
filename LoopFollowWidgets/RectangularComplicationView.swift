@@ -317,7 +317,7 @@ private struct StatsPanel: View {
                 }
 
             // Trend arrow + delta + staleness — vertically centered on BG number
-            VStack(alignment: .leading, spacing: -7) {
+            VStack(alignment: .leading, spacing: -6) {
                 Text(data.direction)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(isStale ? .secondary : .primary)
