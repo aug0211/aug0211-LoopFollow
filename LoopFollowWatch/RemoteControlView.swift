@@ -86,7 +86,26 @@ private struct RemoteTile: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 72)
-        .background(color.opacity(0.3))
-        .cornerRadius(10)
+        .background(
+            ZStack {
+                // Base gradient — lighter top, darker bottom for 3D depth
+                LinearGradient(
+                    colors: [color.opacity(0.8), color.opacity(0.45)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                // Top highlight for raised look
+                VStack {
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.25), Color.white.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 20)
+                    Spacer()
+                }
+            }
+        )
+        .cornerRadius(12)
     }
 }
