@@ -55,7 +55,7 @@ struct WatchBolusView: View {
                     sendBolusAndMeal()
                 }
 
-                Spacer()
+                Color.clear.frame(height: 60)
             } else {
                 HStack {
                     Button {
