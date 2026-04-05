@@ -116,6 +116,7 @@ struct WatchBolusView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.top, -8)
 
                 Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                     confirmedAmount = amount
