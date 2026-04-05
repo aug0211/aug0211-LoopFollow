@@ -56,7 +56,6 @@ struct WatchBolusView: View {
                     sendBolusAndMeal()
                 }
 
-                Color.clear.frame(height: 60)
             } else {
                 HStack {
                     Button {
@@ -132,7 +131,6 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
