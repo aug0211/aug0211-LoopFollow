@@ -65,7 +65,7 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
     /// 15 min is the preferred cadence — matching what SweetDreams and similar
     /// CGM apps achieve.
     static func scheduleBackgroundRefresh() {
-        let preferredDate = Date().addingTimeInterval(15 * 60) // 15 minutes
+        let preferredDate = Date().addingTimeInterval(5 * 60) // 5 minutes
         WKApplication.shared().scheduleBackgroundRefresh(
             withPreferredDate: preferredDate,
             userInfo: nil

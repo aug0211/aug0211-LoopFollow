@@ -63,7 +63,7 @@ struct BGTimelineProvider: TimelineProvider {
         // After the last pre-generated entry, ask for a fresh timeline.
         // This acts as a safety net — most reloads will come from the app
         // calling reloadAllTimelines() on new BG data or from background refresh.
-        let expiry = now.addingTimeInterval(60 * 60) // 1 hour
+        let expiry = now.addingTimeInterval(5 * 60) // 5 minutes
         let timeline = Timeline(entries: entries, policy: .after(expiry))
         completion(timeline)
     }
