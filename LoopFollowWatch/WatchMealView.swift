@@ -215,7 +215,7 @@ struct WatchMealView: View {
 
         Button("Continue") {
             if carbs > 0 || protein > 0 || fat > 0 {
-                bgFetcher.pendingCarbs = carbs
+                bgFetcher.pendingCarbs = Double(Int(carbs))
                 bgFetcher.updateRecommendedBolus()
                 showBolusStep = true
             }
