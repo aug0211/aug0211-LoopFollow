@@ -144,27 +144,28 @@ private struct SparklineView: View {
                 }
 
                 if screenPoints.count >= 2 {
-                    // Filled area with gradient
-                    buildFillPath(points: screenPoints, height: h)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.primary.opacity(0.2), Color.primary.opacity(0.02)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    // Progressive line — each segment drawn with increasing width + opacity
-                    // Color each segment based on the midpoint BG value (ROYGBIV spectrum)
+                    // Per-segment fill + stroke — each colored by midpoint BG value
                     ForEach(0..<(screenPoints.count - 1), id: \.self) { i in
                         let t = Double(i) / Double(max(screenPoints.count - 2, 1))
                         let lineWidth = 0.3 + t * 1.7
                         let opacity = min(t * 1.4, 1.0)
                         let midBG = Double(sorted[i].value + sorted[i + 1].value) / 2.0
+                        let segColor = bgDynamicColor(midBG)
 
+                        // Fill slice under this segment
+                        buildSegmentFill(points: screenPoints, index: i, height: h)
+                            .fill(
+                                LinearGradient(
+                                    colors: [segColor.opacity(0.2), segColor.opacity(0.02)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        // Stroke with progressive width + opacity
                         buildSingleSegment(points: screenPoints, index: i)
                             .stroke(
-                                bgDynamicColor(midBG).opacity(opacity),
+                                segColor.opacity(opacity),
                                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt, lineJoin: .round)
                             )
                     }
@@ -195,6 +196,32 @@ private struct SparklineView: View {
 
             path.move(to: p1)
             path.addCurve(to: p2, control1: cp1, control2: cp2)
+        }
+    }
+
+    /// Builds a single segment's fill slice: Catmull-Rom curve closed down to the bottom edge.
+    private func buildSegmentFill(points: [CGPoint], index: Int, height: Double) -> Path {
+        Path { path in
+            let i = index
+            let p0 = points[max(i - 1, 0)]
+            let p1 = points[i]
+            let p2 = points[min(i + 1, points.count - 1)]
+            let p3 = points[min(i + 2, points.count - 1)]
+
+            let cp1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6.0,
+                y: p1.y + (p2.y - p0.y) / 6.0
+            )
+            let cp2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6.0,
+                y: p2.y - (p3.y - p1.y) / 6.0
+            )
+
+            path.move(to: p1)
+            path.addCurve(to: p2, control1: cp1, control2: cp2)
+            path.addLine(to: CGPoint(x: p2.x, y: height))
+            path.addLine(to: CGPoint(x: p1.x, y: height))
+            path.closeSubpath()
         }
     }
 
