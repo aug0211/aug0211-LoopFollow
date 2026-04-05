@@ -38,9 +38,9 @@ struct BGComplicationContent: View {
 
             // Text overlay on the left
             StatsPanel(data: data, displayDate: displayDate)
-                .padding(.leading, 1)
+                .padding(.leading, 0)
         }
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 0)
     }
 }
 
@@ -304,7 +304,7 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 60, weight: .regular))
+                .font(.system(size: 54, weight: .regular))
                 .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
