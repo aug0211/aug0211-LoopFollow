@@ -75,9 +75,11 @@ private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
 
-    /// Only the points visible in the 3-hour sparkline window.
+    /// Only the points that are actually visible given the left-fade mask.
+    /// The mask is fully transparent for the first 25% and fades in through 65%,
+    /// so data older than ~2h is effectively invisible. Use last 2h for Y-axis range.
     private var visibleHistory: [WidgetBGPoint] {
-        let cutoff = displayDate.addingTimeInterval(-3 * 3600)
+        let cutoff = displayDate.addingTimeInterval(-2 * 3600)
         return history.filter { $0.timestamp >= cutoff }
     }
 
@@ -90,17 +92,28 @@ private struct SparklineView: View {
         return (lo - 2, hi + 2)
     }
 
-    /// Generate ticks: show actual visible min and max BG as debug labels.
+    /// Generate up to 4 "nice" ticks within the visible range.
     private var yTicks: [Int] {
-        let visible = visibleHistory
-        guard !visible.isEmpty else { return [] }
-        let values = visible.map { $0.value }
-        let lo = values.min()!
-        let hi = values.max()!
-        // Show the actual min and max so we can verify
-        if lo == hi { return [lo] }
-        let mid = (lo + hi) / 2
-        return [lo, mid, hi]
+        let range = dataRange
+        let lo = Int(ceil(range.min))
+        let hi = Int(floor(range.max))
+        let span = hi - lo
+        guard span > 0 else { return [] }
+
+        let step: Int
+        if span <= 20 { step = 5 }
+        else if span <= 50 { step = 10 }
+        else if span <= 100 { step = 20 }
+        else { step = 40 }
+
+        let start = lo + (step - (lo % step)) % step
+        var ticks: [Int] = []
+        var v = start
+        while v <= hi && ticks.count < 4 {
+            ticks.append(v)
+            v += step
+        }
+        return ticks
     }
 
     var body: some View {
