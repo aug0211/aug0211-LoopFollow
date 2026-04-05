@@ -5,6 +5,43 @@ import Combine
 import Foundation
 import WidgetKit
 
+// MARK: - Widget Data (shared with LoopFollowWidgets target via UserDefaults)
+
+struct WidgetBGPoint: Codable, Hashable {
+    let value: Int      // mg/dL
+    let timestamp: Date
+}
+
+struct WidgetData: Codable {
+    let bgValue: Int
+    let direction: String
+    let delta: Int?
+    let bgTimestamp: Date
+    let iob: Double?
+    let cob: Double?
+    let basalRate: Double?
+    let scheduledBasal: Double?
+    let history: [WidgetBGPoint]
+    let units: String
+    let updatedAt: Date
+
+    private static let storageKey = "widgetData"
+
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+
+    static func load() -> WidgetData? {
+        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+              let decoded = try? JSONDecoder().decode(WidgetData.self, from: data)
+        else { return nil }
+        return decoded
+    }
+}
+
+// MARK: - Bolus Calculation
+
 struct BolusCalculation {
     let bg: Double
     let target: Double
