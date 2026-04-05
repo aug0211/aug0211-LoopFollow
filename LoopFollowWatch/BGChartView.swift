@@ -80,6 +80,21 @@ struct BGChartView: View {
         return convertBG(baseBG + 15)
     }
 
+    /// Find the closest BG value at a given timestamp, offset higher for carb dots to clear bolus markers
+    private func bgValueAboveCarb(timestamp: Date) -> Double {
+        let closest = visibleBG.min(by: {
+            abs($0.timestamp.timeIntervalSince(timestamp)) < abs($1.timestamp.timeIntervalSince(timestamp))
+        })
+        let baseBG: Double
+        if let closest = closest, abs(closest.timestamp.timeIntervalSince(timestamp)) < 600 {
+            baseBG = Double(closest.bgValue)
+        } else {
+            baseBG = 150
+        }
+        // Offset above by ~40 mg/dL so carbs clear bolus triangles + their text
+        return convertBG(baseBG + 40)
+    }
+
     var body: some View {
         Chart {
             if showTreatments {
@@ -181,7 +196,7 @@ struct BGChartView: View {
                 ForEach(visibleTreatments.filter { $0.type == .carbs }) { treatment in
                     PointMark(
                         x: .value("Time", treatment.timestamp),
-                        y: .value("BG", bgValueAbove(timestamp: treatment.timestamp))
+                        y: .value("BG", bgValueAboveCarb(timestamp: treatment.timestamp))
                     )
                     .symbol(.circle)
                     .symbolSize(30)
