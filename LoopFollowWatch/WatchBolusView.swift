@@ -126,7 +126,7 @@ struct WatchBolusView: View {
                 .disabled(amount <= 0 && pendingMeal == nil)
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 18)
         .modifier(CrownRotationModifier(
             isActive: !showConfirm && resultMessage == nil,
             value: $rawCrown,
