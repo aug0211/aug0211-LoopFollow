@@ -38,7 +38,7 @@ struct BGComplicationContent: View {
 
             // Text overlay on the left
             StatsPanel(data: data, displayDate: displayDate)
-                .padding(.leading, 4)
+                .padding(.leading, 1)
         }
         .padding(.horizontal, 2)
     }
