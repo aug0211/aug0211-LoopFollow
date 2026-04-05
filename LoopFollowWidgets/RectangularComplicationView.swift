@@ -316,11 +316,13 @@ private struct StatsPanel: View {
                     }
                 }
 
-            // Trend arrow + delta stacked vertically to the right of BG
-            VStack(alignment: .leading, spacing: -2) {
+            // Trend arrow + delta + staleness — vertically centered on BG number
+            VStack(alignment: .leading, spacing: 0) {
                 Text(data.direction)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(isStale ? .secondary : .primary)
+
+                Spacer(minLength: 0)
 
                 if let d = data.delta {
                     Text(deltaText(d))
@@ -328,10 +330,11 @@ private struct StatsPanel: View {
                         .foregroundColor(isStale ? .secondary : .primary)
                 }
 
+                Spacer(minLength: 0)
+
                 Text(stalenessText)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(isStale ? .secondary : .primary)
-                    .padding(.top, 2)
             }
         }
     }
