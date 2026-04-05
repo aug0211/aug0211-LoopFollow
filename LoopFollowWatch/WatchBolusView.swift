@@ -96,10 +96,10 @@ struct WatchBolusView: View {
                     .foregroundColor(.blue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .padding(.top, -8)
+                    .padding(.top, -4)
 
                 HStack(spacing: 6) {
-                    Text("Recommended: \(String(format: "%g", bgFetcher.recommendedBolus))U")
+                    Text("Calculated: \(String(format: "%g", bgFetcher.recommendedBolus))U")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
                         .onTapGesture {
@@ -117,7 +117,7 @@ struct WatchBolusView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.top, 2)
+                .padding(.top, -2)
 
                 Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                     confirmedAmount = amount
