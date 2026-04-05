@@ -123,7 +123,7 @@ private struct SparklineView: View {
             let topInset: CGFloat = 6     // room for top y-axis label
             let bottomInset: CGFloat = 4  // room for bottom y-axis label
             let chartH = h - topInset - bottomInset
-            let rightInset: CGFloat = 14  // keep sparkline clear of y-axis labels
+            let rightInset: CGFloat = 16  // keep sparkline clear of y-axis labels
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
