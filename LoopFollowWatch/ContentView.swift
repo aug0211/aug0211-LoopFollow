@@ -97,7 +97,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private func mainView(reading: BGReading, config: WatchConfig) -> some View {
-        let bgColor = reading.bgColor(lowLine: config.lowLine, highLine: config.highLine)
+        let bgColor = bgDynamicColor(Double(reading.bgValue))
         let stale = isTimeTravel ? false : reading.isStale
 
         ZStack {

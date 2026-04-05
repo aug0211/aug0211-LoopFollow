@@ -270,10 +270,7 @@ struct BGChartView: View {
     }
 
     private func pointColor(bgValue: Int) -> Color {
-        let bg = Double(bgValue)
-        if bg <= config.lowLine { return .red }
-        if bg >= config.highLine { return .yellow }
-        return .green
+        return bgDynamicColor(Double(bgValue))
     }
 
     @ChartContentBuilder

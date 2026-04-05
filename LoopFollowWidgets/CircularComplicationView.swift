@@ -29,7 +29,7 @@ struct CircularComplicationView: View {
                     // BG value — center, biggest
                     Text(bgText(data))
                         .font(.system(size: 22, weight: .medium))
-                        .foregroundColor(isStale ? .secondary : .primary)
+                        .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
                         .overlay {
