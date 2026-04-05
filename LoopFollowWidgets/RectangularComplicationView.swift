@@ -85,20 +85,20 @@ private struct SparklineView: View {
         return (floor((lo - padding) / 10) * 10, ceil((hi + padding) / 10) * 10)
     }
 
-    /// Generate up to 6 "nice" ticks within the dynamic range.
+    /// Generate up to 4 "nice" ticks within the dynamic range.
     private var yTicks: [Int] {
         let range = dataRange
         let span = range.max - range.min
-        // Choose step: prefer 10, use 20 if range is large, 5 if very small
+        // Choose step: prefer 20, use 40 if range is large, 10 if very small
         let step: Int
-        if span <= 40 { step = 5 }
-        else if span <= 80 { step = 10 }
-        else { step = 20 }
+        if span <= 40 { step = 10 }
+        else if span <= 100 { step = 20 }
+        else { step = 40 }
 
         let start = Int(range.min) - (Int(range.min) % step) + step
         var ticks: [Int] = []
         var v = start
-        while v < Int(range.max) && ticks.count < 6 {
+        while v < Int(range.max) && ticks.count < 4 {
             ticks.append(v)
             v += step
         }
@@ -137,10 +137,10 @@ private struct SparklineView: View {
                     .foregroundColor(.secondary.opacity(0.15))
 
                     Text("\(value)")
-                        .font(.system(size: 7, weight: .medium))
+                        .font(.system(size: 10.5, weight: .medium))
                         .foregroundColor(.secondary.opacity(0.6))
-                        .frame(width: 22, alignment: .trailing)
-                        .position(x: w - 13, y: y)
+                        .frame(width: 28, alignment: .trailing)
+                        .position(x: w - 16, y: y)
                 }
 
                 if screenPoints.count >= 2 {
@@ -156,7 +156,7 @@ private struct SparklineView: View {
                         buildSegmentFill(points: screenPoints, index: i, height: h)
                             .fill(
                                 LinearGradient(
-                                    colors: [segColor.opacity(0.45), segColor.opacity(0.05)],
+                                    colors: [segColor.opacity(0.7), segColor.opacity(0.08)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
