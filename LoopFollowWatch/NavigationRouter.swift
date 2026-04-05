@@ -6,6 +6,10 @@
 
 import SwiftUI
 
+enum DeepLinkDestination {
+    case bolus, meal, override
+}
+
 class NavigationRouter: ObservableObject {
     /// 0 = ContentView (BG display), 1 = RemoteControlView
     @Published var activeTab: Int = 0
@@ -13,8 +17,11 @@ class NavigationRouter: ObservableObject {
     @Published var showMeal: Bool = false
     @Published var showOverride: Bool = false
 
+    /// Set before switching tabs so RemoteControlView can navigate immediately on appear.
+    @Published var pendingDestination: DeepLinkDestination?
+
     /// Parse a deep link URL and navigate to the appropriate screen.
-    /// URLs: loopfollow://bolus, loopfollow://meal, loopfollow://override
+    /// URLs: loopfollow://open (main graph), loopfollow://bolus, loopfollow://meal, loopfollow://override
     func handle(_ url: URL) {
         guard url.scheme == "loopfollow" else { return }
 
@@ -22,22 +29,33 @@ class NavigationRouter: ObservableObject {
         showBolus = false
         showMeal = false
         showOverride = false
+        pendingDestination = nil
 
-        // Switch to the remote control tab
-        activeTab = 1
+        switch url.host {
+        case "bolus":
+            pendingDestination = .bolus
+            activeTab = 1
+        case "meal":
+            pendingDestination = .meal
+            activeTab = 1
+        case "override":
+            pendingDestination = .override
+            activeTab = 1
+        default:
+            // "open" or unknown — stay on main graph (tab 0)
+            activeTab = 0
+        }
+    }
 
-        // Small delay to let the tab switch settle before pushing a screen
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            switch url.host {
-            case "bolus":
-                self.showBolus = true
-            case "meal":
-                self.showMeal = true
-            case "override":
-                self.showOverride = true
-            default:
-                break // "open" or unknown — just show the app
-            }
+    /// Called by RemoteControlView on appear to consume a pending deep link.
+    func consumePendingDestination() {
+        guard let destination = pendingDestination else { return }
+        pendingDestination = nil
+
+        switch destination {
+        case .bolus:    showBolus = true
+        case .meal:     showMeal = true
+        case .override: showOverride = true
         }
     }
 }

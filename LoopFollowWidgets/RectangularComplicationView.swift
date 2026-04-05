@@ -161,7 +161,7 @@ private struct SparklineView: View {
                         buildSingleSegment(points: screenPoints, index: i)
                             .stroke(
                                 Color.primary.opacity(opacity),
-                                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+                                style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt, lineJoin: .round)
                             )
                     }
                 }
@@ -255,13 +255,13 @@ private struct StatsPanel: View {
         HStack(alignment: .center, spacing: 2) {
             // Big BG value
             Text(bgText)
-                .font(.system(size: 36, weight: .bold))
+                .font(.system(size: 40, weight: .medium))
                 .foregroundColor(.primary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
 
             // Trend arrow + delta stacked vertically to the right of BG
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: -2) {
                 Text(data.direction)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)

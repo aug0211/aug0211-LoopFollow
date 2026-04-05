@@ -57,6 +57,10 @@ struct RemoteControlView: View {
                 WatchOverrideView(config: config, bgFetcher: bgFetcher)
             }
         }
+        .onAppear {
+            // Consume any pending deep link immediately — no pit-stop at the grid
+            router.consumePendingDestination()
+        }
         .onChange(of: router.showOverride) { newValue in
             if newValue {
                 showOverride = true
