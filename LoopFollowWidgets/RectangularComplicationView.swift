@@ -254,7 +254,7 @@ private struct StatsPanel: View {
     let displayDate: Date
 
     private var isStale: Bool {
-        displayDate.timeIntervalSince(data.bgTimestamp) >= 15 * 60
+        displayDate.timeIntervalSince(data.bgTimestamp) >= 16 * 60
     }
 
     var body: some View {
@@ -263,28 +263,31 @@ private struct StatsPanel: View {
             Text(bgText)
                 .font(.system(size: 48, weight: .regular))
                 .foregroundColor(isStale ? .secondary : .primary)
-                .strikethrough(isStale)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
+                .overlay {
+                    if isStale {
+                        Rectangle()
+                            .frame(height: 2)
+                            .foregroundColor(.secondary)
+                    }
+                }
 
             // Trend arrow + delta stacked vertically to the right of BG
             VStack(alignment: .leading, spacing: -2) {
                 Text(data.direction)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(isStale ? .secondary : .primary)
-                    .strikethrough(isStale)
 
                 if let d = data.delta {
                     Text(deltaText(d))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(isStale ? .secondary : .primary)
-                        .strikethrough(isStale)
                 }
 
                 Text(stalenessText)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(isStale ? .secondary : stalenessColor)
-                    .strikethrough(isStale)
             }
         }
     }

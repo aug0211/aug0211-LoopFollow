@@ -4,7 +4,7 @@
 // Round complication for modular watch faces (accessoryCircular).
 // Layout: staleness on top, BG center, delta + trend below.
 // No color — transparent background, white/primary text.
-// When reading is >15 min stale, all text turns gray with strikethrough.
+// When reading is >=16 min stale, all text turns gray with a strikethrough line.
 
 import SwiftUI
 import WidgetKit
@@ -14,7 +14,7 @@ struct CircularComplicationView: View {
 
     var body: some View {
         if let data = entry.data {
-            let isStale = entry.displayDate.timeIntervalSince(data.bgTimestamp) >= 15 * 60
+            let isStale = entry.displayDate.timeIntervalSince(data.bgTimestamp) >= 16 * 60
 
             ZStack {
                 AccessoryWidgetBackground()
@@ -23,17 +23,22 @@ struct CircularComplicationView: View {
                     // Staleness — top
                     Text(stalenessText(data, displayDate: entry.displayDate))
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(isStale ? .secondary : stalenessColor(data, displayDate: entry.displayDate))
-                        .strikethrough(isStale)
+                        .foregroundColor(isStale ? .secondary : .primary)
                         .lineLimit(1)
 
                     // BG value — center, biggest
                     Text(bgText(data))
                         .font(.system(size: 22, weight: .medium))
                         .foregroundColor(isStale ? .secondary : .primary)
-                        .strikethrough(isStale)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
+                        .overlay {
+                            if isStale {
+                                Rectangle()
+                                    .frame(height: 1.5)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
 
                     // Trend arrow + delta — bottom
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
@@ -45,7 +50,6 @@ struct CircularComplicationView: View {
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(isStale ? .secondary : .primary)
-                    .strikethrough(isStale)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 }
@@ -81,9 +85,5 @@ struct CircularComplicationView: View {
         let minutes = Int(displayDate.timeIntervalSince(data.bgTimestamp) / 60)
         if minutes < 1 { return "now" }
         return "\(minutes)m"
-    }
-
-    private func stalenessColor(_ data: WidgetData, displayDate: Date) -> Color {
-        return .primary
     }
 }
