@@ -131,8 +131,8 @@ private struct SparklineView: View {
                         path.move(to: CGPoint(x: 0, y: y))
                         path.addLine(to: CGPoint(x: w, y: y))
                     }
-                    .stroke(style: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
-                    .foregroundColor(.secondary.opacity(0.2))
+                    .stroke(style: StrokeStyle(lineWidth: 0.3, dash: [1, 3]))
+                    .foregroundColor(.secondary.opacity(0.15))
 
                     Text("\(value)")
                         .font(.system(size: 7, weight: .medium))
@@ -252,65 +252,29 @@ private struct StatsPanel: View {
     let displayDate: Date
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            // Line 1: BG value + trend arrow
-            HStack(spacing: 2) {
-                Text(bgText)
-                    .font(.system(size: 26, weight: .heavy))
-                    .foregroundColor(.primary)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                Text(data.direction)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.primary)
-            }
+        HStack(alignment: .center, spacing: 2) {
+            // Big BG value
+            Text(bgText)
+                .font(.system(size: 36, weight: .bold))
+                .foregroundColor(.primary)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
 
-            // Line 2: Delta + staleness
-            HStack(spacing: 3) {
+            // Trend arrow + delta stacked vertically to the right of BG
+            VStack(alignment: .leading, spacing: 0) {
+                Text(data.direction)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+
                 if let d = data.delta {
                     Text(deltaText(d))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.primary)
                 }
+
                 Text(stalenessText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(stalenessColor)
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-
-            // Line 3: IOB / COB
-            HStack(spacing: 3) {
-                if let iob = data.iob {
-                    Text(String(format: "%.1fU", iob))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.primary)
-                }
-                if let cob = data.cob {
-                    Text(String(format: "%.0fg", cob))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.primary)
-                }
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-
-            // Line 4: Basal
-            if let rate = data.basalRate {
-                let scheduled = data.scheduledBasal ?? rate
-                let diff = rate - scheduled
-                HStack(spacing: 1) {
-                    Text(String(format: "%.2fU", rate))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.primary)
-                    if abs(diff) >= 0.005 {
-                        Text(String(format: "%+.2f", diff))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
             }
         }
     }
