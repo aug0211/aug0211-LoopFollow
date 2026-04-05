@@ -75,10 +75,16 @@ private struct SparklineView: View {
     let history: [WidgetBGPoint]
     let displayDate: Date
 
-    /// Compute Y-axis range dynamically from actual data with 5-point padding.
+    /// Only the points visible in the 3-hour sparkline window.
+    private var visibleHistory: [WidgetBGPoint] {
+        let cutoff = displayDate.addingTimeInterval(-3 * 3600)
+        return history.filter { $0.timestamp >= cutoff }
+    }
+
+    /// Compute Y-axis range from visible data only, with 2-point padding.
     private var dataRange: (min: Double, max: Double) {
-        guard !history.isEmpty else { return (40, 300) }
-        let values = history.map { Double($0.value) }
+        guard !visibleHistory.isEmpty else { return (40, 300) }
+        let values = visibleHistory.map { Double($0.value) }
         let lo = values.min()!
         let hi = values.max()!
         return (lo - 2, hi + 2)
@@ -310,17 +316,17 @@ private struct StatsPanel: View {
             VStack(alignment: .leading, spacing: -2) {
                 Text(data.direction)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(isStale ? .secondary : .primary)
+                    .foregroundColor(.secondary.opacity(0.6))
 
                 if let d = data.delta {
                     Text(deltaText(d))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(isStale ? .secondary : .primary)
+                        .foregroundColor(.secondary.opacity(0.6))
                 }
 
                 Text(stalenessText)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isStale ? .secondary : stalenessColor)
+                    .foregroundColor(.secondary.opacity(0.6))
             }
         }
     }
