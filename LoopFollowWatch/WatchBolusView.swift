@@ -163,6 +163,12 @@ struct WatchBolusView: View {
                 }
             }
         }
+        .onAppear {
+            // If launched directly (not from meal entry), clear any stale pending carbs
+            if pendingMeal == nil {
+                bgFetcher.pendingCarbs = 0
+            }
+        }
         .onDisappear {
             bgFetcher.pendingCarbs = 0
         }
