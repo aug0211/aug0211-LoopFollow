@@ -157,10 +157,11 @@ struct ContentView: View {
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 40, weight: .light, design: .default))
+                            .font(.system(size: 38, weight: .ultraLight, design: .default))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
+                            .offset(y: 2)
                     }
                 }
                 .padding(.horizontal, 4)
@@ -205,6 +206,17 @@ struct ContentView: View {
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
+                            )
+                        )
+                        .mask(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .white.opacity(0.3), location: 0),
+                                    .init(color: .white, location: 0.45),
+                                    .init(color: .white, location: 1.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
                         )
                 )
@@ -303,12 +315,14 @@ struct ContentView: View {
     }
 
     private func freshnessText(reading: BGReading) -> String {
-        if isTimeTravel {
+        // When not showing the latest reading, display the clock time
+        if let latest = bgFetcher.currentBG,
+           reading.timestamp != latest.timestamp {
             let formatter = DateFormatter()
             formatter.dateFormat = "h:mm a"
             return formatter.string(from: reading.timestamp)
         }
-        // Use `now` state so SwiftUI re-evaluates every second
+        // At current reading: live countdown
         let totalSeconds = Int(now.timeIntervalSince(reading.timestamp))
         if totalSeconds < 5 { return "now" }
         let minutes = totalSeconds / 60
