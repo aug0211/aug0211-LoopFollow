@@ -146,6 +146,7 @@ struct ContentView: View {
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
+                            .offset(y: 5)
                     }
                 }
                 .padding(.horizontal, 4)

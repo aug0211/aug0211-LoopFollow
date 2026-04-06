@@ -19,9 +19,9 @@ struct BGChartView: View {
 
     private var treatmentFontSize: CGFloat {
         switch zoomHours {
-        case ...0.5: return 11
-        case ...1: return 10
-        default: return 7
+        case ...0.5: return 10
+        case ...1: return 8
+        default: return 6
         }
     }
     private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * min(1.6, max(0.7, 2.0 / zoomHours))) }
