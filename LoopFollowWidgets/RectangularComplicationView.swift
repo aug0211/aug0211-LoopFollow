@@ -304,7 +304,7 @@ private struct StatsPanel: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 2) {
+        HStack(alignment: .center, spacing: 3) {
             // Big BG value
             Text(bgText)
                 .font(.system(size: 54, weight: .regular))

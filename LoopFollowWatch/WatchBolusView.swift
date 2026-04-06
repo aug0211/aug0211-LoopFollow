@@ -223,6 +223,7 @@ struct WatchBolusView: View {
                     // Bolus succeeded — now safe to send carbs
                     sendMeal(meal)
                 } else {
+                    bgFetcher.pendingCarbs = 0
                     resultMessage = "Bolus sent!"
                     showCelebration = CelebrationOverlay.shouldCelebrate()
                     WatchRemoteService.postLocalNotification(
@@ -232,6 +233,7 @@ struct WatchBolusView: View {
                     autoDismiss()
                 }
             } else {
+                bgFetcher.pendingCarbs = 0
                 resultMessage = error ?? "Failed"
                 isError = true
             }
@@ -250,12 +252,11 @@ struct WatchBolusView: View {
             entryTime: mealTime,
             config: config
         ) { success, error in
-            if success {
-                // Clear pending carbs immediately — they've been sent to the remote
-                // system and will appear in COB from Nightscout. Leaving them set
-                // causes double-counting in subsequent bolus calculations.
-                bgFetcher.pendingCarbs = 0
+            // Always clear pending carbs — whether the send succeeded or failed,
+            // the meal flow is done and we must not double-count.
+            bgFetcher.pendingCarbs = 0
 
+            if success {
                 if confirmedAmount > 0 {
                     resultMessage = "Bolus + Meal\nsent!"
                     showCelebration = CelebrationOverlay.shouldCelebrate()
