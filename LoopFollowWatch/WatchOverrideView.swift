@@ -67,7 +67,7 @@ struct WatchOverrideView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 10)
-                            .background(Color.purple.opacity(0.45))
+                            .background(Color.purple.opacity(0.55))
                             .cornerRadius(8)
 
                         Button {
@@ -111,7 +111,7 @@ struct WatchOverrideView: View {
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 16)
-                                .background(Color.purple.opacity(0.45))
+                                .background(Color.purple.opacity(0.55))
                                 .cornerRadius(8)
                             }
                             .buttonStyle(.plain)
