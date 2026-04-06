@@ -159,16 +159,16 @@ struct ContentView: View {
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
-                            .offset(y: -4)
+                            .offset(y: -2)
                     }
 
                     Spacer()
 
                     // Loop success indicator
                     Image(systemName: loopStatusIcon)
-                        .font(.system(size: 24, weight: .medium))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundColor(loopStatusColor)
-                        .padding(.trailing, 6)
+                        .padding(.trailing, 4)
 
                     // Reload button
                     Button {
@@ -176,7 +176,7 @@ struct ContentView: View {
                         bgFetcher.reload()
                     } label: {
                         Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                            .font(.system(size: 26, weight: .semibold))
+                            .font(.system(size: 22, weight: .semibold))
                             .foregroundColor(.white.opacity(0.7))
                     }
                     .buttonStyle(.plain)
