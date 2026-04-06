@@ -91,22 +91,37 @@ struct ContentView: View {
         }
     }
 
+    /// Visible chart window edges (mirrors BGChartView's calculation)
+    private var visibleStart: Date {
+        Date().addingTimeInterval(-zoomHours * 3600 + timeOffset.rounded() * 300)
+    }
+    private var visibleEnd: Date {
+        Date().addingTimeInterval(timeOffset.rounded() * 300)
+    }
+
     private func bgBarGradient(bgHistory: [BGReading]) -> LinearGradient {
-        let sorted = bgHistory.sorted { $0.timestamp < $1.timestamp }
-        guard sorted.count >= 2,
-              let first = sorted.first?.timestamp,
-              let last = sorted.last?.timestamp,
+        let start = visibleStart
+        let end = visibleEnd
+        let visible = bgHistory.filter { $0.timestamp >= start && $0.timestamp <= end }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard visible.count >= 2,
+              let first = visible.first?.timestamp,
+              let last = visible.last?.timestamp,
               last > first else {
+            // Fall back to single color from current reading
+            if let reading = visible.first ?? bgHistory.last {
+                return LinearGradient(colors: [bgDynamicColor(Double(reading.bgValue)).opacity(0.4)], startPoint: .leading, endPoint: .trailing)
+            }
             return LinearGradient(colors: [bgDynamicColor(100).opacity(0.4)], startPoint: .leading, endPoint: .trailing)
         }
         let span = last.timeIntervalSince(first)
-        let step = max(1, sorted.count / 8)
+        let step = max(1, visible.count / 10)
         var stops: [Gradient.Stop] = []
-        for i in stride(from: 0, to: sorted.count, by: step) {
-            let t = sorted[i].timestamp.timeIntervalSince(first) / span
-            stops.append(.init(color: bgDynamicColor(Double(sorted[i].bgValue)).opacity(0.4), location: t))
+        for i in stride(from: 0, to: visible.count, by: step) {
+            let t = visible[i].timestamp.timeIntervalSince(first) / span
+            stops.append(.init(color: bgDynamicColor(Double(visible[i].bgValue)).opacity(0.4), location: t))
         }
-        if let lastReading = sorted.last {
+        if let lastReading = visible.last {
             stops.append(.init(color: bgDynamicColor(Double(lastReading.bgValue)).opacity(0.4), location: 1.0))
         }
         return LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing)
