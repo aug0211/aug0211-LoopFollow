@@ -97,17 +97,17 @@ struct ContentView: View {
               let first = sorted.first?.timestamp,
               let last = sorted.last?.timestamp,
               last > first else {
-            return LinearGradient(colors: [bgDynamicColor(100).opacity(0.25)], startPoint: .leading, endPoint: .trailing)
+            return LinearGradient(colors: [bgDynamicColor(100).opacity(0.4)], startPoint: .leading, endPoint: .trailing)
         }
         let span = last.timeIntervalSince(first)
         let step = max(1, sorted.count / 8)
         var stops: [Gradient.Stop] = []
         for i in stride(from: 0, to: sorted.count, by: step) {
             let t = sorted[i].timestamp.timeIntervalSince(first) / span
-            stops.append(.init(color: bgDynamicColor(Double(sorted[i].bgValue)).opacity(0.25), location: t))
+            stops.append(.init(color: bgDynamicColor(Double(sorted[i].bgValue)).opacity(0.4), location: t))
         }
         if let lastReading = sorted.last {
-            stops.append(.init(color: bgDynamicColor(Double(lastReading.bgValue)).opacity(0.25), location: 1.0))
+            stops.append(.init(color: bgDynamicColor(Double(lastReading.bgValue)).opacity(0.4), location: 1.0))
         }
         return LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing)
     }
@@ -142,7 +142,7 @@ struct ContentView: View {
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 28, weight: .semibold, design: .default))
+                            .font(.system(size: 22, weight: .regular, design: .default))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
