@@ -92,14 +92,14 @@ private struct RemoteTile: View {
             ZStack {
                 // Base gradient — lighter top, darker bottom for 3D depth
                 LinearGradient(
-                    colors: [color.opacity(0.9), color.opacity(0.6)],
+                    colors: [color.opacity(0.95), color.opacity(0.7)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 // Top highlight for raised look
                 VStack {
                     LinearGradient(
-                        colors: [Color.white.opacity(0.2), Color.white.opacity(0)],
+                        colors: [Color.white.opacity(0.12), Color.white.opacity(0)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -108,6 +108,6 @@ private struct RemoteTile: View {
                 }
             }
         )
-        .cornerRadius(10)
+        .cornerRadius(8)
     }
 }
