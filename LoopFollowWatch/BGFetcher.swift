@@ -638,8 +638,9 @@ class BGFetcher: ObservableObject {
         let deltaEffect = floor(delta / isf * 100) / 100
 
         let fullBolus = glucoseEffect + iobEffect + cobEffect + deltaEffect
-        // Floor-round recommended to nearest 0.05
-        recommendedBolus = max(0, floor(fullBolus * 20) / 20)
+        // Round to 2 decimals to match displayed value, then floor to nearest 0.05
+        let roundedBolus = (fullBolus * 100).rounded() / 100
+        recommendedBolus = max(0, floor(roundedBolus * 20) / 20)
 
         bolusCalc = BolusCalculation(
             bg: Double(bg), target: target, isf: isf,
