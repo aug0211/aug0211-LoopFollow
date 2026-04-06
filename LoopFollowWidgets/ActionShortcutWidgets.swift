@@ -40,6 +40,7 @@ struct ActionShortcutView: View {
             Image(systemName: systemImage)
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(color)
+                .widgetAccentable()
         }
     }
 }

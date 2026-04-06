@@ -32,6 +32,7 @@ struct CircularComplicationView: View {
                         .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
+                        .widgetAccentable()
                         .overlay {
                             if isStale {
                                 Rectangle()

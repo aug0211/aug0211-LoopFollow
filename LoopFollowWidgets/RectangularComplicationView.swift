@@ -158,8 +158,9 @@ private struct SparklineView: View {
                 }
 
                 if screenPoints.count >= 2 {
-                    // Per-segment fill + stroke — each colored by midpoint BG value
-                    ForEach(0..<(screenPoints.count - 1), id: \.self) { i in
+                    Group {
+                        // Per-segment fill + stroke — each colored by midpoint BG value
+                        ForEach(0..<(screenPoints.count - 1), id: \.self) { i in
                         let t = Double(i) / Double(max(screenPoints.count - 2, 1))
                         let lineWidth = 0.3 + t * 1.7
                         let opacity = min(t * 1.4, 1.0)
@@ -183,6 +184,8 @@ private struct SparklineView: View {
                                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt, lineJoin: .round)
                             )
                     }
+                    }
+                    .widgetAccentable()
                 }
             }
         }
@@ -308,6 +311,7 @@ private struct StatsPanel: View {
                 .foregroundColor(isStale ? .secondary : bgDynamicColor(Double(data.bgValue)))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
+                .widgetAccentable()
                 .overlay {
                     if isStale {
                         Rectangle()
