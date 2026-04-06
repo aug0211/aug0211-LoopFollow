@@ -3,6 +3,8 @@
 
 import SwiftUI
 
+private let tempColor = Color(red: 0.6, green: 1.0, blue: 0.0)
+
 struct WatchTempTargetView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
@@ -80,7 +82,7 @@ struct WatchTempTargetView: View {
                 if showConfirm {
                     Text("\(pendingTarget) \(config.units == "mmol/L" ? "mmol/L" : "mg/dL") for \(pendingDuration)m")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.pink)
+                        .foregroundColor(tempColor)
 
                     CrownConfirmView(label: "to set target") {
                         sendTempTarget()
@@ -105,7 +107,7 @@ struct WatchTempTargetView: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(editingField == .target ? Color.pink.opacity(0.15) : Color.clear)
+                        .background(editingField == .target ? tempColor.opacity(0.15) : Color.clear)
                         .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
@@ -124,7 +126,7 @@ struct WatchTempTargetView: View {
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(editingField == .duration ? Color.pink.opacity(0.15) : Color.clear)
+                        .background(editingField == .duration ? tempColor.opacity(0.15) : Color.clear)
                         .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
@@ -148,7 +150,7 @@ struct WatchTempTargetView: View {
                                 .font(.system(size: 12, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
-                                .background(Color.pink)
+                                .background(tempColor)
                                 .cornerRadius(6)
                         }
                         .buttonStyle(.plain)
@@ -197,7 +199,7 @@ struct WatchTempTargetView: View {
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Color.pink.opacity(0.4))
+                            .background(tempColor.opacity(0.4))
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
@@ -211,7 +213,7 @@ struct WatchTempTargetView: View {
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Color.pink.opacity(0.4))
+                            .background(tempColor.opacity(0.4))
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
@@ -226,7 +228,7 @@ struct WatchTempTargetView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Color.pink)
+                            .background(tempColor)
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)

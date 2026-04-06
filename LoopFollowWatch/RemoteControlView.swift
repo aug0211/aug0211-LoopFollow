@@ -3,6 +3,8 @@
 
 import SwiftUI
 
+private let tempColor = Color(red: 0.6, green: 1.0, blue: 0.0)
+
 struct RemoteControlView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
@@ -40,7 +42,7 @@ struct RemoteControlView: View {
                 Button {
                     router.activeDestination = .tempTarget
                 } label: {
-                    RemoteTile(icon: "target", label: "Temp", color: .pink)
+                    RemoteTile(icon: "target", label: "Temp", color: tempColor)
                 }
                 .buttonStyle(.plain)
             }

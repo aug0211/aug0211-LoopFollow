@@ -102,7 +102,7 @@ struct TempTargetShortcutWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ActionTimelineProvider()) { _ in
-            ActionShortcutView(systemImage: "target", color: .pink)
+            ActionShortcutView(systemImage: "target", color: Color(red: 0.6, green: 1.0, blue: 0.0))
                 .containerBackground(.fill.tertiary, for: .widget)
                 .widgetURL(URL(string: "loopfollow://temptarget"))
         }
