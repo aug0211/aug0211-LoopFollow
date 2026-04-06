@@ -16,6 +16,15 @@ struct BGChartView: View {
     @State private var lastHapticOffset: Double = 0
     @Binding var zoomHours: Double
     @AppStorage("showTreatments") private var showTreatments: Bool = false
+
+    /// Scale factor for treatment markers — grows as we zoom in, shrinks as we zoom out.
+    /// Baseline 1.0 at 2h zoom. Range: ~0.7 (6h) to ~1.6 (15m).
+    private var treatmentScale: Double {
+        min(1.6, max(0.7, 2.0 / zoomHours))
+    }
+    private var treatmentFontSize: CGFloat { CGFloat(9.0 * treatmentScale) }
+    private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * treatmentScale) }
+    private var showTreatmentLabels: Bool { zoomHours <= 2 }
     @FocusState private var chartFocused: Bool
 
     // timeOffset is in units of 5 minutes (1 BG reading), snapped to integers
@@ -195,15 +204,17 @@ struct BGChartView: View {
                     )
                     .symbol {
                         Image(systemName: "arrowtriangle.down.fill")
-                            .font(.system(size: 6))
+                            .font(.system(size: CGFloat(6.0 * treatmentScale)))
                             .foregroundColor(.blue)
                     }
-                    .symbolSize(30)
+                    .symbolSize(treatmentSymbolSize)
                     .foregroundStyle(.blue)
                     .annotation(position: .top, spacing: 1) {
-                        Text(String(format: "%g", treatment.value))
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white)
+                        if showTreatmentLabels {
+                            Text(String(format: "%g", treatment.value))
+                                .font(.system(size: treatmentFontSize, weight: .medium))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
 
@@ -214,12 +225,14 @@ struct BGChartView: View {
                         y: .value("BG", bgValueAboveCarb(timestamp: treatment.timestamp))
                     )
                     .symbol(.circle)
-                    .symbolSize(30)
+                    .symbolSize(treatmentSymbolSize)
                     .foregroundStyle(.yellow)
                     .annotation(position: .top, spacing: 1) {
-                        Text("\(Int(treatment.value))")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white)
+                        if showTreatmentLabels {
+                            Text("\(Int(treatment.value))")
+                                .font(.system(size: treatmentFontSize, weight: .medium))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
             }
