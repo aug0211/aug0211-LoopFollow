@@ -144,7 +144,7 @@ struct ContentView: View {
 
         ZStack {
             VStack(spacing: 0) {
-                // Row 1: BG + trend + delta ... loop indicator + reload
+                // Row 1: BG + trend/delta stack ... loop indicator + reload
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
                         .font(.system(size: 48, weight: .regular, design: .default))
@@ -152,19 +152,19 @@ struct ContentView: View {
                         .lineLimit(1)
                         .fixedSize()
 
-                    Text(reading.direction)
-                        .font(.system(size: 28, weight: .semibold, design: .default))
-                        .foregroundColor(bgColor)
-                        .fixedSize()
-
-                    if !reading.deltaText(units: config.units).isEmpty {
-                        Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 34, weight: .thin, design: .default))
+                    VStack(alignment: .leading, spacing: -2) {
+                        Text(reading.direction)
+                            .font(.system(size: 18, weight: .semibold, design: .default))
                             .foregroundColor(.white)
-                            .lineLimit(1)
-                            .fixedSize()
-                            .offset(y: -2)
+
+                        if !reading.deltaText(units: config.units).isEmpty {
+                            Text(reading.deltaText(units: config.units))
+                                .font(.system(size: 16, weight: .medium, design: .default))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        }
                     }
+                    .fixedSize()
 
                     Spacer()
 
@@ -172,7 +172,7 @@ struct ContentView: View {
                     Image(systemName: loopStatusIcon)
                         .font(.system(size: 20, weight: .medium))
                         .foregroundColor(loopStatusColor)
-                        .padding(.trailing, 4)
+                        .padding(.trailing, 8)
 
                     // Reload button
                     Button {
