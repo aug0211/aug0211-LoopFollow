@@ -193,7 +193,21 @@ struct ContentView: View {
                 .minimumScaleFactor(0.5)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(bgBarGradient(bgHistory: bgFetcher.bgHistory))
+                .background(
+                    bgBarGradient(bgHistory: bgFetcher.bgHistory)
+                        .mask(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .clear, location: 0),
+                                    .init(color: .white, location: 0.06),
+                                    .init(color: .white, location: 0.94),
+                                    .init(color: .clear, location: 1.0)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
 
                 // Spacer so chart y-axis "300" label doesn't overlap gray bar
                 Spacer().frame(height: 6)

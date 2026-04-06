@@ -15,7 +15,8 @@ struct BGChartView: View {
     @Binding var timeOffset: Double
     @State private var lastHapticOffset: Double = 0
     @Binding var zoomHours: Double
-    @AppStorage("showTreatments") private var showTreatments: Bool = false
+    /// Treatment display: 0 = off, 1 = dots only, 2 = dots + labels
+    @AppStorage("treatmentLevel") private var treatmentLevel: Int = 0
 
     private var treatmentFontSize: CGFloat {
         switch zoomHours {
@@ -25,7 +26,7 @@ struct BGChartView: View {
         }
     }
     private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * min(1.6, max(0.7, 2.0 / zoomHours))) }
-    private var showTreatmentLabels: Bool { zoomHours <= 2 }
+    private var showTreatmentLabels: Bool { treatmentLevel >= 2 && zoomHours <= 2 }
     @FocusState private var chartFocused: Bool
 
     // timeOffset is in units of 5 minutes (1 BG reading), snapped to integers
@@ -111,7 +112,7 @@ struct BGChartView: View {
 
     var body: some View {
         Chart {
-            if showTreatments {
+            if treatmentLevel >= 1 {
                 // Override ticker tape (purple band at bottom: 0-29 mg/dL)
                 ForEach(visibleOverrides) { entry in
                     RectangleMark(
@@ -196,7 +197,7 @@ struct BGChartView: View {
                 }
             }
 
-            if showTreatments {
+            if treatmentLevel >= 1 {
                 // Bolus dots — blue upside-down triangles, offset above BG
                 ForEach(visibleTreatments.filter { $0.type == .bolus || $0.type == .smb }) { treatment in
                     PointMark(
@@ -270,7 +271,7 @@ struct BGChartView: View {
             }
         }
         .onTapGesture(count: 5) {
-            showTreatments.toggle()
+            treatmentLevel = (treatmentLevel + 1) % 3
             WKInterfaceDevice.current().play(.click)
         }
         .onTapGesture(count: 3) {
