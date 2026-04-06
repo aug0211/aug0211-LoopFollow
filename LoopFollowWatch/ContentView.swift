@@ -163,6 +163,7 @@ struct ContentView: View {
                                 .font(.system(size: 20, weight: .medium, design: .default))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
+                                .offset(y: -2)
                         }
                     }
                     .fixedSize()
