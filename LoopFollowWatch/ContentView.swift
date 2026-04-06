@@ -152,14 +152,14 @@ struct ContentView: View {
                         .lineLimit(1)
                         .fixedSize()
 
-                    VStack(alignment: .center, spacing: -2) {
+                    VStack(alignment: .center, spacing: -1) {
                         Text(reading.direction)
-                            .font(.system(size: 18, weight: .semibold, design: .default))
+                            .font(.system(size: 20, weight: .semibold, design: .default))
                             .foregroundColor(.white)
 
                         if !reading.deltaText(units: config.units).isEmpty {
                             Text(reading.deltaText(units: config.units))
-                                .font(.system(size: 16, weight: .medium, design: .default))
+                                .font(.system(size: 18, weight: .medium, design: .default))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                         }
@@ -170,9 +170,9 @@ struct ContentView: View {
 
                     // Loop success indicator
                     Image(systemName: loopStatusIcon)
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 24, weight: .medium))
                         .foregroundColor(loopStatusColor)
-                        .padding(.trailing, 8)
+                        .padding(.trailing, 12)
 
                     // Reload button
                     Button {
@@ -180,7 +180,7 @@ struct ContentView: View {
                         bgFetcher.reload()
                     } label: {
                         Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 26, weight: .semibold))
                             .foregroundColor(.white.opacity(0.7))
                     }
                     .buttonStyle(.plain)
