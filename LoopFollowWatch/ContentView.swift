@@ -157,7 +157,7 @@ struct ContentView: View {
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 38, weight: .ultraLight, design: .default))
+                            .font(.system(size: 34, weight: .thin, design: .default))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
@@ -213,7 +213,8 @@ struct ContentView: View {
                                 stops: [
                                     .init(color: .white.opacity(0.3), location: 0),
                                     .init(color: .white, location: 0.45),
-                                    .init(color: .white, location: 1.0)
+                                    .init(color: .white, location: 0.55),
+                                    .init(color: .white.opacity(0.3), location: 1.0)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
