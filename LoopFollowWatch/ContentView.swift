@@ -142,11 +142,10 @@ struct ContentView: View {
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 32, weight: .regular, design: .default))
+                            .font(.system(size: 48, weight: .light, design: .default))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
-                            .offset(y: 5)
                     }
                 }
                 .padding(.horizontal, 4)
