@@ -233,6 +233,7 @@ struct BGChartView: View {
                     }
                 }
             }
+        }
         .chartBackground { proxy in
             sparklineOverlay(proxy: proxy)
         }
