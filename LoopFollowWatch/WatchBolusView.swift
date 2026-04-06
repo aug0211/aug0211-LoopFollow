@@ -248,6 +248,11 @@ struct WatchBolusView: View {
             config: config
         ) { success, error in
             if success {
+                // Clear pending carbs immediately — they've been sent to the remote
+                // system and will appear in COB from Nightscout. Leaving them set
+                // causes double-counting in subsequent bolus calculations.
+                bgFetcher.pendingCarbs = 0
+
                 if confirmedAmount > 0 {
                     resultMessage = "Bolus + Meal\nsent!"
                     showCelebration = CelebrationOverlay.shouldCelebrate()
