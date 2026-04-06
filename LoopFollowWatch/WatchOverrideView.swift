@@ -76,7 +76,7 @@ struct WatchOverrideView: View {
                             Text("Cancel Override")
                                 .font(.system(size: 15, weight: .medium))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 14)
                                 .background(Color.red.opacity(0.3))
                                 .cornerRadius(8)
                         }
@@ -110,7 +110,7 @@ struct WatchOverrideView: View {
                                     }
                                 }
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 14)
                                 .background(Color.purple.opacity(0.55))
                                 .cornerRadius(8)
                             }
