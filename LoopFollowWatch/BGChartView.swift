@@ -17,13 +17,14 @@ struct BGChartView: View {
     @Binding var zoomHours: Double
     @AppStorage("showTreatments") private var showTreatments: Bool = false
 
-    /// Scale factor for treatment markers — grows as we zoom in, shrinks as we zoom out.
-    /// Baseline 1.0 at 2h zoom. Range: ~0.7 (6h) to ~1.6 (15m).
-    private var treatmentScale: Double {
-        min(1.6, max(0.7, 2.0 / zoomHours))
+    private var treatmentFontSize: CGFloat {
+        switch zoomHours {
+        case ...0.5: return 11
+        case ...1: return 10
+        default: return 7
+        }
     }
-    private var treatmentFontSize: CGFloat { min(11, CGFloat(9.0 * treatmentScale)) }
-    private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * treatmentScale) }
+    private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * min(1.6, max(0.7, 2.0 / zoomHours))) }
     private var showTreatmentLabels: Bool { zoomHours <= 2 }
     @FocusState private var chartFocused: Bool
 
@@ -105,7 +106,7 @@ struct BGChartView: View {
             baseBG = 150
         }
         // Offset above by ~40 mg/dL so carbs clear bolus triangles + their text
-        return convertBG(baseBG + 65)
+        return convertBG(baseBG + 75)
     }
 
     var body: some View {
