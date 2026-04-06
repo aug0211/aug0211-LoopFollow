@@ -14,7 +14,7 @@ struct BGChartView: View {
     let config: WatchConfig
     @Binding var timeOffset: Double
     @State private var lastHapticOffset: Double = 0
-    @State private var zoomHours: Double = 2
+    @Binding var zoomHours: Double
     @AppStorage("showTreatments") private var showTreatments: Bool = false
     @FocusState private var chartFocused: Bool
 
@@ -29,6 +29,10 @@ struct BGChartView: View {
 
     private var visibleEnd: Date {
         Date().addingTimeInterval(snappedOffset * 300)
+    }
+
+    private var centerTime: Date {
+        visibleStart.addingTimeInterval(visibleEnd.timeIntervalSince(visibleStart) / 2)
     }
 
     // Pre-filtered data for visible window only (with small margin)
@@ -139,22 +143,33 @@ struct BGChartView: View {
                 }
             }
 
-            // Threshold lines
-            RuleMark(y: .value("Low", convertBG(config.lowLine)))
-                .foregroundStyle(.red.opacity(0.4))
-                .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [4, 3]))
-            RuleMark(y: .value("High", convertBG(config.highLine)))
-                .foregroundStyle(.yellow.opacity(0.4))
-                .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [4, 3]))
+            // Midpoint inspection marker
+            RuleMark(x: .value("Center", centerTime))
+                .foregroundStyle(.white.opacity(0.3))
+                .lineStyle(StrokeStyle(lineWidth: 0.5))
 
-            // BG history points
+            // BG history — smooth line with gradient fill
             ForEach(visibleBG, id: \.timestamp) { reading in
-                PointMark(
+                LineMark(
                     x: .value("Time", reading.timestamp),
                     y: .value("BG", convertBG(Double(reading.bgValue)))
                 )
-                .symbolSize(12)
+                .interpolationMethod(.catmullRom)
+                .lineStyle(StrokeStyle(lineWidth: 2.5))
                 .foregroundStyle(pointColor(bgValue: reading.bgValue))
+
+                AreaMark(
+                    x: .value("Time", reading.timestamp),
+                    y: .value("BG", convertBG(Double(reading.bgValue)))
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [pointColor(bgValue: reading.bgValue).opacity(0.45), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
 
             // Prediction lines — detect OpenAPS by checking for populated prediction arrays
@@ -211,16 +226,15 @@ struct BGChartView: View {
         }
         .chartYScale(domain: yDomain)
         .chartXScale(domain: visibleStart ... visibleEnd)
+        .chartLegend(.hidden)
         .chartXAxis {
             AxisMarks(values: .stride(by: .hour)) { _ in
-                AxisGridLine()
                 AxisValueLabel(format: .dateTime.hour(.defaultDigits(amPM: .abbreviated)))
                     .font(.system(size: 8))
             }
         }
         .chartYAxis {
             AxisMarks(position: .trailing, values: [0, 100, 200, 300].map { convertBG(Double($0)) }) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.3))
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
                         Text(config.units == "mmol/L" ? String(format: "%.0f", v) : String(format: "%.0f", v))

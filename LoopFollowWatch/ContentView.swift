@@ -11,6 +11,7 @@ struct ContentView: View {
 
     @State private var now = Date()
     @State private var timeOffset: Double = 0
+    @State private var zoomHours: Double = 2
     @State private var showReloadCheck = false
     @State private var timeTravelDebounce: Timer?
     @Environment(\.scenePhase) private var scenePhase
@@ -19,9 +20,9 @@ struct ContentView: View {
     /// Whether the user has scrolled away from the present (more than 1 reading back)
     private var isTimeTravel: Bool { timeOffset < -1 }
 
-    /// The right edge (most recent visible time) of the chart view (timeOffset in 5-min units)
+    /// The center of the visible chart window — the "inspected" point
     private var viewCenterTime: Date {
-        Date().addingTimeInterval(timeOffset * 300)
+        Date().addingTimeInterval(timeOffset * 300 - zoomHours * 1800)
     }
 
     var body: some View {
@@ -90,13 +91,31 @@ struct ContentView: View {
         }
     }
 
-    private var displayReading: BGReading? {
-        if isTimeTravel {
-            return bgFetcher.bgHistory.min(by: {
-                abs($0.timestamp.timeIntervalSince(viewCenterTime)) < abs($1.timestamp.timeIntervalSince(viewCenterTime))
-            })
+    private func bgBarGradient(bgHistory: [BGReading]) -> LinearGradient {
+        let sorted = bgHistory.sorted { $0.timestamp < $1.timestamp }
+        guard sorted.count >= 2,
+              let first = sorted.first?.timestamp,
+              let last = sorted.last?.timestamp,
+              last > first else {
+            return LinearGradient(colors: [bgDynamicColor(100).opacity(0.25)], startPoint: .leading, endPoint: .trailing)
         }
-        return bgFetcher.currentBG
+        let span = last.timeIntervalSince(first)
+        let step = max(1, sorted.count / 8)
+        var stops: [Gradient.Stop] = []
+        for i in stride(from: 0, to: sorted.count, by: step) {
+            let t = sorted[i].timestamp.timeIntervalSince(first) / span
+            stops.append(.init(color: bgDynamicColor(Double(sorted[i].bgValue)).opacity(0.25), location: t))
+        }
+        if let lastReading = sorted.last {
+            stops.append(.init(color: bgDynamicColor(Double(lastReading.bgValue)).opacity(0.25), location: 1.0))
+        }
+        return LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing)
+    }
+
+    private var displayReading: BGReading? {
+        bgFetcher.bgHistory.min(by: {
+            abs($0.timestamp.timeIntervalSince(viewCenterTime)) < abs($1.timestamp.timeIntervalSince(viewCenterTime))
+        }) ?? bgFetcher.currentBG
     }
 
     @ViewBuilder
@@ -109,13 +128,13 @@ struct ContentView: View {
                 // Row 1: Large BG + trend arrow + delta
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
-                        .font(.system(size: 48, weight: .bold, design: .default))
+                        .font(.system(size: 48, weight: .regular, design: .default))
                         .foregroundColor(bgColor)
                         .lineLimit(1)
                         .fixedSize()
 
                     Text(reading.direction)
-                        .font(.system(size: 36, weight: .bold, design: .default))
+                        .font(.system(size: 28, weight: .semibold, design: .default))
                         .foregroundColor(bgColor)
                         .fixedSize()
 
@@ -123,7 +142,7 @@ struct ContentView: View {
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 36, weight: .bold, design: .default))
+                            .font(.system(size: 28, weight: .semibold, design: .default))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
@@ -159,7 +178,7 @@ struct ContentView: View {
                 .minimumScaleFactor(0.5)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color.white.opacity(0.25))
+                .background(bgBarGradient(bgHistory: bgFetcher.bgHistory))
 
                 // Spacer so chart y-axis "300" label doesn't overlap gray bar
                 Spacer().frame(height: 6)
@@ -172,7 +191,8 @@ struct ContentView: View {
                     tempTargetEntries: bgFetcher.tempTargetEntries,
                     overrideEntries: bgFetcher.overrideEntries,
                     config: config,
-                    timeOffset: $timeOffset
+                    timeOffset: $timeOffset,
+                    zoomHours: $zoomHours
                 )
                 .frame(maxHeight: .infinity)
 
