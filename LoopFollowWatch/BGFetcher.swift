@@ -561,7 +561,7 @@ class BGFetcher: ObservableObject {
             updatedAt: Date()
         )
         data.save()
-        WidgetCenter.shared.reloadAllTimelines()
+        WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
 
         // Re-arm the background refresh chain so the complication keeps updating
         // even after the app goes to background.

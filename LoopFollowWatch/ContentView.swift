@@ -3,6 +3,7 @@
 
 import SwiftUI
 import WatchKit
+import WidgetKit
 
 struct ContentView: View {
     @ObservedObject var sessionManager: WatchSessionManager
@@ -70,6 +71,7 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
+                WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
                 refreshIfStale()
             }
         }

@@ -37,8 +37,8 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
                    config.hasAnySource {
                     fetcher.fetch(config: config)
                     // Give the network requests a few seconds to land, then complete.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
-                        WidgetCenter.shared.reloadAllTimelines()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
+                        WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
                         refreshTask.setTaskCompletedWithSnapshot(false)
                     }
                 } else {
@@ -120,6 +120,9 @@ struct LoopFollowWatchApp: App {
             .onAppear {
                 // Share the BGFetcher with the extension delegate for background refresh
                 ExtensionDelegate.sharedBGFetcher = bgFetcher
+
+                // Free foreground reload — doesn't count toward daily budget
+                WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
 
                 if let config = sessionManager.config, config.hasAnySource {
                     bgFetcher.start(config: config)
