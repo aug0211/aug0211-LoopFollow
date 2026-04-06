@@ -174,7 +174,7 @@ struct ContentView: View {
                         showLoopDetail = true
                     } label: {
                         Image(systemName: loopStatusIcon)
-                            .font(.system(size: 24, weight: .medium))
+                            .font(.system(size: 27, weight: .medium))
                             .foregroundColor(loopStatusColor)
                     }
                     .buttonStyle(.plain)
