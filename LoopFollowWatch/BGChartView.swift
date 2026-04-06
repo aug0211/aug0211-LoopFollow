@@ -234,41 +234,7 @@ struct BGChartView: View {
                 }
             }
         .chartBackground { proxy in
-            GeometryReader { geo in
-                let sorted = visibleBG.sorted { $0.timestamp < $1.timestamp }
-                let origin = proxy.plotAreaOrigin
-                let size = proxy.plotAreaSize
-                let bottomY = origin.y + size.height
-
-                let screenPoints: [(point: CGPoint, bgValue: Int)] = sorted.compactMap { reading in
-                    guard let x = proxy.position(forX: reading.timestamp),
-                          let y = proxy.position(forY: convertBG(Double(reading.bgValue))) else { return nil }
-                    return (CGPoint(x: origin.x + x, y: origin.y + y), reading.bgValue)
-                }
-
-                let pts = screenPoints.map(\.point)
-
-                if pts.count >= 2 {
-                    ForEach(0..<(pts.count - 1), id: \.self) { i in
-                        let midBG = Double(screenPoints[i].bgValue + screenPoints[i + 1].bgValue) / 2.0
-                        let segColor = bgDynamicColor(midBG)
-
-                        // Gradient fill under segment
-                        segmentFillPath(points: pts, index: i, bottomY: bottomY)
-                            .fill(
-                                LinearGradient(
-                                    colors: [segColor.opacity(0.45), segColor.opacity(0.03)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-
-                        // Colored stroke
-                        segmentStrokePath(points: pts, index: i)
-                            .stroke(segColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                    }
-                }
-            }
+            sparklineOverlay(proxy: proxy)
         }
         .focusable()
         .focused($chartFocused)
@@ -326,6 +292,53 @@ struct BGChartView: View {
                 .foregroundStyle(color.opacity(0.7))
                 .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
                 .interpolationMethod(.catmullRom)
+            }
+        }
+    }
+
+    // MARK: - BG sparkline overlay (per-segment coloring)
+
+    @ViewBuilder
+    private func sparklineOverlay(proxy: ChartProxy) -> some View {
+        GeometryReader { _ in
+            let sorted = visibleBG.sorted { $0.timestamp < $1.timestamp }
+            let origin = proxy.plotAreaOrigin
+            let plotSize = proxy.plotAreaSize
+            let bottomY = origin.y + plotSize.height
+
+            let screenPoints: [(point: CGPoint, bgValue: Int)] = sorted.compactMap { reading in
+                guard let x = proxy.position(forX: reading.timestamp),
+                      let y = proxy.position(forY: convertBG(Double(reading.bgValue))) else { return nil }
+                return (CGPoint(x: origin.x + x, y: origin.y + y), reading.bgValue)
+            }
+
+            Canvas { context, _ in
+                let pts = screenPoints.map(\.point)
+                guard pts.count >= 2 else { return }
+
+                for i in 0..<(pts.count - 1) {
+                    let midBG = Double(screenPoints[i].bgValue + screenPoints[i + 1].bgValue) / 2.0
+                    let segColor = bgDynamicColor(midBG)
+
+                    // Gradient fill under segment
+                    let fillPath = segmentFillPath(points: pts, index: i, bottomY: bottomY)
+                    context.fill(
+                        fillPath,
+                        with: .linearGradient(
+                            Gradient(colors: [segColor.opacity(0.45), segColor.opacity(0.03)]),
+                            startPoint: CGPoint(x: 0, y: origin.y),
+                            endPoint: CGPoint(x: 0, y: bottomY)
+                        )
+                    )
+
+                    // Colored stroke
+                    let strokePath = segmentStrokePath(points: pts, index: i)
+                    context.stroke(
+                        strokePath,
+                        with: .color(segColor),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                    )
+                }
             }
         }
     }
