@@ -22,7 +22,7 @@ struct BGChartView: View {
     private var treatmentScale: Double {
         min(1.6, max(0.7, 2.0 / zoomHours))
     }
-    private var treatmentFontSize: CGFloat { CGFloat(9.0 * treatmentScale) }
+    private var treatmentFontSize: CGFloat { min(11, CGFloat(9.0 * treatmentScale)) }
     private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * treatmentScale) }
     private var showTreatmentLabels: Bool { zoomHours <= 2 }
     @FocusState private var chartFocused: Bool
@@ -41,7 +41,7 @@ struct BGChartView: View {
     }
 
     private var centerTime: Date {
-        visibleStart.addingTimeInterval(visibleEnd.timeIntervalSince(visibleStart) / 2)
+        visibleStart.addingTimeInterval(visibleEnd.timeIntervalSince(visibleStart) * 0.7)
     }
 
     // Pre-filtered data for visible window only (with small margin)

@@ -20,9 +20,9 @@ struct ContentView: View {
     /// Whether the user has scrolled away from the present (more than 1 reading back)
     private var isTimeTravel: Bool { timeOffset < -1 }
 
-    /// The center of the visible chart window — the "inspected" point
+    /// The inspected point — 70% through the visible chart window
     private var viewCenterTime: Date {
-        Date().addingTimeInterval(timeOffset * 300 - zoomHours * 1800)
+        Date().addingTimeInterval(timeOffset * 300 - zoomHours * 3600 * 0.3)
     }
 
     var body: some View {
@@ -142,10 +142,11 @@ struct ContentView: View {
 
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
-                            .font(.system(size: 22, weight: .regular, design: .default))
+                            .font(.system(size: 24, weight: .regular, design: .default))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize()
+                            .offset(y: 4)
                     }
                 }
                 .padding(.horizontal, 4)
