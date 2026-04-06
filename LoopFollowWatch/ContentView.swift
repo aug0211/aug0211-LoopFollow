@@ -153,14 +153,14 @@ struct ContentView: View {
                         .lineLimit(1)
                         .fixedSize()
 
-                    VStack(alignment: .center, spacing: -1) {
+                    VStack(alignment: .center, spacing: -3) {
                         Text(reading.direction)
-                            .font(.system(size: 20, weight: .semibold, design: .default))
+                            .font(.system(size: 22, weight: .semibold, design: .default))
                             .foregroundColor(.white)
 
                         if !reading.deltaText(units: config.units).isEmpty {
                             Text(reading.deltaText(units: config.units))
-                                .font(.system(size: 18, weight: .medium, design: .default))
+                                .font(.system(size: 20, weight: .medium, design: .default))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                         }
