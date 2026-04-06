@@ -70,8 +70,10 @@ struct ContentView: View {
             }
         }
         .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active {
+            if newPhase == .inactive {
                 WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
+            }
+            if newPhase == .active {
                 refreshIfStale()
             }
         }
