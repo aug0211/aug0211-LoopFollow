@@ -3,7 +3,7 @@
 
 import SwiftUI
 
-private let tempColor = Color(red: 0.6, green: 1.0, blue: 0.0)
+private let tempColor = Color(red: 0.2, green: 0.9, blue: 0.1)
 
 struct WatchTempTargetView: View {
     let config: WatchConfig

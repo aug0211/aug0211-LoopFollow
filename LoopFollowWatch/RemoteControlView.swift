@@ -3,7 +3,7 @@
 
 import SwiftUI
 
-private let tempColor = Color(red: 0.6, green: 1.0, blue: 0.0)
+private let tempColor = Color(red: 0.2, green: 0.9, blue: 0.1)
 
 struct RemoteControlView: View {
     let config: WatchConfig
@@ -92,14 +92,14 @@ private struct RemoteTile: View {
             ZStack {
                 // Base gradient — lighter top, darker bottom for 3D depth
                 LinearGradient(
-                    colors: [color, color.opacity(0.65)],
+                    colors: [color.opacity(0.9), color.opacity(0.6)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 // Top highlight for raised look
                 VStack {
                     LinearGradient(
-                        colors: [Color.white.opacity(0.35), Color.white.opacity(0)],
+                        colors: [Color.white.opacity(0.2), Color.white.opacity(0)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -108,6 +108,6 @@ private struct RemoteTile: View {
                 }
             }
         )
-        .cornerRadius(12)
+        .cornerRadius(10)
     }
 }
