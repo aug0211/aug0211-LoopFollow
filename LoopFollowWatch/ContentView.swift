@@ -152,7 +152,7 @@ struct ContentView: View {
                         .lineLimit(1)
                         .fixedSize()
 
-                    VStack(alignment: .leading, spacing: -2) {
+                    VStack(alignment: .center, spacing: -2) {
                         Text(reading.direction)
                             .font(.system(size: 18, weight: .semibold, design: .default))
                             .foregroundColor(.white)
