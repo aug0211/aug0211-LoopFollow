@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var timeOffset: Double = 7.2  // zoomHours(2) * 3.6 — aligns marker with "now"
     @State private var zoomHours: Double = 2
     @State private var showReloadCheck = false
+    @State private var showLoopDetail = false
     @State private var timeTravelDebounce: Timer?
     @Environment(\.scenePhase) private var scenePhase
     let secondTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -169,10 +170,24 @@ struct ContentView: View {
                     Spacer()
 
                     // Loop success indicator
-                    Image(systemName: loopStatusIcon)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(loopStatusColor)
-                        .padding(.trailing, 12)
+                    Button {
+                        showLoopDetail = true
+                    } label: {
+                        Image(systemName: loopStatusIcon)
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundColor(loopStatusColor)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 12)
+                    .sheet(isPresented: $showLoopDetail) {
+                        VStack(spacing: 8) {
+                            Text("Loop Status")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Coming soon")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                    }
 
                     // Reload button
                     Button {
