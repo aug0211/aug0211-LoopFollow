@@ -26,7 +26,7 @@ struct BGChartView: View {
         }
     }
     private var treatmentSymbolSize: CGFloat { CGFloat(30.0 * min(1.6, max(0.7, 2.0 / zoomHours))) }
-    private var showTreatmentLabels: Bool { treatmentLevel >= 2 && zoomHours <= 2 }
+    private var showTreatmentLabels: Bool { treatmentLevel >= 2 }
     @FocusState private var chartFocused: Bool
 
     // timeOffset is in units of 5 minutes (1 BG reading), snapped to integers
