@@ -16,7 +16,7 @@ struct BGChartView: View {
     @State private var lastHapticOffset: Double = 0
     @Binding var zoomHours: Double
     /// Treatment display: 0 = off, 1 = dots only, 2 = dots + labels
-    @AppStorage("treatmentLevel") private var treatmentLevel: Int = 0
+    @AppStorage("treatmentLevel") private var treatmentLevel: Int = 2
 
     private var treatmentFontSize: CGFloat {
         switch zoomHours {

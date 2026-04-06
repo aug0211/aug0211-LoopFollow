@@ -10,7 +10,7 @@ struct ContentView: View {
     @ObservedObject var bgFetcher: BGFetcher
 
     @State private var now = Date()
-    @State private var timeOffset: Double = 0
+    @State private var timeOffset: Double = 7.2  // zoomHours(2) * 3.6 — aligns marker with "now"
     @State private var zoomHours: Double = 2
     @State private var showReloadCheck = false
     @State private var timeTravelDebounce: Timer?
@@ -62,6 +62,10 @@ struct ContentView: View {
             }
         }
         .onReceive(secondTimer) { _ in now = Date() }
+        .onChange(of: zoomHours) { newZoom in
+            // Re-align inspection marker to "now" when zoom changes
+            timeOffset = newZoom * 3.6
+        }
         .onChange(of: timeOffset) { _ in
             timeTravelDebounce?.invalidate()
             if isTimeTravel, let config = sessionManager.config {
