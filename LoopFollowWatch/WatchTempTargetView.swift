@@ -199,7 +199,7 @@ struct WatchTempTargetView: View {
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(tempColor.opacity(0.4))
+                            .background(tempColor.opacity(0.55))
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
@@ -213,7 +213,7 @@ struct WatchTempTargetView: View {
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(tempColor.opacity(0.4))
+                            .background(tempColor.opacity(0.55))
                             .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
