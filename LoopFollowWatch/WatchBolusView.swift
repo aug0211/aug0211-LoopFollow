@@ -163,6 +163,9 @@ struct WatchBolusView: View {
                 }
             }
         }
+        .onDisappear {
+            bgFetcher.pendingCarbs = 0
+        }
     }
 
     @ViewBuilder

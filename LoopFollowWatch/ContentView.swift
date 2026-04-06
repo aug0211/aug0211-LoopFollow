@@ -76,6 +76,7 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .inactive {
+                bgFetcher.pendingCarbs = 0
                 WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
             }
             if newPhase == .active {
