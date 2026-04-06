@@ -178,7 +178,7 @@ struct WatchTempTargetView: View {
                             Text("Cancel Temp Target")
                                 .font(.system(size: 15, weight: .medium))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .padding(.vertical, 12)
                                 .background(Color.red.opacity(0.3))
                                 .cornerRadius(8)
                         }
@@ -198,7 +198,7 @@ struct WatchTempTargetView: View {
                         Text("Exercise: 160 / 3h")
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 12)
                             .background(tempColor.opacity(0.55))
                             .cornerRadius(8)
                     }
@@ -212,7 +212,7 @@ struct WatchTempTargetView: View {
                         Text("Mealtime: 80 / 2h")
                             .font(.system(size: 15, weight: .medium))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 12)
                             .background(tempColor.opacity(0.55))
                             .cornerRadius(8)
                     }
@@ -227,7 +227,7 @@ struct WatchTempTargetView: View {
                         Text("Custom...")
                             .font(.system(size: 15, weight: .semibold))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 12)
                             .background(tempColor)
                             .cornerRadius(8)
                     }
