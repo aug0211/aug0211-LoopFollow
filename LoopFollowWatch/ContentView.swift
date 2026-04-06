@@ -140,7 +140,7 @@ struct ContentView: View {
 
         ZStack {
             VStack(spacing: 0) {
-                // Row 1: Large BG + trend arrow + delta
+                // Row 1: BG + trend + delta ... loop indicator + reload
                 HStack(alignment: .center, spacing: 2) {
                     Text(reading.bgText(units: config.units))
                         .font(.system(size: 48, weight: .regular, design: .default))
@@ -153,8 +153,6 @@ struct ContentView: View {
                         .foregroundColor(bgColor)
                         .fixedSize()
 
-                    Spacer()
-
                     if !reading.deltaText(units: config.units).isEmpty {
                         Text(reading.deltaText(units: config.units))
                             .font(.system(size: 34, weight: .thin, design: .default))
@@ -163,6 +161,24 @@ struct ContentView: View {
                             .fixedSize()
                             .offset(y: 2)
                     }
+
+                    Spacer()
+
+                    // Loop success indicator
+                    Image(systemName: loopStatusIcon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(loopStatusColor)
+
+                    // Reload button
+                    Button {
+                        timeOffset = zoomHours * 3.6
+                        bgFetcher.reload()
+                    } label: {
+                        Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 4)
                 .padding(.top, 30)
@@ -252,11 +268,6 @@ struct ContentView: View {
                 }
                 .font(.system(size: 13))
                 .lineLimit(1)
-                .onTapGesture(count: 2) {
-                    // Scroll so the inspection marker lands on "now"
-                    timeOffset = zoomHours * 3.6
-                    bgFetcher.reload()
-                }
 
                 // Footer: Override and/or Temp Target (only when active)
                 if let status = displayStatus {
@@ -295,6 +306,23 @@ struct ContentView: View {
 
     private var displayStatus: LoopStatus? {
         bgFetcher.loopStatus
+    }
+
+    /// Whether Trio looped successfully on the most recent BG reading.
+    /// Compares loop status timestamp to latest BG — if within 6 minutes, it looped.
+    private var loopedOnLatestReading: Bool {
+        guard let loopTime = bgFetcher.loopStatus?.timestamp,
+              let bgTime = bgFetcher.currentBG?.timestamp else { return false }
+        return abs(loopTime.timeIntervalSince(bgTime)) < 360
+    }
+
+    private var loopStatusIcon: String {
+        loopedOnLatestReading ? "circle.circle.fill" : "circle.dashed"
+    }
+
+    private var loopStatusColor: Color {
+        guard bgFetcher.loopStatus != nil else { return .gray }
+        return loopedOnLatestReading ? .green : .orange
     }
 
     @ViewBuilder
