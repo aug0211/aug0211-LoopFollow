@@ -205,7 +205,7 @@ struct BGChartView: View {
                     )
                     .symbol {
                         Image(systemName: "arrowtriangle.down.fill")
-                            .font(.system(size: CGFloat(6.0 * treatmentScale)))
+                            .font(.system(size: treatmentFontSize * 0.6))
                             .foregroundColor(.blue)
                     }
                     .symbolSize(treatmentSymbolSize)
