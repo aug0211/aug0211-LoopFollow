@@ -159,30 +159,6 @@ struct BGChartView: View {
                 .foregroundStyle(.white.opacity(0.3))
                 .lineStyle(StrokeStyle(lineWidth: 0.5))
 
-            // BG history — smooth line with gradient fill
-            ForEach(visibleBG, id: \.timestamp) { reading in
-                LineMark(
-                    x: .value("Time", reading.timestamp),
-                    y: .value("BG", convertBG(Double(reading.bgValue)))
-                )
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 2.5))
-                .foregroundStyle(pointColor(bgValue: reading.bgValue))
-
-                AreaMark(
-                    x: .value("Time", reading.timestamp),
-                    y: .value("BG", convertBG(Double(reading.bgValue)))
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [pointColor(bgValue: reading.bgValue).opacity(0.45), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
-
             // Prediction lines — detect OpenAPS by checking for populated prediction arrays
             if let status = loopStatus {
                 let hasOpenAPSPredictions = status.ztPredictions != nil || status.iobPredictions != nil ||
@@ -257,6 +233,42 @@ struct BGChartView: View {
                     }
                 }
             }
+        .chartBackground { proxy in
+            GeometryReader { geo in
+                let sorted = visibleBG.sorted { $0.timestamp < $1.timestamp }
+                let origin = proxy.plotAreaOrigin
+                let size = proxy.plotAreaSize
+                let bottomY = origin.y + size.height
+
+                let screenPoints: [(point: CGPoint, bgValue: Int)] = sorted.compactMap { reading in
+                    guard let x = proxy.position(forX: reading.timestamp),
+                          let y = proxy.position(forY: convertBG(Double(reading.bgValue))) else { return nil }
+                    return (CGPoint(x: origin.x + x, y: origin.y + y), reading.bgValue)
+                }
+
+                let pts = screenPoints.map(\.point)
+
+                if pts.count >= 2 {
+                    ForEach(0..<(pts.count - 1), id: \.self) { i in
+                        let midBG = Double(screenPoints[i].bgValue + screenPoints[i + 1].bgValue) / 2.0
+                        let segColor = bgDynamicColor(midBG)
+
+                        // Gradient fill under segment
+                        segmentFillPath(points: pts, index: i, bottomY: bottomY)
+                            .fill(
+                                LinearGradient(
+                                    colors: [segColor.opacity(0.45), segColor.opacity(0.03)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+
+                        // Colored stroke
+                        segmentStrokePath(points: pts, index: i)
+                            .stroke(segColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                    }
+                }
+            }
         }
         .focusable()
         .focused($chartFocused)
@@ -315,6 +327,55 @@ struct BGChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
                 .interpolationMethod(.catmullRom)
             }
+        }
+    }
+
+    // MARK: - Catmull-Rom path builders (per-segment coloring)
+
+    /// Single Catmull-Rom curve segment from points[index] to points[index+1].
+    private func segmentStrokePath(points: [CGPoint], index i: Int) -> Path {
+        Path { path in
+            let p0 = points[max(i - 1, 0)]
+            let p1 = points[i]
+            let p2 = points[min(i + 1, points.count - 1)]
+            let p3 = points[min(i + 2, points.count - 1)]
+
+            let cp1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6.0,
+                y: p1.y + (p2.y - p0.y) / 6.0
+            )
+            let cp2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6.0,
+                y: p2.y - (p3.y - p1.y) / 6.0
+            )
+
+            path.move(to: p1)
+            path.addCurve(to: p2, control1: cp1, control2: cp2)
+        }
+    }
+
+    /// Fill area under a single Catmull-Rom segment, closed to bottomY.
+    private func segmentFillPath(points: [CGPoint], index i: Int, bottomY: CGFloat) -> Path {
+        Path { path in
+            let p0 = points[max(i - 1, 0)]
+            let p1 = points[i]
+            let p2 = points[min(i + 1, points.count - 1)]
+            let p3 = points[min(i + 2, points.count - 1)]
+
+            let cp1 = CGPoint(
+                x: p1.x + (p2.x - p0.x) / 6.0,
+                y: p1.y + (p2.y - p0.y) / 6.0
+            )
+            let cp2 = CGPoint(
+                x: p2.x - (p3.x - p1.x) / 6.0,
+                y: p2.y - (p3.y - p1.y) / 6.0
+            )
+
+            path.move(to: p1)
+            path.addCurve(to: p2, control1: cp1, control2: cp2)
+            path.addLine(to: CGPoint(x: p2.x, y: bottomY))
+            path.addLine(to: CGPoint(x: p1.x, y: bottomY))
+            path.closeSubpath()
         }
     }
 }
