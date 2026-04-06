@@ -300,19 +300,19 @@ struct BGChartView: View {
 
     @ViewBuilder
     private func sparklineOverlay(proxy: ChartProxy) -> some View {
-        GeometryReader { _ in
+        // In .chartBackground, positions from proxy are relative to the plot area.
+        GeometryReader { geo in
+            let plotH = geo.size.height
             let sorted = visibleBG.sorted { $0.timestamp < $1.timestamp }
-            let origin = proxy.plotAreaOrigin
-            let plotSize = proxy.plotAreaSize
-            let bottomY = origin.y + plotSize.height
 
-            let screenPoints: [(point: CGPoint, bgValue: Int)] = sorted.compactMap { reading in
-                guard let x = proxy.position(forX: reading.timestamp),
-                      let y = proxy.position(forY: convertBG(Double(reading.bgValue))) else { return nil }
-                return (CGPoint(x: origin.x + x, y: origin.y + y), reading.bgValue)
-            }
+            Canvas { context, size in
+                var screenPoints: [(point: CGPoint, bgValue: Int)] = []
+                for reading in sorted {
+                    guard let x = proxy.position(forX: reading.timestamp),
+                          let y = proxy.position(forY: convertBG(Double(reading.bgValue))) else { continue }
+                    screenPoints.append((CGPoint(x: x, y: y), reading.bgValue))
+                }
 
-            Canvas { context, _ in
                 let pts = screenPoints.map(\.point)
                 guard pts.count >= 2 else { return }
 
@@ -320,18 +320,16 @@ struct BGChartView: View {
                     let midBG = Double(screenPoints[i].bgValue + screenPoints[i + 1].bgValue) / 2.0
                     let segColor = bgDynamicColor(midBG)
 
-                    // Gradient fill under segment
-                    let fillPath = segmentFillPath(points: pts, index: i, bottomY: bottomY)
+                    let fillPath = segmentFillPath(points: pts, index: i, bottomY: size.height)
                     context.fill(
                         fillPath,
                         with: .linearGradient(
                             Gradient(colors: [segColor.opacity(0.45), segColor.opacity(0.03)]),
-                            startPoint: CGPoint(x: 0, y: origin.y),
-                            endPoint: CGPoint(x: 0, y: bottomY)
+                            startPoint: CGPoint(x: 0, y: 0),
+                            endPoint: CGPoint(x: 0, y: size.height)
                         )
                     )
 
-                    // Colored stroke
                     let strokePath = segmentStrokePath(points: pts, index: i)
                     context.stroke(
                         strokePath,
@@ -340,6 +338,7 @@ struct BGChartView: View {
                     )
                 }
             }
+            .frame(height: plotH)
         }
     }
 
