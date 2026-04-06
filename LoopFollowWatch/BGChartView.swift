@@ -239,7 +239,7 @@ struct BGChartView: View {
         }
         .focusable()
         .focused($chartFocused)
-        .digitalCrownRotation($timeOffset, from: -300, through: 12, by: 1, sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: false)
+        .digitalCrownRotation($timeOffset, from: -300, through: 22, by: 1, sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: false)
         .onAppear { chartFocused = true }
         .onChange(of: timeOffset) { newValue in
             let snapped = newValue.rounded()

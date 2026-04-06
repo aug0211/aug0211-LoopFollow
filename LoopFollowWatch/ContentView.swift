@@ -253,7 +253,8 @@ struct ContentView: View {
                 .font(.system(size: 13))
                 .lineLimit(1)
                 .onTapGesture(count: 2) {
-                    timeOffset = 0
+                    // Scroll so the inspection marker lands on "now"
+                    timeOffset = zoomHours * 3.6
                     bgFetcher.reload()
                 }
 
