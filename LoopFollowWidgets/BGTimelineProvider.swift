@@ -51,6 +51,10 @@ struct BGTimelineProvider: TimelineProvider {
         let data = WidgetData.load()
         let now = Date()
 
+        LFLog.bump("timeline.request")
+        let age = Int(now.timeIntervalSince(data?.bgTimestamp ?? .distantPast))
+        LFLog.log("TIMELINE", "req dataAge=\(age)s entries=60")
+
         // Generate entries every minute for the next hour.
         // Each entry carries a different `displayDate` so the staleness text
         // advances correctly without burning a reload.
