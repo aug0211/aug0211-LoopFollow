@@ -106,20 +106,69 @@ class BGFetcher: ObservableObject {
     private let dexcomUserAgent = "Dexcom Share/3.0.2.11 CFNetwork/711.2.23 Darwin/14.0.0"
     private let dexcomApplicationId = "d89443d2-327c-4a6f-89e5-496bbb0317db"
 
+    // MARK: - Adaptive fetch cadence
+    //
+    // CGM readings arrive every ~5 min. Rather than fetching on a fixed 5-min
+    // repeating timer (which ends up phase-locked to whenever start() was
+    // called, and so perpetually fetches just before each new reading lands),
+    // we compute the next fetch time from the last successful reading's
+    // timestamp:
+    //
+    //     nextFetch = bg.timestamp + readingInterval + uploadBuffer
+    //
+    // uploadBuffer is a small cushion for sensor → phone → Nightscout upload
+    // latency. If the target is in the past (we're behind, or the next reading
+    // is late), we clamp to lateReadingPollFloor so we poll at a reasonable
+    // cadence without tight-looping. The ceiling caps how long we'll wait when
+    // a sensor reading is genuinely missing.
+    private static let readingInterval: TimeInterval = 300
+    private static let uploadBuffer: TimeInterval = 10
+    private static let lateReadingPollFloor: TimeInterval = 30
+    private static let readingGapCeiling: TimeInterval = 330
+
+    /// Compute the delay (seconds from now) until the next fetch, given the
+    /// timestamp of the most recently known BG reading. Nil bgTimestamp means
+    /// "no reading yet" — fall back to the ceiling so we retry periodically.
+    static func nextFetchDelay(afterReadingAt bgTimestamp: Date?, now: Date = Date()) -> TimeInterval {
+        guard let ts = bgTimestamp else { return readingGapCeiling }
+        let target = ts.addingTimeInterval(readingInterval + uploadBuffer)
+        let rawDelay = target.timeIntervalSince(now)
+        return min(max(rawDelay, lateReadingPollFloor), readingGapCeiling)
+    }
+
     func start(config: WatchConfig) {
         stop()
         profileLoaded = false
         fetch(config: config)
-        timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+        // Initial one-shot timer. Rearmed by updateWidgetData() after each
+        // successful fetch, based on the new reading's timestamp.
+        scheduleNextFetch(config: config, delay: Self.readingGapCeiling)
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// Arm a one-shot timer to fire `delay` seconds from now. Replaces any
+    /// existing scheduled fetch. Safe to call from main only.
+    private func scheduleNextFetch(config: WatchConfig, delay: TimeInterval) {
+        timer?.invalidate()
+        LFLog.log("TIMER", "arm +\(Int(delay))s")
+        timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             LFLog.bump("timer.fire")
             LFLog.log("TIMER", "fire")
             self?.fetch(config: config)
         }
     }
 
-    func stop() {
-        timer?.invalidate()
-        timer = nil
+    /// Re-arm the foreground timer based on the latest reading's timestamp,
+    /// so the next fetch is scheduled right after the next reading is expected
+    /// to be available on Nightscout.
+    private func rearmForegroundTimer(after bgTimestamp: Date) {
+        guard let config = currentConfig else { return }
+        let delay = Self.nextFetchDelay(afterReadingAt: bgTimestamp)
+        scheduleNextFetch(config: config, delay: delay)
     }
 
     func reload() {
@@ -581,8 +630,10 @@ class BGFetcher: ObservableObject {
         LFLog.log("RELOAD", "fetcher")
         WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
 
-        // Re-arm the background refresh chain so the complication keeps updating
-        // even after the app goes to background.
+        // Re-arm the foreground timer and the background refresh chain based
+        // on the reading we just wrote, so the next fetch lands right after
+        // the next reading is expected on Nightscout.
+        rearmForegroundTimer(after: bg.timestamp)
         ExtensionDelegate.scheduleBackgroundRefresh()
     }
 

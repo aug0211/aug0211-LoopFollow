@@ -67,14 +67,18 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    /// Schedule the next background app refresh. Requests wake-up in ~15 minutes.
-    /// watchOS may grant it sooner or later depending on system conditions, but
-    /// 15 min is the preferred cadence — matching what SweetDreams and similar
-    /// CGM apps achieve.
+    /// Schedule the next background app refresh. The preferred date is
+    /// computed from the last known BG reading's timestamp so the wake-up
+    /// lands right after the next reading is expected on Nightscout, rather
+    /// than on a fixed 5-minute cadence that can perpetually fire just before
+    /// each new reading arrives. Uses the same adaptive logic as the
+    /// foreground timer in `BGFetcher`.
     static func scheduleBackgroundRefresh() {
-        let preferredDate = Date().addingTimeInterval(5 * 60) // 5 minutes
+        let lastBGTimestamp = WidgetData.load()?.bgTimestamp
+        let delay = BGFetcher.nextFetchDelay(afterReadingAt: lastBGTimestamp)
+        let preferredDate = Date().addingTimeInterval(delay)
         LFLog.bump("bgTask.scheduled")
-        LFLog.log("SCHEDULE", "bg +\(Int(preferredDate.timeIntervalSinceNow))s")
+        LFLog.log("SCHEDULE", "bg +\(Int(delay))s")
         WKApplication.shared().scheduleBackgroundRefresh(
             withPreferredDate: preferredDate,
             userInfo: nil
