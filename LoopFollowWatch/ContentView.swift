@@ -388,7 +388,7 @@ private struct DiagnosticsView: View {
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
+        f.dateFormat = "h:mm:ss a"
         return f
     }()
 

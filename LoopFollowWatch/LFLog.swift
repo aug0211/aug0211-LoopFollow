@@ -37,7 +37,7 @@ enum LFLog {
 
     private static let printFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
+        f.dateFormat = "h:mm:ss.SSS a"
         return f
     }()
 
