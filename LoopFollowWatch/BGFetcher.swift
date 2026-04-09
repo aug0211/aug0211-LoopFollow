@@ -66,6 +66,13 @@ struct BolusCalculation {
 }
 
 class BGFetcher: ObservableObject {
+    /// Process-wide singleton. Used by both the SwiftUI App body (@StateObject)
+    /// and the `ExtensionDelegate` background-task handler. Making this a
+    /// singleton fixes the bug where a cold background launch left the
+    /// delegate's weak reference nil — the delegate can now reach the fetcher
+    /// directly without depending on `.onAppear` firing first.
+    static let shared = BGFetcher()
+
     @Published var currentBG: BGReading?
     @Published var bgHistory: [BGReading] = []
     @Published var loopStatus: LoopStatus?

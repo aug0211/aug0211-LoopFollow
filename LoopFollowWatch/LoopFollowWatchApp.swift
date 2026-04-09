@@ -8,10 +8,6 @@ import WidgetKit
 
 class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCenterDelegate {
 
-    /// Shared BGFetcher instance — set by the App struct on launch so the delegate
-    /// can trigger background fetches without creating a second fetcher.
-    static weak var sharedBGFetcher: BGFetcher?
-
     func applicationDidFinishLaunching() {
         LFLog.log("STARTUP", "")
         WatchSessionManager.shared.startSession()
@@ -35,11 +31,13 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
             LFLog.log("TASK", "fire \(type(of: task))")
             switch task {
             case let refreshTask as WKApplicationRefreshBackgroundTask:
-                // Fetch fresh BG data in the background
-                if let fetcher = Self.sharedBGFetcher,
-                   let config = WatchSessionManager.shared.config,
+                // Fetch fresh BG data in the background. BGFetcher.shared is
+                // a process-wide singleton, so it's guaranteed to exist here
+                // regardless of whether the app was cold-launched by the
+                // system or brought to the foreground by the user.
+                if let config = WatchSessionManager.shared.config,
                    config.hasAnySource {
-                    fetcher.fetch(config: config)
+                    BGFetcher.shared.fetch(config: config)
                     // Give the network requests a few seconds to land, then complete.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
                         LFLog.bump("reload.background")
@@ -49,11 +47,7 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
                         refreshTask.setTaskCompletedWithSnapshot(false)
                     }
                 } else {
-                    if Self.sharedBGFetcher == nil {
-                        LFLog.bump("bgTask.noFetcher")
-                    } else {
-                        LFLog.bump("bgTask.noConfig")
-                    }
+                    LFLog.bump("bgTask.noConfig")
                     LFLog.log("TASK", "complete elapsed=\(Int(Date().timeIntervalSince(taskStart)))s (skip)")
                     refreshTask.setTaskCompletedWithSnapshot(false)
                 }
@@ -106,7 +100,7 @@ struct LoopFollowWatchApp: App {
     @WKApplicationDelegateAdaptor(ExtensionDelegate.self) var delegate
 
     @StateObject private var sessionManager = WatchSessionManager.shared
-    @StateObject private var bgFetcher = BGFetcher()
+    @StateObject private var bgFetcher = BGFetcher.shared
     @StateObject private var router = NavigationRouter()
 
     var body: some Scene {
@@ -133,9 +127,6 @@ struct LoopFollowWatchApp: App {
                 }
             }
             .onAppear {
-                // Share the BGFetcher with the extension delegate for background refresh
-                ExtensionDelegate.sharedBGFetcher = bgFetcher
-
                 // Free foreground reload — doesn't count toward daily budget
                 LFLog.bump("reload.onAppear")
                 LFLog.log("RELOAD", "onAppear")
