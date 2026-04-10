@@ -57,10 +57,7 @@ struct WatchBolusView: View {
                 }
 
             } else {
-                // +/- buttons flanking the amount value — placed here rather
-                // than in a separate top row to avoid tap-target overlap with
-                // the system back button on smaller watches (Series 10).
-                HStack(spacing: 8) {
+                HStack {
                     Button {
                         rawCrown = max(rawCrown - 1.0, 0)
                         WKInterfaceDevice.current().play(.click)
@@ -68,17 +65,21 @@ struct WatchBolusView: View {
                         Text("−")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.blue)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 32, height: 32)
                             .background(Color.blue.opacity(0.3))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    // Extra padding so the tap target doesn't bleed
+                    // into the system back button zone on small watches.
+                    .padding(.leading, 8)
 
-                    Text(String(format: "%.2f U", amount))
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundColor(.blue)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                    Spacer()
+
+                    Text("Bolus")
+                        .font(.system(size: 16, weight: .semibold))
+
+                    Spacer()
 
                     Button {
                         rawCrown = min(rawCrown + 1.0, config.maxBolus / 0.25)
@@ -87,18 +88,24 @@ struct WatchBolusView: View {
                         Text("+")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.blue)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 32, height: 32)
                             .background(Color.blue.opacity(0.3))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+
+                Text(String(format: "%.2f U", amount))
+                    .font(.system(size: 60, weight: .bold, design: .rounded))
+                    .foregroundColor(.blue)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 HStack(spacing: 6) {
-                    Text("Calc: \(String(format: "%.2f", bgFetcher.recommendedBolus))U")
-                        .font(.system(size: 15, weight: .medium))
+                    Text("Calculated: \(String(format: "%.2f", bgFetcher.recommendedBolus))U")
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.blue)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -110,15 +117,15 @@ struct WatchBolusView: View {
                             showCalcDetail = true
                         } label: {
                             Image(systemName: "info.circle")
-                                .font(.system(size: 18))
+                                .font(.system(size: 20))
                                 .foregroundColor(.blue.opacity(0.8))
-                                .frame(width: 32, height: 32)
+                                .frame(width: 36, height: 36)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, -4)
+                .padding(.leading, 8)
+                .padding(.top, -8)
 
                 Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                     confirmedAmount = amount
@@ -149,7 +156,6 @@ struct WatchBolusView: View {
                 BolusCalcDetailView(calc: calc, recommended: bgFetcher.recommendedBolus)
             }
         }
-        .navigationTitle("Bolus")
         .navigationBarBackButtonHidden(showConfirm)
         .toolbar {
             if showConfirm {
