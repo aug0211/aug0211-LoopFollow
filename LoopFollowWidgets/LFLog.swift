@@ -10,7 +10,7 @@
 // Writes:
 //   - print() with a [LFLog HH:mm:ss.SSS tag] prefix for Console.app streaming
 //   - per-day counters (auto-reset at midnight via date-keyed storage)
-//   - a bounded ring buffer of the last ~200 events for in-app display
+//   - a bounded ring buffer of the last ~500 events for in-app display
 //
 // No haptics, no network, no expensive work. A single JSON encode/decode
 // per call. Safe to invoke from any thread; writes are serialized on an
@@ -26,7 +26,7 @@ enum LFLog {
     }
 
     private static let eventsKey = "lflog.events"
-    private static let maxEvents = 200
+    private static let maxEvents = 500
     private static let queue = DispatchQueue(label: "com.loopfollow.lflog", qos: .utility)
 
     private static var defaults: UserDefaults {

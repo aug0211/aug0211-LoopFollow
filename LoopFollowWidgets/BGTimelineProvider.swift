@@ -48,27 +48,35 @@ struct BGTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BGEntry>) -> Void) {
-        let data = WidgetData.load()
-        let now = Date()
-
         LFLog.bump("timeline.request")
-        let age = Int(now.timeIntervalSince(data?.bgTimestamp ?? .distantPast))
-        LFLog.log("TIMELINE", "req dataAge=\(age)s entries=60")
 
-        // Generate entries every minute for the next hour.
-        // Each entry carries a different `displayDate` so the staleness text
-        // advances correctly without burning a reload.
-        var entries: [BGEntry] = []
-        for i in 0..<60 {
-            let entryDate = now.addingTimeInterval(Double(i) * 60) // every 1 min
-            entries.append(BGEntry(date: entryDate, data: data, displayDate: entryDate))
+        // Try to fetch fresh BG directly from Nightscout. This runs inside
+        // the widget extension process — independent of the watch app and its
+        // background task budget. The system calls getTimeline every ~5 min
+        // for an active complication, so this is our most reliable update path.
+        WidgetNightscoutFetcher.fetch { result in
+            let data: WidgetData?
+            switch result {
+            case .updated(let d):  data = d
+            case .unchanged(let d): data = d
+            case .failed(let d):   data = d
+            }
+
+            let now = Date()
+
+            // Generate entries every minute for the next hour.
+            // Each entry carries a different `displayDate` so the staleness text
+            // advances correctly without burning a reload.
+            var entries: [BGEntry] = []
+            for i in 0..<60 {
+                let entryDate = now.addingTimeInterval(Double(i) * 60)
+                entries.append(BGEntry(date: entryDate, data: data, displayDate: entryDate))
+            }
+
+            // Ask for a fresh timeline in 5 minutes.
+            let expiry = now.addingTimeInterval(5 * 60)
+            let timeline = Timeline(entries: entries, policy: .after(expiry))
+            completion(timeline)
         }
-
-        // After the last pre-generated entry, ask for a fresh timeline.
-        // This acts as a safety net — most reloads will come from the app
-        // calling reloadAllTimelines() on new BG data or from background refresh.
-        let expiry = now.addingTimeInterval(5 * 60) // 5 minutes
-        let timeline = Timeline(entries: entries, policy: .after(expiry))
-        completion(timeline)
     }
 }
