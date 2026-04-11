@@ -123,13 +123,10 @@ private struct SparklineView: View {
             let topInset: CGFloat = 6     // room for top y-axis label
             let bottomInset: CGFloat = 4  // room for bottom y-axis label
             let chartH = h - topInset - bottomInset
-            // Keep sparkline clear of the y-axis labels on the right.
-            // Labels are positioned at x = w - 16 with a 28pt
-            // trailing-aligned frame, so 3-digit text like "140"
-            // extends left to ~w - 24. 26pt gives ~2pt clearance so
-            // the sparkline's rightmost point never overlaps a label
-            // even when the current BG lands on a tick value.
-            let rightInset: CGFloat = 26
+            // Sparkline uses the full width; labels render on top
+            // via z-order (see ZStack below) so they stay readable
+            // even when a data point lands exactly on a tick value.
+            let rightInset: CGFloat = 16
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
@@ -145,7 +142,7 @@ private struct SparklineView: View {
             }
 
             ZStack {
-                // Dotted horizontal reference lines + Y-axis labels
+                // Dotted horizontal reference lines (bottom layer)
                 ForEach(yTicks, id: \.self) { value in
                     let y = topInset + yPosition(for: Double(value), yMin: yMin, yMax: yMax, height: chartH)
 
@@ -155,12 +152,6 @@ private struct SparklineView: View {
                     }
                     .stroke(style: StrokeStyle(lineWidth: 0.3, dash: [1, 3]))
                     .foregroundColor(.secondary.opacity(0.15))
-
-                    Text("\(value)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary.opacity(0.6))
-                        .frame(width: 28, alignment: .trailing)
-                        .position(x: w - 16, y: y)
                 }
 
                 if screenPoints.count >= 2 {
@@ -192,6 +183,17 @@ private struct SparklineView: View {
                     }
                     }
                     .widgetAccentable()
+                }
+
+                // Y-axis labels (top layer) — rendered last so they stay
+                // readable even when a sparkline point lands on a tick value.
+                ForEach(yTicks, id: \.self) { value in
+                    let y = topInset + yPosition(for: Double(value), yMin: yMin, yMax: yMax, height: chartH)
+                    Text("\(value)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.8))
+                        .frame(width: 28, alignment: .trailing)
+                        .position(x: w - 16, y: y)
                 }
             }
         }
