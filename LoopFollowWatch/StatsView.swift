@@ -28,23 +28,18 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        // Outer VStack pins the "Last 24h ·  N readings" line to the
-        // bottom of the page (above the TabView's page-indicator dots),
-        // mirroring how ContentView's freshness row is laid out. The
-        // ScrollView only holds the pie + grid so it can scroll
-        // independently on smaller watches without dragging the footer
-        // under the dots.
+        // Fill the full page so the Spacer can push the footer text
+        // down to the bottom, right above the TabView's page-indicator
+        // dots — mirroring how ContentView's freshness row is pinned.
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 10) {
-                    pieChart(stats: stats)
-                        .frame(height: 90)
-                    statsGrid(stats: stats)
-                }
-                .padding(.horizontal, 6)
-                .padding(.top, 6)
-                .padding(.bottom, 6)
+            VStack(spacing: 8) {
+                pieChart(stats: stats)
+                statsGrid(stats: stats)
             }
+            .padding(.horizontal, 6)
+            .padding(.top, 6)
+
+            Spacer(minLength: 8)
 
             if let count = stats?.count {
                 Text("Last 24h · \(count) readings")
@@ -52,42 +47,48 @@ struct StatsView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, 8)
     }
 
     @ViewBuilder
     private func pieChart(stats: StatsResult?) -> some View {
-        if let stats = stats, stats.count > 0 {
-            if stats.countRange == stats.count {
-                // 100% in range — celebrate with a shades emoji inside a
-                // solid green ring (xdrip4ios-inspired).
-                ZStack {
-                    Circle()
-                        .strokeBorder(Color.green, lineWidth: 5)
-                    Text("\u{1F60E}") // 😎
-                        .font(.system(size: 50))
+        // Both dimensions must be fixed — Chart/SectorMark inside a
+        // ScrollView treats a single-axis .frame as a hint and will
+        // otherwise stretch vertically, crowding the stats grid.
+        Group {
+            if let stats = stats, stats.count > 0 {
+                if stats.countRange == stats.count {
+                    // 100% in range — celebrate with a shades emoji inside
+                    // a solid green ring (xdrip4ios-inspired).
+                    ZStack {
+                        Circle()
+                            .strokeBorder(Color.green, lineWidth: 4)
+                        Text("\u{1F60E}") // 😎
+                            .font(.system(size: 44))
+                    }
+                } else {
+                    let slices: [PieSlice] = [
+                        PieSlice(name: "Low", count: stats.countLow, color: .red),
+                        PieSlice(name: "In Range", count: stats.countRange, color: .green),
+                        PieSlice(name: "High", count: stats.countHigh, color: .yellow),
+                    ]
+                    Chart(slices) { slice in
+                        SectorMark(
+                            angle: .value("Count", slice.count),
+                            innerRadius: .ratio(0),
+                            angularInset: 0
+                        )
+                        .foregroundStyle(slice.color)
+                    }
+                    .chartLegend(.hidden)
                 }
             } else {
-                let slices: [PieSlice] = [
-                    PieSlice(name: "Low", count: stats.countLow, color: .red),
-                    PieSlice(name: "In Range", count: stats.countRange, color: .green),
-                    PieSlice(name: "High", count: stats.countHigh, color: .yellow),
-                ]
-                Chart(slices) { slice in
-                    SectorMark(
-                        angle: .value("Count", slice.count),
-                        innerRadius: .ratio(0),
-                        angularInset: 0
-                    )
-                    .foregroundStyle(slice.color)
-                }
-                .chartLegend(.hidden)
+                Circle()
+                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 2)
             }
-        } else {
-            Circle()
-                .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 2)
-                .frame(width: 80, height: 80)
         }
+        .frame(width: 78, height: 78)
     }
 
     private func statsGrid(stats: StatsResult?) -> some View {
