@@ -109,13 +109,13 @@ struct StatsView: View {
                 StatCell(
                     label: "Low",
                     value: percentText(stats?.percentLow),
-                    suffix: rangeEdgeDisplay(config.lowLine, delta: 1)
+                    suffix: "<\(rangeEdgeDisplay(config.lowLine, delta: 1))"
                 )
                 StatCell(label: "In Range", value: percentText(stats?.percentRange))
                 StatCell(
                     label: "High",
                     value: percentText(stats?.percentHigh),
-                    suffix: rangeEdgeDisplay(config.highLine, delta: -1)
+                    suffix: ">\(rangeEdgeDisplay(config.highLine, delta: -1))"
                 )
             }
             HStack(spacing: 4) {
