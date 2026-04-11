@@ -28,23 +28,31 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        ScrollView {
-            VStack(spacing: 10) {
-                pieChart(stats: stats)
-                    .frame(height: 90)
-                statsGrid(stats: stats)
-                if let count = stats?.count {
-                    Text("Last 24h · \(count) readings")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+        // Outer VStack pins the "Last 24h ·  N readings" line to the
+        // bottom of the page (above the TabView's page-indicator dots),
+        // mirroring how ContentView's freshness row is laid out. The
+        // ScrollView only holds the pie + grid so it can scroll
+        // independently on smaller watches without dragging the footer
+        // under the dots.
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 10) {
+                    pieChart(stats: stats)
+                        .frame(height: 90)
+                    statsGrid(stats: stats)
                 }
+                .padding(.horizontal, 6)
+                .padding(.top, 6)
+                .padding(.bottom, 6)
             }
-            .padding(.horizontal, 6)
-            .padding(.top, 6)
-            // Clear the TabView's page-indicator dots at the bottom so the
-            // "Last 24h · N readings" line doesn't collide with them.
-            .padding(.bottom, 28)
+
+            if let count = stats?.count {
+                Text("Last 24h · \(count) readings")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
         }
+        .padding(.bottom, 10)
     }
 
     @ViewBuilder
