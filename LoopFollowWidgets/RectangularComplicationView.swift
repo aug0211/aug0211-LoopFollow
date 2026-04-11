@@ -131,14 +131,19 @@ private struct SparklineView: View {
             let rightInset: CGFloat = 22
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
-            let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
+            // End the x-axis at the most recent reading (not displayDate)
+            // so the sparkline's rightmost point always lands at sparkW.
+            // Otherwise staleness (~5–10m typical) adds a visible gap on
+            // the right — ~4% of sparkW per 7 minutes of staleness.
+            let endTime = sorted.last?.timestamp ?? displayDate
+            let threeHoursAgo = endTime.addingTimeInterval(-3 * 3600)
             let yMin = dataRange.min
             let yMax = dataRange.max
 
             // Convert BG points to screen coordinates (within sparkline area)
             let screenPoints: [CGPoint] = sorted.map { point in
                 CGPoint(
-                    x: xPosition(for: point.timestamp, start: threeHoursAgo, end: displayDate, width: sparkW),
+                    x: xPosition(for: point.timestamp, start: threeHoursAgo, end: endTime, width: sparkW),
                     y: topInset + yPosition(for: Double(point.value), yMin: yMin, yMax: yMax, height: chartH)
                 )
             }
