@@ -284,7 +284,7 @@ private struct ProfileTab: View {
     private func scheduleSection(
         title: String,
         schedule: [(timeAsSeconds: Double, value: Double)],
-        formatter: (Double) -> String
+        formatter: @escaping (Double) -> String
     ) -> some View {
         if !schedule.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
