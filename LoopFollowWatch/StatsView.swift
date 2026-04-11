@@ -40,20 +40,25 @@ struct StatsView: View {
         // tuned to match ContentView's gradient bar (16pt medium) and
         // freshness row (13pt) respectively.
         VStack(spacing: 0) {
-            VStack(spacing: 8) {
+            // Pie slot — GeometryReader gives us the actual available
+            // space so we can compute a hard pie size (65% of the slot,
+            // capped at 110pt). Chart / SectorMark doesn't consistently
+            // respect .aspectRatio + maxHeight, so we apply an explicit
+            // .frame(width:height:) instead. This is what makes the pie
+            // scale down on smaller watches — the slot shrinks, so the
+            // 65% fraction shrinks with it.
+            GeometryReader { geo in
+                let slot = min(geo.size.width, geo.size.height)
+                let side = min(slot * 0.65, 110)
                 pieChart(stats: stats)
-                    .aspectRatio(1, contentMode: .fit)
-                    .frame(maxHeight: .infinity)
-                    // Inset from each side so the pie doesn't dominate
-                    // the page — especially important on smaller watches
-                    // where the stats grid needs its share of the height.
-                    .padding(.horizontal, 26)
-
-                statsGrid(stats: stats)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: side, height: side)
+                    .frame(width: geo.size.width, height: geo.size.height)
             }
-            .padding(.horizontal, 6)
             .frame(maxHeight: .infinity)
+
+            statsGrid(stats: stats)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 6)
 
             if let count = stats?.count {
                 Text("Last 24h · \(count) readings")
@@ -188,12 +193,12 @@ private struct StatCell: View {
         VStack(spacing: 2) {
             labelText
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.6)
             Text(value)
-                .font(.system(size: 14, weight: .medium, design: .default))
+                .font(.system(size: 12, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
     }
@@ -201,14 +206,17 @@ private struct StatCell: View {
     /// Label + optional threshold annotation, e.g. "Low (<70)". Heading
     /// and threshold share a line via Text concatenation so they scale
     /// together when space is tight. Every run on the stats page uses
-    /// the same 14pt medium font for a uniform look.
+    /// the same 12pt medium font for a uniform look. The space before
+    /// "(" is omitted so the High cell ("High(>180)") fits in its
+    /// column on narrow watches without triggering minimumScaleFactor
+    /// and rendering smaller than the Low cell.
     private var labelText: Text {
         let base = Text(label)
-            .font(.system(size: 14, weight: .medium))
+            .font(.system(size: 12, weight: .medium))
             .foregroundColor(.secondary)
         guard let suffix = suffix else { return base }
-        return base + Text(" (\(suffix))")
-            .font(.system(size: 14, weight: .medium))
+        return base + Text("(\(suffix))")
+            .font(.system(size: 12, weight: .medium))
             .foregroundColor(.secondary)
     }
 }
