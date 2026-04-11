@@ -28,16 +28,12 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        // Layout mirrors ContentView's body structure exactly so the
-        // footer lands in the same spot on every watch size:
-        //   - Outer VStack(spacing: 0) with .padding(.bottom, 10) only
-        //     (no outer .frame — ContentView doesn't use one either)
-        //   - First child gets .padding(.top, 30) to clear status bar
-        //   - ONE middle element owns .frame(maxHeight: .infinity) to
-        //     act as the flex expander (in ContentView that's the
-        //     BGChartView; here it's a Color.clear filler between the
-        //     stats grid and footer)
-        //   - Footer is a plain child with no trailing padding/spacer
+        // Pie at the top (.padding(.top, 30) clears the status bar),
+        // small fixed gap, stats grid, and a flex filler below that
+        // absorbs any remaining vertical space. No bottom footer —
+        // positioning it above the TabView page-indicator dots across
+        // watch sizes was unreliable, and the reading count isn't
+        // essential info on the watch.
         //
         // The pie lives inside a GeometryReader scoped just to its row
         // so it can dynamically size itself from screen width (62%
@@ -60,19 +56,8 @@ struct StatsView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 6)
 
-            // Flex filler — mirrors ContentView's BGChartView flex slot.
-            // This is the only element with maxHeight: .infinity, so it
-            // absorbs all remaining vertical space and pushes the footer
-            // to the bottom of the padded area.
             Color.clear.frame(maxHeight: .infinity)
-
-            if let count = stats?.count {
-                Text("Last 24h · \(count) readings")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-            }
         }
-        .padding(.bottom, 10)
     }
 
     @ViewBuilder
