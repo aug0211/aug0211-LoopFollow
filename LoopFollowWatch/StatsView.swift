@@ -113,8 +113,8 @@ struct StatsView: View {
     }
 
     private func statsGrid(stats: StatsResult?) -> some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 4) {
+        VStack(spacing: 4) {
+            HStack(spacing: 2) {
                 StatCell(
                     label: "Low",
                     value: percentText(stats?.percentLow),
@@ -127,7 +127,7 @@ struct StatsView: View {
                     suffix: ">\(rangeEdgeDisplay(config.highLine, delta: -1))"
                 )
             }
-            HStack(spacing: 4) {
+            HStack(spacing: 2) {
                 StatCell(label: "Avg BG", value: avgBGText(stats?.avgBG))
                 StatCell(label: "Est A1C", value: a1cText(stats?.a1c))
                 StatCell(label: "Std Dev", value: stdDevText(stats?.stdDev))
@@ -190,7 +190,7 @@ private struct StatCell: View {
     }
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 0) {
             labelText
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
