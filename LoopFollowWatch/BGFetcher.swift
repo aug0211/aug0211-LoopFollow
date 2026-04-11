@@ -103,6 +103,7 @@ class BGFetcher: ObservableObject {
     @Published private(set) var profileName: String?
     @Published private(set) var profileDIA: Double?
     @Published private(set) var uploaderBattery: Int?
+    @Published private(set) var pumpBattery: Int?
     @Published private(set) var pumpReservoir: Double?
     @Published private(set) var cannulaChangeDate: Date?
     @Published private(set) var sensorChangeDate: Date?
@@ -383,6 +384,21 @@ class BGFetcher: ObservableObject {
         }
     }
 
+    /// Pump battery percent. Handles the common shapes:
+    /// `pump.battery.percent`, `pump.battery` as a number, or
+    /// `pump.battery.voltage` (skipped — we only surface percent).
+    private static func parsePumpBattery(entry: [String: Any]) -> Int? {
+        guard let pump = entry["pump"] as? [String: Any] else { return nil }
+        if let bDict = pump["battery"] as? [String: Any] {
+            if let pct = bDict["percent"] as? Double { return Int(pct) }
+            if let pct = bDict["percent"] as? Int { return pct }
+            return nil
+        }
+        if let pct = pump["battery"] as? Double { return Int(pct) }
+        if let pct = pump["battery"] as? Int { return pct }
+        return nil
+    }
+
     private func parseLoopDeviceStatus(entry: [String: Any], loopRecord: [String: Any], formatter: ISO8601DateFormatter) {
         var iob: Double?
         var cob: Double?
@@ -401,9 +417,11 @@ class BGFetcher: ObservableObject {
             }
             return nil
         }()
+        let pumpBatt = Self.parsePumpBattery(entry: entry)
         let reservoir = (entry["pump"] as? [String: Any])?["reservoir"] as? Double
         DispatchQueue.main.async {
             self.uploaderBattery = battery
+            self.pumpBattery = pumpBatt
             self.pumpReservoir = reservoir
         }
 
@@ -509,9 +527,11 @@ class BGFetcher: ObservableObject {
             }
             return nil
         }()
+        let pumpBatt = Self.parsePumpBattery(entry: entry)
         let reservoir = (entry["pump"] as? [String: Any])?["reservoir"] as? Double
         DispatchQueue.main.async {
             self.uploaderBattery = battery
+            self.pumpBattery = pumpBatt
             self.pumpReservoir = reservoir
         }
 

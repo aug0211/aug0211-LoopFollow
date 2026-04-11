@@ -93,13 +93,12 @@ private struct DeviceStatusTab: View {
     }
 
     var body: some View {
+        updatedSection
         loopSection
         overrideSection
-        reasonSection
-        pumpSection
-        siteSection
+        devicesSection
         todaySection
-        updatedSection
+        reasonSection
     }
 
     private var loopSection: some View {
@@ -145,7 +144,6 @@ private struct DeviceStatusTab: View {
                     if let auto = s?.autosensRatio {
                         StatusRow("Autosens", String(format: "%.0f%%", auto * 100))
                     }
-                    StatusRow("TDD", FollowStatusFormat.units(s?.tdd, decimals: 1, suffix: " U"))
                 }
                 if recBolus != nil {
                     StatusRow("Rec. Bolus", FollowStatusFormat.units(recBolus, decimals: 2, suffix: " U"))
@@ -188,27 +186,22 @@ private struct DeviceStatusTab: View {
     }
 
     @ViewBuilder
-    private var pumpSection: some View {
-        if bgFetcher.uploaderBattery != nil || bgFetcher.pumpReservoir != nil {
-            VStack(alignment: .leading, spacing: 4) {
-                SectionHeader("Pump")
-                if let battery = bgFetcher.uploaderBattery {
-                    StatusRow("Battery", "\(battery)%")
-                }
-                if let reservoir = bgFetcher.pumpReservoir {
-                    StatusRow("Reservoir", String(format: "%.0f U", reservoir))
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var siteSection: some View {
-        if bgFetcher.cannulaChangeDate != nil
+    private var devicesSection: some View {
+        let hasAny = bgFetcher.pumpBattery != nil
+            || bgFetcher.uploaderBattery != nil
+            || bgFetcher.cannulaChangeDate != nil
             || bgFetcher.sensorChangeDate != nil
-            || bgFetcher.insulinChangeDate != nil {
+            || bgFetcher.insulinChangeDate != nil
+            || bgFetcher.pumpReservoir != nil
+        if hasAny {
             VStack(alignment: .leading, spacing: 4) {
-                SectionHeader("Site")
+                SectionHeader("Devices")
+                if let pb = bgFetcher.pumpBattery {
+                    StatusRow("Pump Battery", "\(pb)%")
+                }
+                if let tb = bgFetcher.uploaderBattery {
+                    StatusRow("Trio Battery", "\(tb)%")
+                }
                 if let d = bgFetcher.cannulaChangeDate {
                     StatusRow("Cannula (CAGE)", FollowStatusFormat.age(d))
                 }
@@ -218,16 +211,25 @@ private struct DeviceStatusTab: View {
                 if let d = bgFetcher.insulinChangeDate {
                     StatusRow("Insulin (IAGE)", FollowStatusFormat.age(d))
                 }
+                if let reservoir = bgFetcher.pumpReservoir {
+                    StatusRow("Reservoir", String(format: "%.0f U", reservoir))
+                }
             }
         }
     }
 
     @ViewBuilder
     private var todaySection: some View {
-        if let carbs = bgFetcher.carbsToday {
+        let tdd = bgFetcher.loopStatus?.tdd
+        if bgFetcher.carbsToday != nil || tdd != nil {
             VStack(alignment: .leading, spacing: 4) {
                 SectionHeader("Today")
-                StatusRow("Carbs", String(format: "%.0f g", carbs))
+                if let carbs = bgFetcher.carbsToday {
+                    StatusRow("Carbs", String(format: "%.0f g", carbs))
+                }
+                if let tdd = tdd {
+                    StatusRow("TDD", String(format: "%.1f U", tdd))
+                }
             }
         }
     }
