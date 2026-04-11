@@ -115,25 +115,24 @@ private struct DeviceStatusTab: View {
             Group {
                 StatusRow("IOB", FollowStatusFormat.units(s?.iob, decimals: 2, suffix: " U"))
                 StatusRow("COB", FollowStatusFormat.units(s?.cob, decimals: 0, suffix: " g"))
-                if let basal = s?.basalRate {
-                    StatusRow("Basal", String(format: "%.2f U/hr", basal))
-                } else {
-                    StatusRow("Basal", nil)
-                }
-                if let scheduled = bgFetcher.scheduledBasal {
-                    StatusRow("  scheduled", String(format: "%.2f U/hr", scheduled))
-                }
+                StatusRow("Basal", FollowStatusFormat.currentVsScheduled(
+                    current: s?.basalRate,
+                    scheduled: bgFetcher.scheduledBasal,
+                    valueFormatter: { String(format: "%.2f", $0) },
+                    suffix: " U/hr"
+                ))
                 if s?.isOpenAPS == true {
-                    StatusRow("ISF", FollowStatusFormat.bgLike(s?.isf, units: units))
-                }
-                if let isfSched = bgFetcher.lookupScheduleValue(bgFetcher.isfSchedule) {
-                    StatusRow("  scheduled", FollowStatusFormat.bgLike(isfSched, units: units))
-                }
-                if s?.isOpenAPS == true {
-                    StatusRow("CR", FollowStatusFormat.units(s?.carbRatio, decimals: 1, suffix: " g/U"))
-                }
-                if let crSched = bgFetcher.lookupScheduleValue(bgFetcher.carbRatioSchedule) {
-                    StatusRow("  scheduled", String(format: "%.1f g/U", crSched))
+                    StatusRow("ISF", FollowStatusFormat.currentVsScheduled(
+                        current: s?.isf,
+                        scheduled: bgFetcher.lookupScheduleValue(bgFetcher.isfSchedule),
+                        valueFormatter: { FollowStatusFormat.bgLike($0, units: units) ?? "—" }
+                    ))
+                    StatusRow("CR", FollowStatusFormat.currentVsScheduled(
+                        current: s?.carbRatio,
+                        scheduled: bgFetcher.lookupScheduleValue(bgFetcher.carbRatioSchedule),
+                        valueFormatter: { String(format: "%.1f", $0) },
+                        suffix: " g/U"
+                    ))
                 }
             }
             Group {
@@ -346,6 +345,27 @@ private enum FollowStatusFormat {
     static func units(_ value: Double?, decimals: Int, suffix: String) -> String? {
         guard let value = value else { return nil }
         return String(format: "%.\(decimals)f%@", value, suffix)
+    }
+
+    /// Merge a "currently enacted" value with its scheduled counterpart into a
+    /// single row string. When they're equal (or one side is missing) just the
+    /// available value is shown; when they differ, "scheduled → current".
+    /// `suffix` is appended once at the end so we don't repeat units like
+    /// "1.10 U/hr → 0.95 U/hr".
+    static func currentVsScheduled(
+        current: Double?,
+        scheduled: Double?,
+        valueFormatter: (Double) -> String,
+        suffix: String = ""
+    ) -> String? {
+        let c = current.map(valueFormatter)
+        let s = scheduled.map(valueFormatter)
+        if let c = c, let s = s {
+            return c == s ? "\(c)\(suffix)" : "\(s) \u{2192} \(c)\(suffix)"
+        }
+        if let c = c { return "\(c)\(suffix)" }
+        if let s = s { return "\(s)\(suffix)" }
+        return nil
     }
 
     /// Format a BG-like value (target / eventual / ISF) respecting the user's units.
