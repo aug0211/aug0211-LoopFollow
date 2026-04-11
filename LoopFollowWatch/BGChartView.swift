@@ -325,7 +325,7 @@ struct BGChartView: View {
                     context.fill(
                         fillPath,
                         with: .linearGradient(
-                            Gradient(colors: [segColor.opacity(0.65), segColor.opacity(0.13)]),
+                            Gradient(colors: [segColor.opacity(0.60), segColor.opacity(0.05)]),
                             startPoint: CGPoint(x: 0, y: 0),
                             endPoint: CGPoint(x: 0, y: size.height)
                         )

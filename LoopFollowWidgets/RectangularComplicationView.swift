@@ -171,7 +171,7 @@ private struct SparklineView: View {
                         buildSegmentFill(points: screenPoints, index: i, height: topInset + chartH)
                             .fill(
                                 LinearGradient(
-                                    colors: [segColor.opacity(0.65), segColor.opacity(0.13)],
+                                    colors: [segColor.opacity(0.60), segColor.opacity(0.05)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
