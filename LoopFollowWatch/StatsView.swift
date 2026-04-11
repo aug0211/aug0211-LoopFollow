@@ -44,6 +44,9 @@ struct StatsView: View {
                 pieChart(stats: stats)
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxHeight: .infinity)
+                    // Inset ~10% from each side so the pie doesn't
+                    // dominate the page on larger watches.
+                    .padding(.horizontal, 14)
 
                 statsGrid(stats: stats)
                     .fixedSize(horizontal: false, vertical: true)
@@ -194,18 +197,17 @@ private struct StatCell: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// Label + optional threshold annotation, e.g. "Low (70)". Heading
+    /// Label + optional threshold annotation, e.g. "Low (<70)". Heading
     /// and threshold share a line via Text concatenation so they scale
-    /// together when space is tight. The heading matches the value size
-    /// (16pt medium); the threshold annotation is a touch smaller so the
-    /// heading still reads as the primary label.
+    /// together when space is tight. Both runs use the same 16pt medium
+    /// font as the value below them.
     private var labelText: Text {
         let base = Text(label)
             .font(.system(size: 16, weight: .medium))
             .foregroundColor(.secondary)
         guard let suffix = suffix else { return base }
         return base + Text(" (\(suffix))")
-            .font(.system(size: 12))
+            .font(.system(size: 16, weight: .medium))
             .foregroundColor(.secondary)
     }
 }
