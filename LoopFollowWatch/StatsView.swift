@@ -33,44 +33,46 @@ struct StatsView: View {
         // .padding(.top, 30) clears the status bar and .padding(.bottom, 10)
         // lands the footer just above the page-indicator dots.
         //
-        // Layout strategy: the pie chart is the only flexible element —
-        // it takes whatever height is left after the stats grid and
-        // footer claim their intrinsic sizes, so on smaller watches it
-        // shrinks automatically. Stats grid and footer have fixed sizes
-        // tuned to match ContentView's gradient bar (16pt medium) and
-        // freshness row (13pt) respectively.
-        VStack(spacing: 0) {
-            // Pie slot — GeometryReader gives us the actual available
-            // space so we can compute a hard pie size (65% of the slot,
-            // capped at 110pt). Chart / SectorMark doesn't consistently
-            // respect .aspectRatio + maxHeight, so we apply an explicit
-            // .frame(width:height:) instead. This is what makes the pie
-            // scale down on smaller watches — the slot shrinks, so the
-            // 65% fraction shrinks with it.
-            GeometryReader { geo in
-                let slot = min(geo.size.width, geo.size.height)
-                let side = min(slot * 0.65, 110)
+        // Layout: the pie chart is anchored at the very top of the
+        // content area, followed by a small fixed gap, the stats grid,
+        // then a flexible Spacer that pushes the footer down to the
+        // bottom. Pie size is computed from the actual screen width via
+        // the outer GeometryReader, so it scales on smaller watches.
+        // Chart / SectorMark doesn't consistently respect .aspectRatio +
+        // maxHeight, so we apply an explicit .frame(width:height:).
+        GeometryReader { geo in
+            // Dynamic pie size — proportional to screen width (watch
+            // screens are always taller than wide, so width is the
+            // limiting dimension for a square pie). Capped so it
+            // doesn't dominate the page on larger Ultra screens.
+            let pieSize = min(geo.size.width * 0.62, 105)
+
+            VStack(spacing: 0) {
+                // Pie pinned at top
                 pieChart(stats: stats)
-                    .frame(width: side, height: side)
-                    // Align the pie to the bottom of its slot so the
-                    // stats grid below sits right under it instead of
-                    // floating in empty flex space.
-                    .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
-            }
-            .frame(maxHeight: .infinity)
+                    .frame(width: pieSize, height: pieSize)
 
-            statsGrid(stats: stats)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 6)
+                // Moderate gap between pie and stats grid — more than
+                // the flush zero-gap iteration, less than the original
+                // flex-space iteration.
+                Spacer().frame(height: 10)
 
-            if let count = stats?.count {
-                Text("Last 24h · \(count) readings")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                    .padding(.top, 6)
+                statsGrid(stats: stats)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 6)
+
+                // Flex spacer consumes remaining vertical space so the
+                // footer lands at the bottom regardless of pie size.
+                Spacer(minLength: 6)
+
+                if let count = stats?.count {
+                    Text("Last 24h · \(count) readings")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 30)
         .padding(.bottom, 10)
     }
