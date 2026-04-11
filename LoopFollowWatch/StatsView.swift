@@ -44,9 +44,10 @@ struct StatsView: View {
                 pieChart(stats: stats)
                     .aspectRatio(1, contentMode: .fit)
                     .frame(maxHeight: .infinity)
-                    // Inset ~10% from each side so the pie doesn't
-                    // dominate the page on larger watches.
-                    .padding(.horizontal, 14)
+                    // Inset from each side so the pie doesn't dominate
+                    // the page — especially important on smaller watches
+                    // where the stats grid needs its share of the height.
+                    .padding(.horizontal, 26)
 
                 statsGrid(stats: stats)
                     .fixedSize(horizontal: false, vertical: true)
@@ -189,7 +190,7 @@ private struct StatCell: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text(value)
-                .font(.system(size: 16, weight: .medium, design: .default))
+                .font(.system(size: 14, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -199,15 +200,15 @@ private struct StatCell: View {
 
     /// Label + optional threshold annotation, e.g. "Low (<70)". Heading
     /// and threshold share a line via Text concatenation so they scale
-    /// together when space is tight. Both runs use the same 16pt medium
-    /// font as the value below them.
+    /// together when space is tight. Every run on the stats page uses
+    /// the same 14pt medium font for a uniform look.
     private var labelText: Text {
         let base = Text(label)
-            .font(.system(size: 16, weight: .medium))
+            .font(.system(size: 14, weight: .medium))
             .foregroundColor(.secondary)
         guard let suffix = suffix else { return base }
         return base + Text(" (\(suffix))")
-            .font(.system(size: 16, weight: .medium))
+            .font(.system(size: 14, weight: .medium))
             .foregroundColor(.secondary)
     }
 }
