@@ -28,53 +28,52 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        // Mirrors ContentView: .edgesIgnoringSafeArea(.vertical) at the
-        // TabView level extends the page over both safe areas, then
-        // .padding(.top, 30) clears the status bar and .padding(.bottom, 10)
-        // lands the footer just above the page-indicator dots.
+        // Mirrors ContentView's layout pattern: plain outer VStack with
+        // .padding(.top, 30) on the first child (clears status bar) and
+        // .padding(.bottom, 22) on the outer VStack (clears the TabView
+        // page-indicator dots — 10pt wasn't enough on Watch Series 10
+        // with .edgesIgnoringSafeArea(.vertical) active at the TabView
+        // tag level).
         //
         // Layout: the pie chart is anchored at the very top of the
         // content area, followed by a small fixed gap, the stats grid,
-        // then a flexible Spacer that pushes the footer down to the
-        // bottom. Pie size is computed from the actual screen width via
-        // the outer GeometryReader, so it scales on smaller watches.
-        // Chart / SectorMark doesn't consistently respect .aspectRatio +
-        // maxHeight, so we apply an explicit .frame(width:height:).
-        GeometryReader { geo in
-            // Dynamic pie size — proportional to screen width (watch
-            // screens are always taller than wide, so width is the
-            // limiting dimension for a square pie). Capped so it
-            // doesn't dominate the page on larger Ultra screens.
-            let pieSize = min(geo.size.width * 0.62, 105)
-
-            VStack(spacing: 0) {
-                // Pie pinned at top
+        // then a flexible Spacer that pushes the footer down toward the
+        // bottom. The pie lives inside a GeometryReader scoped just to
+        // its row so it can dynamically size itself from screen width
+        // (62% capped at 105pt) without affecting the rest of the
+        // layout. The reader is given a fixed height of 105 (matching
+        // the cap) and centers the pie inside — on smaller watches the
+        // pie shrinks but keeps its reserved slot.
+        VStack(spacing: 0) {
+            GeometryReader { geo in
+                let pieSize = min(geo.size.width * 0.62, 105)
                 pieChart(stats: stats)
                     .frame(width: pieSize, height: pieSize)
-
-                // Moderate gap between pie and stats grid — more than
-                // the flush zero-gap iteration, less than the original
-                // flex-space iteration.
-                Spacer().frame(height: 10)
-
-                statsGrid(stats: stats)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 6)
-
-                // Flex spacer consumes remaining vertical space so the
-                // footer lands at the bottom regardless of pie size.
-                Spacer(minLength: 6)
-
-                if let count = stats?.count {
-                    Text("Last 24h · \(count) readings")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            .frame(height: 105)
+            .padding(.top, 30)
+
+            // Moderate gap between pie and stats grid — more than the
+            // flush zero-gap iteration, less than the original flex one.
+            Spacer().frame(height: 12)
+
+            statsGrid(stats: stats)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 6)
+
+            // Flex spacer consumes remaining vertical space so the
+            // footer lands at the bottom regardless of pie size.
+            Spacer(minLength: 6)
+
+            if let count = stats?.count {
+                Text("Last 24h · \(count) readings")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
         }
-        .padding(.top, 30)
-        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, 22)
     }
 
     @ViewBuilder
