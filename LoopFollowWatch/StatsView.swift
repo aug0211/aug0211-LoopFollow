@@ -48,20 +48,31 @@ struct StatsView: View {
     @ViewBuilder
     private func pieChart(stats: StatsResult?) -> some View {
         if let stats = stats, stats.count > 0 {
-            let slices: [PieSlice] = [
-                PieSlice(name: "Low", count: stats.countLow, color: .red),
-                PieSlice(name: "In Range", count: stats.countRange, color: .green),
-                PieSlice(name: "High", count: stats.countHigh, color: .yellow),
-            ]
-            Chart(slices) { slice in
-                SectorMark(
-                    angle: .value("Count", slice.count),
-                    innerRadius: .ratio(0),
-                    angularInset: 0
-                )
-                .foregroundStyle(slice.color)
+            if stats.countRange == stats.count {
+                // 100% in range — celebrate with a shades emoji inside a
+                // solid green ring (xdrip4ios-inspired).
+                ZStack {
+                    Circle()
+                        .strokeBorder(Color.green, lineWidth: 5)
+                    Text("\u{1F60E}") // 😎
+                        .font(.system(size: 50))
+                }
+            } else {
+                let slices: [PieSlice] = [
+                    PieSlice(name: "Low", count: stats.countLow, color: .red),
+                    PieSlice(name: "In Range", count: stats.countRange, color: .green),
+                    PieSlice(name: "High", count: stats.countHigh, color: .yellow),
+                ]
+                Chart(slices) { slice in
+                    SectorMark(
+                        angle: .value("Count", slice.count),
+                        innerRadius: .ratio(0),
+                        angularInset: 0
+                    )
+                    .foregroundStyle(slice.color)
+                }
+                .chartLegend(.hidden)
             }
-            .chartLegend(.hidden)
         } else {
             Circle()
                 .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 2)
@@ -72,9 +83,17 @@ struct StatsView: View {
     private func statsGrid(stats: StatsResult?) -> some View {
         VStack(spacing: 8) {
             HStack(spacing: 4) {
-                StatCell(label: "Low", value: percentText(stats?.percentLow))
+                StatCell(
+                    label: "Low",
+                    value: percentText(stats?.percentLow),
+                    suffix: "<\(thresholdDisplay(config.lowLine))"
+                )
                 StatCell(label: "In Range", value: percentText(stats?.percentRange))
-                StatCell(label: "High", value: percentText(stats?.percentHigh))
+                StatCell(
+                    label: "High",
+                    value: percentText(stats?.percentHigh),
+                    suffix: ">\(thresholdDisplay(config.highLine))"
+                )
             }
             HStack(spacing: 4) {
                 StatCell(label: "Avg BG", value: avgBGText(stats?.avgBG))
@@ -111,6 +130,15 @@ struct StatsView: View {
         }
         return String(format: "%.2f", mgdl)
     }
+
+    /// "70" for mg/dL, "3.9" for mmol/L — used in the Low/High cell
+    /// threshold annotations.
+    private func thresholdDisplay(_ mgdl: Double) -> String {
+        if config.units == "mmol/L" {
+            return String(format: "%.1f", mgdl / 18.0182)
+        }
+        return "\(Int(mgdl.rounded()))"
+    }
 }
 
 // MARK: - Stat cell
@@ -118,14 +146,19 @@ struct StatsView: View {
 private struct StatCell: View {
     let label: String
     let value: String
+    let suffix: String?
+
+    init(label: String, value: String, suffix: String? = nil) {
+        self.label = label
+        self.value = value
+        self.suffix = suffix
+    }
 
     var body: some View {
         VStack(spacing: 1) {
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+            labelText
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
@@ -133,6 +166,19 @@ private struct StatCell: View {
                 .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// Label + optional threshold annotation, e.g. "Low (<70)".
+    /// Rendered via Text concatenation so the two runs share one line and
+    /// scale together when space is tight.
+    private var labelText: Text {
+        let base = Text(label)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.secondary)
+        guard let suffix = suffix else { return base }
+        return base + Text(" (\(suffix))")
+            .font(.system(size: 9))
+            .foregroundColor(.secondary)
     }
 }
 
