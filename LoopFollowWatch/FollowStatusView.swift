@@ -114,8 +114,12 @@ private struct DeviceStatusTab: View {
             Group {
                 StatusRow("IOB", FollowStatusFormat.units(s?.iob, decimals: 2, suffix: " U"))
                 StatusRow("COB", FollowStatusFormat.units(s?.cob, decimals: 0, suffix: " g"))
+                // Prefer the temp-basal treatment's `absolute` (what the pump
+                // actually delivered, matching the iPhone Follow display) over
+                // devicestatus.enacted.rate (the algorithm's request, which can
+                // round differently).
                 StatusRow("Basal", FollowStatusFormat.currentVsScheduled(
-                    current: s?.basalRate,
+                    current: bgFetcher.currentTempBasal ?? s?.basalRate,
                     scheduled: bgFetcher.scheduledBasal,
                     valueFormatter: { String(format: "%.2f", $0) },
                     suffix: " U/hr"

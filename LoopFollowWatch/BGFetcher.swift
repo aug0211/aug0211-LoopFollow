@@ -105,6 +105,11 @@ class BGFetcher: ObservableObject {
     @Published private(set) var uploaderBattery: Int?
     @Published private(set) var pumpBattery: Int?
     @Published private(set) var pumpReservoir: Double?
+    /// Most-recent active temp basal's `absolute` value from the treatments
+    /// stream. Mirrors what the iPhone Follow app displays — this is the
+    /// pump-rounded delivered rate, which can differ from `loopStatus.basalRate`
+    /// (which comes from `devicestatus.enacted.rate`, the algorithm's request).
+    @Published private(set) var currentTempBasal: Double?
     @Published private(set) var cannulaChangeDate: Date?
     @Published private(set) var sensorChangeDate: Date?
     @Published private(set) var insulinChangeDate: Date?
@@ -1029,6 +1034,7 @@ class BGFetcher: ObservableObject {
         var newTreatments: [Treatment] = []
         var tempTargetRaw: [[String: Any]] = []
         var overrideRaw: [[String: Any]] = []
+        var tempBasalRaw: [[String: Any]] = []
         var newCannulaChangeDate: Date?
         var newSensorChangeDate: Date?
         var newInsulinChangeDate: Date?
@@ -1106,6 +1112,9 @@ class BGFetcher: ObservableObject {
 
             case "Temporary Target":
                 tempTargetRaw.append(entry)
+
+            case "Temp Basal":
+                tempBasalRaw.append(entry)
 
             default:
                 // Generic bolus/carb fallback
@@ -1219,6 +1228,29 @@ class BGFetcher: ObservableObject {
             .filter { $0.type == .carbs && $0.timestamp >= today && $0.timestamp < tomorrow }
             .reduce(0.0) { $0 + $1.value }
 
+        // Find the temp basal that's still running right now and surface its
+        // `absolute` value. This matches what the iPhone Follow app shows for
+        // the basal info row — see LoopFollow/Controllers/Nightscout/Treatments/
+        // Basals.swift, which uses `absolute` from the latest active Temp Basal
+        // record. Differs from devicestatus.enacted.rate when the pump rounds.
+        let nowDate = Date()
+        let parsedTempBasals: [(start: Date, absolute: Double, duration: Double)] =
+            tempBasalRaw.compactMap { entry in
+                guard let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                      let ts = parseNSDate(dateStr),
+                      let absolute = entry["absolute"] as? Double else { return nil }
+                let duration = entry["duration"] as? Double ?? 0
+                return (ts, absolute, duration)
+            }
+            .sorted { $0.start < $1.start }
+        var newCurrentTempBasal: Double?
+        if let last = parsedTempBasals.last {
+            let endTime = last.start.addingTimeInterval(last.duration * 60)
+            if endTime > nowDate {
+                newCurrentTempBasal = last.absolute
+            }
+        }
+
         DispatchQueue.main.async {
             self.treatments = newTreatments
             self.tempTargetEntries = newTempTargets
@@ -1227,6 +1259,7 @@ class BGFetcher: ObservableObject {
             self.sensorChangeDate = newSensorChangeDate
             self.insulinChangeDate = newInsulinChangeDate
             self.carbsToday = newCarbsToday
+            self.currentTempBasal = newCurrentTempBasal
         }
     }
 
