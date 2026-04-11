@@ -52,7 +52,10 @@ struct StatsView: View {
                 let side = min(slot * 0.65, 110)
                 pieChart(stats: stats)
                     .frame(width: side, height: side)
-                    .frame(width: geo.size.width, height: geo.size.height)
+                    // Align the pie to the bottom of its slot so the
+                    // stats grid below sits right under it instead of
+                    // floating in empty flex space.
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
             }
             .frame(maxHeight: .infinity)
 
