@@ -181,12 +181,7 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .padding(.trailing, 12)
                     .sheet(isPresented: $showLoopDetail) {
-                        VStack {
-                            Text("Loop Status")
-                                .font(.headline)
-                            Text("Coming soon")
-                                .foregroundColor(.secondary)
-                        }
+                        FollowStatusView(bgFetcher: bgFetcher, sessionManager: sessionManager)
                     }
 
                     // Reload button

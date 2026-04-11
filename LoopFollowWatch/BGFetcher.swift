@@ -94,14 +94,24 @@ class BGFetcher: ObservableObject {
     @Published var tempTargetEntries: [TempTargetEntry] = []
     @Published var overrideEntries: [OverrideEntry] = []
 
+    // Profile + device-status detail surfaced in the Follow Status sheet.
+    @Published private(set) var basalSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    @Published private(set) var isfSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    @Published private(set) var carbRatioSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    @Published private(set) var targetSchedule: [(timeAsSeconds: Double, value: Double)] = []
+    @Published private(set) var profileTimezone: TimeZone = .current
+    @Published private(set) var profileName: String?
+    @Published private(set) var profileDIA: Double?
+    @Published private(set) var uploaderBattery: Int?
+    @Published private(set) var pumpReservoir: Double?
+    @Published private(set) var cannulaChangeDate: Date?
+    @Published private(set) var sensorChangeDate: Date?
+    @Published private(set) var insulinChangeDate: Date?
+    @Published private(set) var carbsToday: Double?
+
     private var timer: Timer?
     private var dexSessionToken: String?
     private var profileLoaded = false
-    private var basalSchedule: [(timeAsSeconds: Double, value: Double)] = []
-    private var isfSchedule: [(timeAsSeconds: Double, value: Double)] = []
-    private var carbRatioSchedule: [(timeAsSeconds: Double, value: Double)] = []
-    private var targetSchedule: [(timeAsSeconds: Double, value: Double)] = []
-    private var profileTimezone: TimeZone = .current
 
     private let dexcomUserAgent = "Dexcom Share/3.0.2.11 CFNetwork/711.2.23 Darwin/14.0.0"
     private let dexcomApplicationId = "d89443d2-327c-4a6f-89e5-496bbb0317db"
@@ -383,6 +393,20 @@ class BGFetcher: ObservableObject {
         var predictionStart: Date?
         var recommendedBolus: Double?
 
+        // Pump / uploader info live as siblings of `loop` on the devicestatus entry.
+        let battery: Int? = {
+            if let uploader = entry["uploader"] as? [String: Any],
+               let b = uploader["battery"] as? Double {
+                return Int(b)
+            }
+            return nil
+        }()
+        let reservoir = (entry["pump"] as? [String: Any])?["reservoir"] as? Double
+        DispatchQueue.main.async {
+            self.uploaderBattery = battery
+            self.pumpReservoir = reservoir
+        }
+
         // Timestamp
         let timestamp: Date
         if let ts = loopRecord["timestamp"] as? String, let d = formatter.date(from: ts) {
@@ -448,7 +472,10 @@ class BGFetcher: ObservableObject {
             cobPredictions: nil, uamPredictions: nil,
             isOpenAPS: false,
             tempTargetActive: false, tempTargetText: nil,
-            recommendedBolus: recommendedBolus, isf: nil, carbRatio: nil, currentTarget: nil
+            recommendedBolus: recommendedBolus, isf: nil, carbRatio: nil, currentTarget: nil,
+            autosensRatio: nil, eventualBG: nil, tdd: nil,
+            minPredBG: predictions?.min(), maxPredBG: predictions?.max(),
+            insulinReq: nil, reason: nil
         )
 
         DispatchQueue.main.async {
@@ -473,6 +500,20 @@ class BGFetcher: ObservableObject {
         var isf: Double?
         var carbRatio: Double?
         var currentTarget: Double?
+
+        // Pump / uploader info live as siblings of `openaps` on the devicestatus entry.
+        let battery: Int? = {
+            if let uploader = entry["uploader"] as? [String: Any],
+               let b = uploader["battery"] as? Double {
+                return Int(b)
+            }
+            return nil
+        }()
+        let reservoir = (entry["pump"] as? [String: Any])?["reservoir"] as? Double
+        DispatchQueue.main.async {
+            self.uploaderBattery = battery
+            self.pumpReservoir = reservoir
+        }
 
         let enactedOrSuggested = openapsRecord["suggested"] as? [String: Any]
             ?? openapsRecord["enacted"] as? [String: Any]
@@ -542,6 +583,29 @@ class BGFetcher: ObservableObject {
             uamPredictions = predBGs["UAM"] as? [Double]
         }
 
+        // Aggregate min/max across all predicted-BG arrays for the Follow Status sheet.
+        let allPreds = (ztPredictions ?? []) + (iobPredictions ?? []) + (cobPredictions ?? []) + (uamPredictions ?? [])
+        let minPredBG = allPreds.min()
+        let maxPredBG = allPreds.max()
+
+        // Extra OpenAPS/Trio fields surfaced in the Follow Status sheet.
+        let autosensRatio = enactedOrSuggested?["sensitivityRatio"] as? Double
+        let eventualBG = enactedOrSuggested?["eventualBG"] as? Double
+        let insulinReq = enactedOrSuggested?["insulinReq"] as? Double
+        let reasonText = enactedOrSuggested?["reason"] as? String
+
+        // TDD: prefer the explicit field, otherwise regex it out of the reason string
+        // (matches the iPhone fallback in DeviceStatusOpenAPS.swift).
+        var tdd: Double? = enactedOrSuggested?["TDD"] as? Double
+        if tdd == nil, let reason = reasonText {
+            let pattern = "TDD:\\s*(\\d+(?:\\.\\d+)?)"
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: reason, range: NSRange(location: 0, length: reason.utf16.count)) {
+                let valueString = (reason as NSString).substring(with: match.range(at: 1))
+                tdd = Double(valueString)
+            }
+        }
+
         // Temp target — only detect from explicit "targetBottom"/"targetTop" in enacted,
         // not from the reason string (which always includes "Target:" for the profile target)
         var tempTargetActive = false
@@ -563,7 +627,10 @@ class BGFetcher: ObservableObject {
             cobPredictions: cobPredictions, uamPredictions: uamPredictions,
             isOpenAPS: true,
             tempTargetActive: tempTargetActive, tempTargetText: tempTargetText,
-            recommendedBolus: nil, isf: isf, carbRatio: carbRatio, currentTarget: currentTarget
+            recommendedBolus: nil, isf: isf, carbRatio: carbRatio, currentTarget: currentTarget,
+            autosensRatio: autosensRatio, eventualBG: eventualBG, tdd: tdd,
+            minPredBG: minPredBG, maxPredBG: maxPredBG,
+            insulinReq: insulinReq, reason: reasonText
         )
 
         DispatchQueue.main.async {
@@ -625,7 +692,7 @@ class BGFetcher: ObservableObject {
         ExtensionDelegate.scheduleBackgroundRefresh()
     }
 
-    private func lookupScheduleValue(_ schedule: [(timeAsSeconds: Double, value: Double)]) -> Double? {
+    func lookupScheduleValue(_ schedule: [(timeAsSeconds: Double, value: Double)]) -> Double? {
         guard !schedule.isEmpty else { return nil }
         var calendar = Calendar.current
         calendar.timeZone = profileTimezone
@@ -755,6 +822,17 @@ class BGFetcher: ObservableObject {
             ?? store?["Default"] as? [String: Any]
             ?? store?.values.first as? [String: Any]
 
+        // Profile metadata surfaced in the Follow Status sheet
+        let nameForDisplay = defaultProfileName
+        let dia = defaultStore?["dia"] as? Double
+
+        // Local copies — assigned to @Published properties on main below.
+        var newBasalSchedule: [(timeAsSeconds: Double, value: Double)] = basalSchedule
+        var newISFSchedule: [(timeAsSeconds: Double, value: Double)] = isfSchedule
+        var newCRSchedule: [(timeAsSeconds: Double, value: Double)] = carbRatioSchedule
+        var newTargetSchedule: [(timeAsSeconds: Double, value: Double)] = targetSchedule
+        var newTimezone: TimeZone = profileTimezone
+
         // Extract basal schedule from default store
         if let basalArray = defaultStore?["basal"] as? [[String: Any]] {
             var schedule: [(timeAsSeconds: Double, value: Double)] = []
@@ -764,7 +842,7 @@ class BGFetcher: ObservableObject {
                 schedule.append((timeAsSeconds: timeAsSeconds, value: value))
             }
             schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
-            basalSchedule = schedule
+            newBasalSchedule = schedule
         }
 
         // Extract ISF schedule from default store
@@ -776,7 +854,7 @@ class BGFetcher: ObservableObject {
                 schedule.append((timeAsSeconds: timeAsSeconds, value: value))
             }
             schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
-            isfSchedule = schedule
+            newISFSchedule = schedule
         }
 
         // Extract carb ratio schedule from default store
@@ -788,7 +866,7 @@ class BGFetcher: ObservableObject {
                 schedule.append((timeAsSeconds: timeAsSeconds, value: value))
             }
             schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
-            carbRatioSchedule = schedule
+            newCRSchedule = schedule
         }
 
         // Extract target BG schedule from default store
@@ -800,13 +878,13 @@ class BGFetcher: ObservableObject {
                 schedule.append((timeAsSeconds: timeAsSeconds, value: value))
             }
             schedule.sort { $0.timeAsSeconds < $1.timeAsSeconds }
-            targetSchedule = schedule
+            newTargetSchedule = schedule
         }
 
         // Extract timezone
         if let tz = defaultStore?["timezone"] as? String,
            let timezone = TimeZone(identifier: tz) {
-            profileTimezone = timezone
+            newTimezone = timezone
         }
 
         // Trio overrides — JSON key is "overridePresets" at profile top level
@@ -859,7 +937,14 @@ class BGFetcher: ObservableObject {
 
         profileLoaded = true
         DispatchQueue.main.async {
+            self.basalSchedule = newBasalSchedule
+            self.isfSchedule = newISFSchedule
+            self.carbRatioSchedule = newCRSchedule
+            self.targetSchedule = newTargetSchedule
+            self.profileTimezone = newTimezone
             self.overridePresets = presets
+            self.profileName = nameForDisplay
+            self.profileDIA = dia
             // Update scheduled basal for current time
             self.updateScheduledBasal(for: Date())
             self.updateRecommendedBolus()
@@ -924,12 +1009,39 @@ class BGFetcher: ObservableObject {
         var newTreatments: [Treatment] = []
         var tempTargetRaw: [[String: Any]] = []
         var overrideRaw: [[String: Any]] = []
+        var newCannulaChangeDate: Date?
+        var newSensorChangeDate: Date?
+        var newInsulinChangeDate: Date?
 
         // Step 1: Sort entries into categories, matching iPhone app event types exactly
         for entry in entries {
             guard let eventType = entry["eventType"] as? String else { continue }
 
             switch eventType {
+            case "Pump Site Change", "Site Change":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr) {
+                    if newCannulaChangeDate == nil || ts > newCannulaChangeDate! {
+                        newCannulaChangeDate = ts
+                    }
+                }
+
+            case "Sensor Start", "Sensor Change":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr) {
+                    if newSensorChangeDate == nil || ts > newSensorChangeDate! {
+                        newSensorChangeDate = ts
+                    }
+                }
+
+            case "Insulin Change", "Insulin Cartridge Change":
+                if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
+                   let ts = parseNSDate(dateStr) {
+                    if newInsulinChangeDate == nil || ts > newInsulinChangeDate! {
+                        newInsulinChangeDate = ts
+                    }
+                }
+
             case "Correction Bolus", "Bolus", "External Insulin":
                 if let dateStr = entry["timestamp"] as? String ?? entry["created_at"] as? String,
                    let ts = parseNSDate(dateStr) {
@@ -1079,10 +1191,22 @@ class BGFetcher: ObservableObject {
             ))
         }
 
+        // Sum of carb treatments whose timestamp is in the device's calendar today.
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86400)
+        let newCarbsToday = newTreatments
+            .filter { $0.type == .carbs && $0.timestamp >= today && $0.timestamp < tomorrow }
+            .reduce(0.0) { $0 + $1.value }
+
         DispatchQueue.main.async {
             self.treatments = newTreatments
             self.tempTargetEntries = newTempTargets
             self.overrideEntries = newOverrides
+            self.cannulaChangeDate = newCannulaChangeDate
+            self.sensorChangeDate = newSensorChangeDate
+            self.insulinChangeDate = newInsulinChangeDate
+            self.carbsToday = newCarbsToday
         }
     }
 
