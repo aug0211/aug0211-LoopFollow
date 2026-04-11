@@ -28,21 +28,21 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        // TabView .page dots on watchOS render as an overlay on top of
-        // page content — safe-area respecting doesn't reserve their
-        // space. Manual bottom padding is the only way to push our
-        // footer above them. 22pt wasn't enough on Series 10; going to
-        // 32pt to give the dots a comfortable buffer everywhere. The
-        // top uses .padding(.top, 30) on the pie row to clear the
-        // status-bar area (same as ContentView's Row 1).
+        // Layout mirrors ContentView's body structure exactly so the
+        // footer lands in the same spot on every watch size:
+        //   - Outer VStack(spacing: 0) with .padding(.bottom, 10) only
+        //     (no outer .frame — ContentView doesn't use one either)
+        //   - First child gets .padding(.top, 30) to clear status bar
+        //   - ONE middle element owns .frame(maxHeight: .infinity) to
+        //     act as the flex expander (in ContentView that's the
+        //     BGChartView; here it's a Color.clear filler between the
+        //     stats grid and footer)
+        //   - Footer is a plain child with no trailing padding/spacer
         //
-        // Layout: pie anchored at the very top, small fixed gap, stats
-        // grid, then a flex Spacer that pushes the footer to the bottom
-        // of the padded area. The pie lives inside a GeometryReader
-        // scoped just to its row so it can dynamically size itself from
-        // screen width (62% capped at 105pt). The reader is given a
-        // fixed height of 105 (the cap) and centers the pie inside —
-        // on smaller watches the pie shrinks but keeps its slot.
+        // The pie lives inside a GeometryReader scoped just to its row
+        // so it can dynamically size itself from screen width (62%
+        // capped at 105pt). The reader has a fixed 105pt height — on
+        // smaller watches the pie shrinks but keeps its slot.
         VStack(spacing: 0) {
             GeometryReader { geo in
                 let pieSize = min(geo.size.width * 0.62, 105)
@@ -53,17 +53,18 @@ struct StatsView: View {
             .frame(height: 105)
             .padding(.top, 30)
 
-            // Moderate gap between pie and stats grid — more than the
-            // flush zero-gap iteration, less than the original flex one.
+            // Moderate gap between pie and stats grid
             Spacer().frame(height: 12)
 
             statsGrid(stats: stats)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 6)
 
-            // Flex spacer consumes remaining vertical space so the
-            // footer lands just above the 32pt bottom padding.
-            Spacer(minLength: 6)
+            // Flex filler — mirrors ContentView's BGChartView flex slot.
+            // This is the only element with maxHeight: .infinity, so it
+            // absorbs all remaining vertical space and pushes the footer
+            // to the bottom of the padded area.
+            Color.clear.frame(maxHeight: .infinity)
 
             if let count = stats?.count {
                 Text("Last 24h · \(count) readings")
@@ -71,8 +72,7 @@ struct StatsView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.bottom, 32)
+        .padding(.bottom, 10)
     }
 
     @ViewBuilder
