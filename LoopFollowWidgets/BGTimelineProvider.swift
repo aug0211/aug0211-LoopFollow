@@ -48,8 +48,6 @@ struct BGTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BGEntry>) -> Void) {
-        LFLog.bump("timeline.request")
-
         // Try to fetch fresh BG directly from Nightscout. This runs inside
         // the widget extension process — independent of the watch app and its
         // background task budget. The system calls getTimeline every ~5 min

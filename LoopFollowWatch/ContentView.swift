@@ -77,8 +77,6 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .inactive {
-                LFLog.bump("reload.inactive")
-                LFLog.log("RELOAD", "inactive")
                 WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
             }
             if newPhase == .active {
@@ -183,7 +181,12 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .padding(.trailing, 12)
                     .sheet(isPresented: $showLoopDetail) {
-                        DiagnosticsView()
+                        VStack {
+                            Text("Loop Status")
+                                .font(.headline)
+                            Text("Coming soon")
+                                .foregroundColor(.secondary)
+                        }
                     }
 
                     // Reload button
@@ -375,108 +378,5 @@ struct ContentView: View {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return "\(minutes)m \(seconds)s"
-    }
-}
-
-// MARK: - Diagnostics (complication staleness investigation)
-
-/// In-app view of LFLog counters + recent events. Reached from the loop-status
-/// icon in the top row of ContentView. Purely diagnostic — no behavior change.
-private struct DiagnosticsView: View {
-    @State private var counters: [String: Int] = [:]
-    @State private var events: [LFLog.Event] = []
-
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm:ss a"
-        return f
-    }()
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Diagnostics")
-                    .font(.system(size: 14, weight: .bold))
-                    .frame(maxWidth: .infinity, alignment: .center)
-
-                Text("Counters (today)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
-
-                if counters.isEmpty {
-                    Text("(empty)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(counters.keys.sorted(), id: \.self) { key in
-                        HStack {
-                            Text(key)
-                                .font(.system(size: 10, design: .monospaced))
-                            Spacer()
-                            Text("\(counters[key] ?? 0)")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        }
-                    }
-                }
-
-                Divider()
-
-                Text("Recent events")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
-
-                if events.isEmpty {
-                    Text("(empty)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(Array(events.reversed().prefix(30).enumerated()), id: \.offset) { _, ev in
-                        VStack(alignment: .leading, spacing: 0) {
-                            HStack(spacing: 4) {
-                                Text(Self.timeFormatter.string(from: ev.ts))
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                Text(ev.tag)
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.primary)
-                            }
-                            if !ev.msg.isEmpty {
-                                Text(ev.msg)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                HStack(spacing: 8) {
-                    Button("Refresh") {
-                        reload()
-                    }
-                    .buttonStyle(.bordered)
-                    .font(.system(size: 11))
-
-                    Button("Clear") {
-                        LFLog.clear()
-                        reload()
-                    }
-                    .buttonStyle(.bordered)
-                    .font(.system(size: 11))
-                    .tint(.red)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.horizontal, 4)
-        }
-        .onAppear { reload() }
-    }
-
-    private func reload() {
-        let snap = LFLog.snapshot()
-        counters = snap.counters
-        events = snap.events
     }
 }

@@ -154,10 +154,7 @@ class BGFetcher: ObservableObject {
     /// existing scheduled fetch. Safe to call from main only.
     private func scheduleNextFetch(config: WatchConfig, delay: TimeInterval) {
         timer?.invalidate()
-        LFLog.log("TIMER", "arm +\(Int(delay))s")
         timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            LFLog.bump("timer.fire")
-            LFLog.log("TIMER", "fire")
             self?.fetch(config: config)
         }
     }
@@ -182,9 +179,6 @@ class BGFetcher: ObservableObject {
 
     func fetch(config: WatchConfig) {
         currentConfig = config
-
-        LFLog.bump("fetch.start")
-        LFLog.log("FETCH", "start ns=\(config.hasNightscoutURL) dex=\(config.hasDexcomCredentials)")
 
         // Always fetch from Nightscout if available (BG entries + devicestatus + profile + treatments)
         if config.hasNightscoutURL {
@@ -280,8 +274,6 @@ class BGFetcher: ObservableObject {
                     delta: delta
                 ))
             }
-
-            LFLog.log("FETCH", "ns done n=\(readings.count)")
 
             DispatchQueue.main.async {
                 self.bgHistory = readings
@@ -607,8 +599,6 @@ class BGFetcher: ObservableObject {
 
     func updateWidgetData() {
         guard let bg = currentBG else { return }
-        LFLog.bump("fetch.updateWidget")
-        LFLog.log("WIDGET", "write bgAge=\(Int(Date().timeIntervalSince(bg.timestamp)))s")
         let cutoff = Date().addingTimeInterval(-3.5 * 3600)
         let recentHistory = bgHistory.filter { $0.timestamp > cutoff }
         let points = recentHistory.map { WidgetBGPoint(value: $0.bgValue, timestamp: $0.timestamp) }
@@ -626,8 +616,6 @@ class BGFetcher: ObservableObject {
             updatedAt: Date()
         )
         data.save()
-        LFLog.bump("reload.fetcher")
-        LFLog.log("RELOAD", "fetcher")
         WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
 
         // Re-arm the foreground timer and the background refresh chain based
@@ -1246,8 +1234,6 @@ class BGFetcher: ObservableObject {
             self.fallbackToNightscout(config: config, dexError: "No Dexcom readings")
             return
         }
-
-        LFLog.log("FETCH", "dex done n=\(readings.count)")
 
         DispatchQueue.main.async {
             self.bgHistory = readings

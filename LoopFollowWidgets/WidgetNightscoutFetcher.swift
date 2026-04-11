@@ -26,7 +26,6 @@ enum WidgetNightscoutFetcher {
         let nsToken = shared.string(forKey: "nsToken") ?? ""
 
         guard !nsURL.isEmpty else {
-            LFLog.log("FETCH-W", "no NS URL")
             completion(.failed(WidgetData.load()))
             return
         }
@@ -43,7 +42,6 @@ enum WidgetNightscoutFetcher {
         components?.queryItems = queryItems
 
         guard let url = components?.url else {
-            LFLog.log("FETCH-W", "bad URL")
             completion(.failed(WidgetData.load()))
             return
         }
@@ -52,18 +50,13 @@ enum WidgetNightscoutFetcher {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = timeout
 
-        LFLog.bump("fetch.widget")
-        LFLog.log("FETCH-W", "start")
-
         URLSession.shared.dataTask(with: request) { data, _, error in
-            if let error = error {
-                LFLog.log("FETCH-W", "fail \(error.localizedDescription)")
+            if error != nil {
                 completion(.failed(WidgetData.load()))
                 return
             }
 
             guard let data = data else {
-                LFLog.log("FETCH-W", "no data")
                 completion(.failed(WidgetData.load()))
                 return
             }
@@ -107,7 +100,6 @@ enum WidgetNightscoutFetcher {
         guard let entries = try? JSONDecoder().decode([NSEntry].self, from: data),
               let latest = entries.first,
               let latestBG = latest.bgValue else {
-            LFLog.log("FETCH-W", "parse fail")
             return .failed(cache)
         }
 
@@ -115,7 +107,6 @@ enum WidgetNightscoutFetcher {
 
         // If cache already has this reading (or newer), nothing to do.
         if let cache = cache, cache.bgTimestamp >= latestTimestamp {
-            LFLog.log("FETCH-W", "noop bgAge=\(Int(Date().timeIntervalSince(latestTimestamp)))s")
             return .unchanged(cache)
         }
 
@@ -167,12 +158,6 @@ enum WidgetNightscoutFetcher {
             updatedAt: Date()
         )
         updated.save()
-
-        let n = newPoints.filter { p in
-            guard let c = cache else { return true }
-            return p.timestamp > c.bgTimestamp
-        }.count
-        LFLog.log("FETCH-W", "done new=\(n) bgAge=\(Int(Date().timeIntervalSince(latestTimestamp)))s")
 
         return .updated(updated)
     }

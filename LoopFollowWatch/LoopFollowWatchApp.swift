@@ -9,7 +9,6 @@ import WidgetKit
 class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCenterDelegate {
 
     func applicationDidFinishLaunching() {
-        LFLog.log("STARTUP", "")
         WatchSessionManager.shared.startSession()
         let center = UNUserNotificationCenter.current()
         center.delegate = self
@@ -26,9 +25,6 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
     /// even when the app isn't in the foreground.
     func handle(_ backgroundTasks: Set<WKRefreshBackgroundTask>) {
         for task in backgroundTasks {
-            let taskStart = Date()
-            LFLog.bump("bgTask.fire")
-            LFLog.log("TASK", "fire \(type(of: task))")
             switch task {
             case let refreshTask as WKApplicationRefreshBackgroundTask:
                 // Fetch fresh BG data in the background. BGFetcher.shared is
@@ -40,15 +36,10 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
                     BGFetcher.shared.fetch(config: config)
                     // Give the network requests a few seconds to land, then complete.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 12) {
-                        LFLog.bump("reload.background")
-                        LFLog.log("RELOAD", "bg")
                         WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
-                        LFLog.log("TASK", "complete elapsed=\(Int(Date().timeIntervalSince(taskStart)))s")
                         refreshTask.setTaskCompletedWithSnapshot(false)
                     }
                 } else {
-                    LFLog.bump("bgTask.noConfig")
-                    LFLog.log("TASK", "complete elapsed=\(Int(Date().timeIntervalSince(taskStart)))s (skip)")
                     refreshTask.setTaskCompletedWithSnapshot(false)
                 }
                 // Always schedule the next one
@@ -77,8 +68,6 @@ class ExtensionDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
         let lastBGTimestamp = WidgetData.load()?.bgTimestamp
         let delay = BGFetcher.nextFetchDelay(afterReadingAt: lastBGTimestamp)
         let preferredDate = Date().addingTimeInterval(delay)
-        LFLog.bump("bgTask.scheduled")
-        LFLog.log("SCHEDULE", "bg +\(Int(delay))s")
         WKApplication.shared().scheduleBackgroundRefresh(
             withPreferredDate: preferredDate,
             userInfo: nil
@@ -132,8 +121,6 @@ struct LoopFollowWatchApp: App {
             }
             .onAppear {
                 // Free foreground reload — doesn't count toward daily budget
-                LFLog.bump("reload.onAppear")
-                LFLog.log("RELOAD", "onAppear")
                 WidgetCenter.shared.reloadTimelines(ofKind: "BGComplication")
 
                 if let config = sessionManager.config, config.hasAnySource {
