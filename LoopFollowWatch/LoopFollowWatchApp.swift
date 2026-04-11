@@ -110,12 +110,7 @@ struct LoopFollowWatchApp: App {
 
                 if let config = sessionManager.config {
                     StatsView(bgFetcher: bgFetcher, config: config)
-                        // Only extend over the TOP safe area — leave
-                        // bottom respected so the TabView page-indicator
-                        // dots reserve their own space. Fighting the
-                        // bottom safe area with manual padding ended up
-                        // under-clearing the dots on Series 10.
-                        .edgesIgnoringSafeArea(.top)
+                        .edgesIgnoringSafeArea(.vertical)
                         .tag(2)
                 }
             }

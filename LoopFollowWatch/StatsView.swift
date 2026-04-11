@@ -28,17 +28,17 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        // At the TabView level this page uses .edgesIgnoringSafeArea(.top)
-        // only, so the top extends under the status bar (cleared below
-        // by .padding(.top, 30)) while the bottom respects the system
-        // safe area — that's where the TabView page-indicator dots
-        // live, and letting SwiftUI reserve their space avoids the
-        // manual-padding guesswork that under-cleared them on S10.
+        // TabView .page dots on watchOS render as an overlay on top of
+        // page content — safe-area respecting doesn't reserve their
+        // space. Manual bottom padding is the only way to push our
+        // footer above them. 22pt wasn't enough on Series 10; going to
+        // 32pt to give the dots a comfortable buffer everywhere. The
+        // top uses .padding(.top, 30) on the pie row to clear the
+        // status-bar area (same as ContentView's Row 1).
         //
-        // Layout: the pie chart is anchored at the very top of the
-        // content area, followed by a small fixed gap, the stats grid,
-        // then a flexible Spacer that pushes the footer to the bottom
-        // of the safe area. The pie lives inside a GeometryReader
+        // Layout: pie anchored at the very top, small fixed gap, stats
+        // grid, then a flex Spacer that pushes the footer to the bottom
+        // of the padded area. The pie lives inside a GeometryReader
         // scoped just to its row so it can dynamically size itself from
         // screen width (62% capped at 105pt). The reader is given a
         // fixed height of 105 (the cap) and centers the pie inside —
@@ -62,8 +62,7 @@ struct StatsView: View {
                 .padding(.horizontal, 6)
 
             // Flex spacer consumes remaining vertical space so the
-            // footer lands at the bottom of the safe area regardless
-            // of pie size.
+            // footer lands just above the 32pt bottom padding.
             Spacer(minLength: 6)
 
             if let count = stats?.count {
@@ -73,6 +72,7 @@ struct StatsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, 32)
     }
 
     @ViewBuilder
