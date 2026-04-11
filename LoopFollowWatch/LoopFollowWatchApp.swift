@@ -107,6 +107,11 @@ struct LoopFollowWatchApp: App {
                     RemoteControlView(config: config, bgFetcher: bgFetcher, router: router)
                         .tag(1)
                 }
+
+                if let config = sessionManager.config {
+                    StatsView(bgFetcher: bgFetcher, config: config)
+                        .tag(2)
+                }
             }
             .tabViewStyle(.page)
             .onOpenURL { url in

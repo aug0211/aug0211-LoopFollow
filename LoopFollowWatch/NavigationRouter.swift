@@ -11,7 +11,7 @@ enum DeepLinkDestination: Hashable {
 }
 
 class NavigationRouter: ObservableObject {
-    /// 0 = ContentView (BG display), 1 = RemoteControlView
+    /// 0 = ContentView (BG display), 1 = RemoteControlView, 2 = StatsView
     @Published var activeTab: Int = 0
 
     /// The currently presented (or about-to-be-presented) destination inside RemoteControlView's NavigationStack.
