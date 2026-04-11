@@ -88,13 +88,13 @@ struct StatsView: View {
                 StatCell(
                     label: "Low",
                     value: percentText(stats?.percentLow),
-                    suffix: "<\(thresholdDisplay(config.lowLine))"
+                    suffix: rangeEdgeDisplay(config.lowLine, delta: 1)
                 )
                 StatCell(label: "In Range", value: percentText(stats?.percentRange))
                 StatCell(
                     label: "High",
                     value: percentText(stats?.percentHigh),
-                    suffix: ">\(thresholdDisplay(config.highLine))"
+                    suffix: rangeEdgeDisplay(config.highLine, delta: -1)
                 )
             }
             HStack(spacing: 4) {
@@ -133,13 +133,16 @@ struct StatsView: View {
         return String(format: "%.2f", mgdl)
     }
 
-    /// "70" for mg/dL, "3.9" for mmol/L — used in the Low/High cell
-    /// threshold annotations.
-    private func thresholdDisplay(_ mgdl: Double) -> String {
+    /// Display the first in-range value on either side of a threshold,
+    /// nudged by `delta` mg/dL (±1 for Low/High labels). E.g. with
+    /// lowLine=69 and delta=+1 this yields "70"; with highLine=181 and
+    /// delta=-1 it yields "180". mmol/L users get a 0.1 mmol nudge.
+    private func rangeEdgeDisplay(_ mgdl: Double, delta: Int) -> String {
         if config.units == "mmol/L" {
-            return String(format: "%.1f", mgdl / 18.0182)
+            let mmol = mgdl / 18.0182 + 0.1 * Double(delta)
+            return String(format: "%.1f", mmol)
         }
-        return "\(Int(mgdl.rounded()))"
+        return "\(Int(mgdl.rounded()) + delta)"
     }
 }
 
