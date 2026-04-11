@@ -181,7 +181,7 @@ private struct DeviceStatusTab: View {
         if let reason = bgFetcher.loopStatus?.reason, !reason.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 SectionHeader("Reason")
-                Text(reason)
+                Text(FollowStatusFormat.formatReason(reason))
                     .font(.system(size: 12))
                     .foregroundColor(.white)
                     .fixedSize(horizontal: false, vertical: true)
@@ -351,6 +351,30 @@ private enum FollowStatusFormat {
     static func units(_ value: Double?, decimals: Int, suffix: String) -> String? {
         guard let value = value else { return nil }
         return String(format: "%.\(decimals)f%@", value, suffix)
+    }
+
+    /// Break an OpenAPS/Trio "reason" blob onto multiple lines so each piece
+    /// of data is readable on the watch. The reason text uses a mix of `,`,
+    /// `;`, and `.` to separate phrases — split on any of those when followed
+    /// by whitespace (or end-of-string), which preserves numeric periods like
+    /// "0.13U" while breaking phrases like "Eventual BG 117 >= 99 ; Insulin
+    /// req 0.13U" into two lines.
+    static func formatReason(_ reason: String) -> String {
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trimmed }
+        let pattern = "\\s*[,;.](?:\\s+|$)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return trimmed }
+        let ns = trimmed as NSString
+        let normalized = regex.stringByReplacingMatches(
+            in: trimmed,
+            range: NSRange(location: 0, length: ns.length),
+            withTemplate: "\n"
+        )
+        return normalized
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 
     /// Merge a "currently enacted" value with its scheduled counterpart into a
