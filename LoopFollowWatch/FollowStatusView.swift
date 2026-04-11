@@ -31,6 +31,7 @@ struct FollowStatusView: View {
                 .padding(.horizontal, 6)
                 .padding(.bottom, 12)
             }
+            .id(selectedTab)
         }
     }
 
@@ -255,16 +256,6 @@ private struct ProfileTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                SectionHeader("Profile")
-                StatusRow("Name", bgFetcher.profileName)
-                StatusRow("Timezone", bgFetcher.profileTimezone.identifier)
-                StatusRow("Units", units)
-                if let dia = bgFetcher.profileDIA {
-                    StatusRow("DIA", String(format: "%.0f hours", dia))
-                }
-            }
-
             scheduleSection(title: "Basal Rates", schedule: bgFetcher.basalSchedule) { value in
                 String(format: "%.2f U/hr", value)
             }
