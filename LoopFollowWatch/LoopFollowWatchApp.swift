@@ -110,6 +110,7 @@ struct LoopFollowWatchApp: App {
 
                 if let config = sessionManager.config {
                     StatsView(bgFetcher: bgFetcher, config: config)
+                        .edgesIgnoringSafeArea(.vertical)
                         .tag(2)
                 }
             }

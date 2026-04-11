@@ -28,16 +28,16 @@ struct StatsView: View {
             highLine: config.highLine
         )
 
-        // Fill the full page so the Spacer can push the footer text
-        // down to the bottom, right above the TabView's page-indicator
-        // dots — mirroring how ContentView's freshness row is pinned.
+        // Mirrors ContentView: .edgesIgnoringSafeArea(.vertical) at the
+        // TabView level extends the page over both safe areas, then
+        // .padding(.top, 30) clears the status bar and .padding(.bottom, 10)
+        // lands the footer just above the page-indicator dots.
         VStack(spacing: 0) {
             VStack(spacing: 8) {
                 pieChart(stats: stats)
                 statsGrid(stats: stats)
             }
             .padding(.horizontal, 6)
-            .padding(.top, 6)
 
             Spacer(minLength: 8)
 
@@ -48,7 +48,8 @@ struct StatsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.bottom, 8)
+        .padding(.top, 30)
+        .padding(.bottom, 10)
     }
 
     @ViewBuilder
