@@ -41,7 +41,9 @@ struct StatsView: View {
             }
             .padding(.horizontal, 6)
             .padding(.top, 6)
-            .padding(.bottom, 10)
+            // Clear the TabView's page-indicator dots at the bottom so the
+            // "Last 24h · N readings" line doesn't collide with them.
+            .padding(.bottom, 28)
         }
     }
 
