@@ -32,19 +32,30 @@ struct StatsView: View {
         // TabView level extends the page over both safe areas, then
         // .padding(.top, 30) clears the status bar and .padding(.bottom, 10)
         // lands the footer just above the page-indicator dots.
+        //
+        // Layout strategy: the pie chart is the only flexible element —
+        // it takes whatever height is left after the stats grid and
+        // footer claim their intrinsic sizes, so on smaller watches it
+        // shrinks automatically. Stats grid and footer have fixed sizes
+        // tuned to match ContentView's gradient bar (16pt medium) and
+        // freshness row (13pt) respectively.
         VStack(spacing: 0) {
             VStack(spacing: 8) {
                 pieChart(stats: stats)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(maxHeight: .infinity)
+
                 statsGrid(stats: stats)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 6)
-
-            Spacer(minLength: 8)
+            .frame(maxHeight: .infinity)
 
             if let count = stats?.count {
                 Text("Last 24h · \(count) readings")
-                    .font(.system(size: 10))
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
+                    .padding(.top, 6)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,42 +65,42 @@ struct StatsView: View {
 
     @ViewBuilder
     private func pieChart(stats: StatsResult?) -> some View {
-        // Both dimensions must be fixed — Chart/SectorMark inside a
-        // ScrollView treats a single-axis .frame as a hint and will
-        // otherwise stretch vertically, crowding the stats grid.
-        Group {
-            if let stats = stats, stats.count > 0 {
-                if stats.countRange == stats.count {
-                    // 100% in range — celebrate with a shades emoji inside
-                    // a solid green ring (xdrip4ios-inspired).
+        if let stats = stats, stats.count > 0 {
+            if stats.countRange == stats.count {
+                // 100% in range — celebrate with a shades emoji inside
+                // a solid green ring (xdrip4ios-inspired). GeometryReader
+                // sizes the emoji proportionally to the pie so it fills
+                // the ring cleanly on every watch size.
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
                     ZStack {
                         Circle()
-                            .strokeBorder(Color.green, lineWidth: 4)
+                            .strokeBorder(Color.green, lineWidth: max(3, side * 0.05))
                         Text("\u{1F60E}") // 😎
-                            .font(.system(size: 44))
+                            .font(.system(size: side * 0.55))
                     }
-                } else {
-                    let slices: [PieSlice] = [
-                        PieSlice(name: "Low", count: stats.countLow, color: .red),
-                        PieSlice(name: "In Range", count: stats.countRange, color: .green),
-                        PieSlice(name: "High", count: stats.countHigh, color: .yellow),
-                    ]
-                    Chart(slices) { slice in
-                        SectorMark(
-                            angle: .value("Count", slice.count),
-                            innerRadius: .ratio(0),
-                            angularInset: 0
-                        )
-                        .foregroundStyle(slice.color)
-                    }
-                    .chartLegend(.hidden)
+                    .frame(width: geo.size.width, height: geo.size.height)
                 }
             } else {
-                Circle()
-                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 2)
+                let slices: [PieSlice] = [
+                    PieSlice(name: "Low", count: stats.countLow, color: .red),
+                    PieSlice(name: "In Range", count: stats.countRange, color: .green),
+                    PieSlice(name: "High", count: stats.countHigh, color: .yellow),
+                ]
+                Chart(slices) { slice in
+                    SectorMark(
+                        angle: .value("Count", slice.count),
+                        innerRadius: .ratio(0),
+                        angularInset: 0
+                    )
+                    .foregroundStyle(slice.color)
+                }
+                .chartLegend(.hidden)
             }
+        } else {
+            Circle()
+                .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 2)
         }
-        .frame(width: 78, height: 78)
     }
 
     private func statsGrid(stats: StatsResult?) -> some View {
@@ -170,29 +181,31 @@ private struct StatCell: View {
     }
 
     var body: some View {
-        VStack(spacing: 1) {
+        VStack(spacing: 2) {
             labelText
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.5)
             Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(.system(size: 16, weight: .medium, design: .default))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.5)
         }
         .frame(maxWidth: .infinity)
     }
 
-    /// Label + optional threshold annotation, e.g. "Low (<70)".
-    /// Rendered via Text concatenation so the two runs share one line and
-    /// scale together when space is tight.
+    /// Label + optional threshold annotation, e.g. "Low (70)". Heading
+    /// and threshold share a line via Text concatenation so they scale
+    /// together when space is tight. The heading matches the value size
+    /// (16pt medium); the threshold annotation is a touch smaller so the
+    /// heading still reads as the primary label.
     private var labelText: Text {
         let base = Text(label)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 16, weight: .medium))
             .foregroundColor(.secondary)
         guard let suffix = suffix else { return base }
         return base + Text(" (\(suffix))")
-            .font(.system(size: 9))
+            .font(.system(size: 12))
             .foregroundColor(.secondary)
     }
 }
