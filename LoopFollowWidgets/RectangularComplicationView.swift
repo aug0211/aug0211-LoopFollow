@@ -123,7 +123,13 @@ private struct SparklineView: View {
             let topInset: CGFloat = 6     // room for top y-axis label
             let bottomInset: CGFloat = 4  // room for bottom y-axis label
             let chartH = h - topInset - bottomInset
-            let rightInset: CGFloat = 16  // keep sparkline clear of y-axis labels
+            // Keep sparkline clear of the y-axis labels on the right.
+            // Labels are positioned at x = w - 16 with a 28pt
+            // trailing-aligned frame, so 3-digit text like "140"
+            // extends left to ~w - 24. 26pt gives ~2pt clearance so
+            // the sparkline's rightmost point never overlaps a label
+            // even when the current BG lands on a tick value.
+            let rightInset: CGFloat = 26
             let sparkW = w - rightInset
             let sorted = history.sorted { $0.timestamp < $1.timestamp }
             let threeHoursAgo = displayDate.addingTimeInterval(-3 * 3600)
