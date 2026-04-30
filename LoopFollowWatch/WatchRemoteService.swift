@@ -181,8 +181,20 @@ class WatchRemoteService {
         }
     }
 
+    private struct APSPayload: Encodable {
+        let contentAvailable: Int = 1
+        let interruptionLevel: String = "time-sensitive"
+        let alert: String
+
+        enum CodingKeys: String, CodingKey {
+            case contentAvailable = "content-available"
+            case interruptionLevel = "interruption-level"
+            case alert
+        }
+    }
+
     private struct APNSMessage: Encodable {
-        let aps: [String: Int] = ["content-available": 1]
+        let aps: APSPayload
         let encryptedData: String
 
         enum CodingKeys: String, CodingKey {
@@ -222,16 +234,20 @@ class WatchRemoteService {
             return
         }
 
-        let message = APNSMessage(encryptedData: encryptedData)
+        let message = APNSMessage(
+            aps: APSPayload(alert: "Remote Command: \(payload.commandType)"),
+            encryptedData: encryptedData
+        )
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("bearer \(jwt)", forHTTPHeaderField: "authorization")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue("10", forHTTPHeaderField: "apns-priority")
-        request.setValue("0", forHTTPHeaderField: "apns-expiration")
+        request.setValue("600", forHTTPHeaderField: "apns-expiration")
         request.setValue(config.trcBundleId, forHTTPHeaderField: "apns-topic")
-        request.setValue("background", forHTTPHeaderField: "apns-push-type")
+        request.setValue("alert", forHTTPHeaderField: "apns-push-type")
+        request.setValue(payload.commandType, forHTTPHeaderField: "apns-collapse-id")
         request.httpBody = try? JSONEncoder().encode(message)
 
         URLSession.shared.dataTask(with: request) { data, response, error in
