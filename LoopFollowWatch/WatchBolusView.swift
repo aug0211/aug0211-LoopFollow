@@ -173,6 +173,7 @@ struct WatchBolusView: View {
             if pendingMeal == nil {
                 bgFetcher.pendingCarbs = 0
             }
+            bgFetcher.updateRecommendedBolus()
         }
         .onDisappear {
             bgFetcher.pendingCarbs = 0
@@ -230,6 +231,8 @@ struct WatchBolusView: View {
     private func sendBolus() {
         WatchRemoteService.sendBolus(amount: confirmedAmount, config: config) { success, error in
             if success {
+                bgFetcher.pendingInsulin += confirmedAmount
+                bgFetcher.updateRecommendedBolus()
                 if let meal = pendingMeal {
                     // Bolus succeeded — now safe to send carbs
                     sendMeal(meal)

@@ -89,6 +89,11 @@ class BGFetcher: ObservableObject {
     /// Set before navigating to the bolus screen; included in recommended bolus calculation.
     var pendingCarbs: Double = 0
 
+    /// Insulin sent from the watch not yet reflected in remote IOB.
+    /// Subtracted from the recommended bolus so the user doesn't
+    /// double-dose while waiting for the next loop cycle.
+    var pendingInsulin: Double = 0
+
     // Treatment data for chart display
     @Published var treatments: [Treatment] = []
     @Published var tempTargetEntries: [TempTargetEntry] = []
@@ -503,6 +508,7 @@ class BGFetcher: ObservableObject {
 
         DispatchQueue.main.async {
             self.loopStatus = status
+            self.pendingInsulin = 0
             self.statusMatchesScroll = true
             self.updateScheduledBasal(for: timestamp)
             self.updateRecommendedBolus()
@@ -660,6 +666,7 @@ class BGFetcher: ObservableObject {
 
         DispatchQueue.main.async {
             self.loopStatus = status
+            self.pendingInsulin = 0
             self.statusMatchesScroll = true
             self.updateScheduledBasal(for: timestamp)
             self.updateRecommendedBolus()
@@ -736,7 +743,7 @@ class BGFetcher: ObservableObject {
     func updateRecommendedBolus() {
         // For Loop: use the pre-calculated recommendedBolus from devicestatus if available
         if let recBolus = loopStatus?.recommendedBolus {
-            recommendedBolus = max(0, recBolus)
+            recommendedBolus = max(0, recBolus - pendingInsulin)
             bolusCalc = nil
             return
         }
@@ -756,7 +763,7 @@ class BGFetcher: ObservableObject {
         }
         let cr = loopStatus?.carbRatio ?? lookupScheduleValue(carbRatioSchedule)
         let target = loopStatus?.currentTarget ?? lookupScheduleValue(targetSchedule) ?? 100
-        let iob = loopStatus?.iob ?? 0
+        let iob = (loopStatus?.iob ?? 0) + pendingInsulin
         let cob = loopStatus?.cob ?? 0
 
         // Use 15-minute delta: find the BG reading closest to 15 minutes ago
