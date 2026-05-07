@@ -399,19 +399,19 @@
 			remoteGlobalIDString = BB01000000000003000000AA;
 			remoteInfo = LoopFollowWatch;
 		};
-		DDCC3ADA2DDE1790006F1C10 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = FC97880C2485969B00A7906C /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = FC9788132485969B00A7906C;
-			remoteInfo = LoopFollow;
-		};
 		CC01000000000010000000AA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = FC97880C2485969B00A7906C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = CC01000000000003000000AA;
 			remoteInfo = LoopFollowWidgets;
+		};
+		DDCC3ADA2DDE1790006F1C10 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FC97880C2485969B00A7906C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FC9788132485969B00A7906C;
+			remoteInfo = LoopFollow;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -455,8 +455,8 @@
 		65E8A2852E44B0300065037B /* VolumeButtonHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeButtonHandler.swift; sourceTree = "<group>"; };
 		A7D55B42A22051DAD69E89D0 /* Pods_LoopFollow.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_LoopFollow.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB01000000000001000000AA /* LoopFollowWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LoopFollowWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CC01000000000002000000AA /* LoopFollowWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LoopFollowWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB0100000000000E000000AA /* PhoneSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSessionManager.swift; sourceTree = "<group>"; };
+		CC01000000000002000000AA /* LoopFollowWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LoopFollowWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD0247582DB2E89600FCADF6 /* AlarmCondition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmCondition.swift; sourceTree = "<group>"; };
 		DD02475B2DB2E8FB00FCADF6 /* BuildExpireCondition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildExpireCondition.swift; sourceTree = "<group>"; };
 		DD0650A82DCA8A10004D3B41 /* AlarmBGSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmBGSection.swift; sourceTree = "<group>"; };
@@ -837,7 +837,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				LoopFollowWatch.entitlements,
 			);
 			target = BB01000000000003000000AA /* LoopFollowWatch */;
 		};
@@ -845,7 +844,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				LoopFollowWidgets.entitlements,
 			);
 			target = CC01000000000003000000AA /* LoopFollowWidgets */;
 		};
@@ -2359,7 +2357,7 @@
 				CODE_SIGN_ENTITLEMENTS = LoopFollowWatch/LoopFollowWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = C6U8V99TR3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LoopFollowWatch/Info.plist;
 				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
@@ -2385,13 +2383,62 @@
 				CODE_SIGN_ENTITLEMENTS = LoopFollowWatch/LoopFollowWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = C6U8V99TR3;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LoopFollowWatch/Info.plist;
 				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp";
 				PRODUCT_MODULE_NAME = LoopFollowWatch;
 				PRODUCT_NAME = LoopFollowWatch;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		CC01000000000007000000BB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = FC5A5C3C2497B229009C550E /* Config.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = LoopFollowWidgets/LoopFollowWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6U8V99TR3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LoopFollowWidgets/Info.plist;
+				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp.widgets";
+				PRODUCT_MODULE_NAME = LoopFollowWidgets;
+				PRODUCT_NAME = LoopFollowWidgets;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		CC01000000000008000000BB /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = FC5A5C3C2497B229009C550E /* Config.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = LoopFollowWidgets/LoopFollowWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C6U8V99TR3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LoopFollowWidgets/Info.plist;
+				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp.widgets";
+				PRODUCT_MODULE_NAME = LoopFollowWidgets;
+				PRODUCT_NAME = LoopFollowWidgets;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -2582,7 +2629,7 @@
 				CODE_SIGN_ENTITLEMENTS = "LoopFollow/Loop Follow.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = C6U8V99TR3;
 				INFOPLIST_FILE = LoopFollow/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2605,7 +2652,7 @@
 				CODE_SIGN_ENTITLEMENTS = "LoopFollow/Loop Follow.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = C6U8V99TR3;
 				INFOPLIST_FILE = LoopFollow/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -2617,55 +2664,6 @@
 				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		CC01000000000007000000BB /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = FC5A5C3C2497B229009C550E /* Config.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CODE_SIGN_ENTITLEMENTS = LoopFollowWidgets/LoopFollowWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = LoopFollowWidgets/Info.plist;
-				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp.widgets";
-				PRODUCT_MODULE_NAME = LoopFollowWidgets;
-				PRODUCT_NAME = LoopFollowWidgets;
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
-			};
-			name = Debug;
-		};
-		CC01000000000008000000BB /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = FC5A5C3C2497B229009C550E /* Config.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CODE_SIGN_ENTITLEMENTS = LoopFollowWidgets/LoopFollowWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = LoopFollowWidgets/Info.plist;
-				MARKETING_VERSION = "$(LOOP_FOLLOW_MARKETING_VERSION)";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.$(unique_id).LoopFollow$(app_suffix).watchkitapp.widgets";
-				PRODUCT_MODULE_NAME = LoopFollowWidgets;
-				PRODUCT_NAME = LoopFollowWidgets;
-				SDKROOT = watchos;
-				SKIP_INSTALL = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 10.0;
 			};
 			name = Release;
 		};
