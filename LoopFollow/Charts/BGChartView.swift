@@ -195,7 +195,7 @@ private struct MainBGChart: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 8) {
             zoomControls
 
             GeometryReader { geo in
@@ -206,24 +206,17 @@ private struct MainBGChart: View {
     }
 
     private var zoomControls: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 1) {
-                zoomInButton
-                zoomPresetButtons
-                zoomOutButton
-            }
+        HStack(spacing: 8) {
+            zoomInButton
 
-            VStack(spacing: 4) {
-                HStack(spacing: 4) {
-                    zoomPresetButtons
-                }
-                HStack {
-                    zoomInButton
-                    Spacer(minLength: 0)
-                    zoomOutButton
-                }
+            HStack(spacing: 4) {
+                zoomPresetButtons
             }
+            .frame(maxWidth: .infinity)
+
+            zoomOutButton
         }
+        .frame(height: 32)
     }
 
     private var zoomPresetButtons: some View {
@@ -260,8 +253,8 @@ private struct MainBGChart: View {
             applyButtonZoom(interaction.visibleSeconds * factor, anchorToNow: false)
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 44, height: 44)
+                .font(.system(size: 18, weight: .medium))
+                .frame(width: 50, height: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color(uiColor: .systemGray5))
@@ -282,11 +275,11 @@ private struct MainBGChart: View {
             applyButtonZoom(seconds, anchorToNow: true)
         } label: {
             Text(title)
-                .font(.caption2.weight(.medium))
+                .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(selected ? Color.white : Color.accentColor)
-                .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: 32)
                 .background(
                     RoundedRectangle(cornerRadius: 5)
                         .fill(selected ? Color.accentColor : Color(uiColor: .systemGray5))
