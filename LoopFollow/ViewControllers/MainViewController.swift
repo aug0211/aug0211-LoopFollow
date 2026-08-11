@@ -2,7 +2,6 @@
 // MainViewController.swift
 
 import AVFAudio
-import Charts
 import Combine
 import CoreBluetooth
 import EventKit
@@ -23,7 +22,13 @@ private struct APNSCredentialSnapshot: Equatable {
     let lfKeyId: String
 }
 
-class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificationCenterDelegate {
+private struct SmoothedBgConfiguration: Equatable {
+    let url: String
+    let token: String
+    let device: String
+}
+
+class MainViewController: UIViewController, UNUserNotificationCenterDelegate {
     /// The single, long-lived MainViewController that owns the app's data
     /// pipeline (scheduleAllTasks). Held strongly so it stays alive — and the
     /// engine keeps running — regardless of which tabs are visible or whether
@@ -41,8 +46,6 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
         vc.loadViewIfNeeded()
     }
 
-    var BGChart: LineChartView!
-    var BGChartFull: LineChartView!
     var statsDisplayModel = StatsDisplayModel()
 
     /// The hosting controller's view — hidden during loading / first-time setup.
@@ -90,17 +93,21 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
     var overrideGraphData: [DataStructs.overrideStruct] = []
     var tempTargetGraphData: [DataStructs.tempTargetStruct] = []
     var predictionData: [ShareGlucoseData] = []
+    var ztPredictionData: [ShareGlucoseData] = []
+    var iobPredictionData: [ShareGlucoseData] = []
+    var cobPredictionData: [ShareGlucoseData] = []
+    var uamPredictionData: [ShareGlucoseData] = []
     var openAPSPredBGs: [String: [Double]]?
     var openAPSPredUpdatedTime: TimeInterval?
     var smoothedBgData: [SmoothedBgPoint] = []
     var hasFetchedSmoothedBgHistory: Bool = false
     var lastSmoothedBgBulkRefreshAt: Date?
+    var smoothedBgFetchGeneration: UInt = 0
     var bgCheckData: [ShareGlucoseData] = []
     var suspendGraphData: [DataStructs.timestampOnlyStruct] = []
     var resumeGraphData: [DataStructs.timestampOnlyStruct] = []
     var sensorStartGraphData: [DataStructs.timestampOnlyStruct] = []
     var noteGraphData: [DataStructs.noteStruct] = []
-    var chartData = LineChartData()
     var deviceBatteryData: [DataStructs.batteryStruct] = []
     var lastCalDate: Double = 0
     var latestLoopStatusString = ""
@@ -130,11 +137,11 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
     // Stores the timestamp of the last BG value that was spoken.
     var lastSpokenBGDate: TimeInterval = 0
 
-    var autoScrollPauseUntil: Date?
-
     var IsNotLooping = false
 
     let contactImageUpdater = ContactImageUpdater()
+
+    let chartModel = BGChartModel()
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -153,17 +160,10 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
     private func setupUI() {
         view.backgroundColor = .systemBackground
 
-        BGChart = LineChartView()
-        BGChart.backgroundColor = .systemBackground
-
-        BGChartFull = LineChartView()
-        BGChartFull.backgroundColor = .systemBackground
-
         infoManager = InfoManager()
 
         let mainView = MainHomeView(
-            bgChart: BGChart,
-            bgChartFull: BGChartFull,
+            chartModel: chartModel,
             infoManager: infoManager,
             statsModel: statsDisplayModel,
             onRefresh: { [weak self] in self?.refresh() },
@@ -209,16 +209,10 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
         // Synchronize info types to ensure arrays are the correct size
         synchronizeInfoTypes()
 
-        let shareUserName = Storage.shared.shareUserName.value
-        let sharePassword = Storage.shared.sharePassword.value
-        let shareServer = Storage.shared.shareServer.value == "US" ?KnownShareServers.US.rawValue : KnownShareServers.NON_US.rawValue
-        dexShare = ShareClient(username: shareUserName, password: sharePassword, shareServer: shareServer)
+        configureDexShareClient()
 
         // setup show/hide graphs (first-time setup check)
         updateGraphVisibility()
-
-        BGChart.delegate = self
-        BGChartFull.delegate = self
 
         // Apply initial appearance mode
         updateAppearance(Storage.shared.appearanceMode.value)
@@ -231,9 +225,9 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
         // when runMigrationsIfNeeded() is called. This catches migrations deferred by a
         // background BGAppRefreshTask launch in Before-First-Unlock state.
         notificationCenter.addObserver(self, selector: #selector(appDidBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
-        // Posted by AppDelegate after Storage.reloadAll has refreshed every StorageValue
-        // following a BFU launch. If we're alive when this fires, our scheduled tasks
-        // were set up with BFU defaults (url='') and need to be redone.
+        // Posted by AppDelegate after BFU recovery. Vestigial with the readiness gate
+        // (this controller is built only after storage is ready, so it never fires
+        // while we're alive); retained one release as a safety net.
         notificationCenter.addObserver(self, selector: #selector(handleBFUReloadCompleted), name: .bfuReloadCompleted, object: nil)
 
         #if !targetEnvironment(macCatalyst)
@@ -282,8 +276,7 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 guard Storage.shared.displaySmoothedBG.value else { return }
-                self.smoothedBgData = []
-                self.hasFetchedSmoothedBgHistory = false
+                self.invalidateSmoothedBgCache()
                 self.webLoadNSSmoothedBgHistory()
             }
             .store(in: &cancellables)
@@ -297,13 +290,41 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
             .sink { [weak self] enabled in
                 guard let self = self else { return }
                 if enabled {
-                    self.hasFetchedSmoothedBgHistory = false
+                    self.invalidateSmoothedBgCache()
                     self.webLoadNSSmoothedBgHistory()
                 } else {
-                    self.smoothedBgData = []
-                    self.hasFetchedSmoothedBgHistory = false
-                    self.infoManager.clearInfoData(type: .smoothedBg)
-                    self.updateBGGraph()
+                    self.invalidateSmoothedBgCache()
+                }
+            }
+            .store(in: &cancellables)
+
+        // Never carry smoothed history across Nightscout accounts or looping
+        // systems. The generation token also makes stale in-flight responses inert.
+        let smoothedBgConfigurationChanges = Publishers.CombineLatest3(
+            Storage.shared.url.$value,
+            Storage.shared.token.$value,
+            Storage.shared.device.$value
+        )
+        .map { url, token, device in
+            SmoothedBgConfiguration(url: url, token: token, device: device)
+        }
+        .dropFirst()
+        .removeDuplicates()
+        .receive(on: DispatchQueue.main)
+        .eraseToAnyPublisher()
+
+        smoothedBgConfigurationChanges
+            .sink { [weak self] _ in
+                self?.invalidateSmoothedBgCache()
+            }
+            .store(in: &cancellables)
+
+        smoothedBgConfigurationChanges
+            .debounce(for: .seconds(1), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if Storage.shared.displaySmoothedBG.value {
+                    self.webLoadNSSmoothedBgHistory()
                 }
             }
             .store(in: &cancellables)
@@ -371,19 +392,18 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
             }
             .store(in: &cancellables)
 
-        Storage.shared.shareUserName.$value
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.checkAndShowImportButtonIfNeeded()
-            }
-            .store(in: &cancellables)
-
-        Storage.shared.sharePassword.$value
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.checkAndShowImportButtonIfNeeded()
-            }
-            .store(in: &cancellables)
+        // ShareClient captures the credentials at init, so it's rebuilt on any change.
+        Publishers.MergeMany(
+            Storage.shared.shareUserName.$value.map { _ in () }.eraseToAnyPublisher(),
+            Storage.shared.sharePassword.$value.map { _ in () }.eraseToAnyPublisher(),
+            Storage.shared.shareServer.$value.map { _ in () }.eraseToAnyPublisher()
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] in
+            self?.configureDexShareClient()
+            self?.checkAndShowImportButtonIfNeeded()
+        }
+        .store(in: &cancellables)
 
         Publishers.CombineLatest4(
             Storage.shared.remoteApnsKey.$value,
@@ -457,6 +477,14 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
         }
 
         checkAndShowImportButtonIfNeeded()
+    }
+
+    /// Builds the Dexcom Share client from the stored credentials.
+    private func configureDexShareClient() {
+        let shareUserName = Storage.shared.shareUserName.value
+        let sharePassword = Storage.shared.sharePassword.value
+        let shareServer = Storage.shared.shareServer.value == "US" ? KnownShareServers.US.rawValue : KnownShareServers.NON_US.rawValue
+        dexShare = ShareClient(username: shareUserName, password: sharePassword, shareServer: shareServer)
     }
 
     // MARK: - Loading Overlay
@@ -603,29 +631,6 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
     @objc func refresh() {
         LogManager.shared.log(category: .general, message: "Refreshing")
 
-        // Clear prediction for both Loop or OpenAPS
-
-        // Check if Loop prediction data exists and clear it if necessary
-        if !predictionData.isEmpty {
-            predictionData.removeAll()
-            updatePredictionGraph()
-        }
-
-        // Check if OpenAPS prediction data exists and clear it if necessary
-        let openAPSDataIndices = [12, 13, 14, 15]
-        for dataIndex in openAPSDataIndices {
-            let mainChart = BGChart.lineData!.dataSets[dataIndex] as! LineChartDataSet
-            let smallChart = BGChartFull.lineData!.dataSets[dataIndex] as! LineChartDataSet
-            if !mainChart.entries.isEmpty || !smallChart.entries.isEmpty {
-                updatePredictionGraphGeneric(
-                    dataIndex: dataIndex,
-                    predictionData: [],
-                    chartLabel: "",
-                    color: UIColor.systemGray
-                )
-            }
-        }
-
         Observable.shared.minAgoText.value = "Refreshing"
         scheduleAllTasks()
         NightscoutSocketManager.shared.connectIfNeeded()
@@ -684,12 +689,6 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
         //   2. Update any other StorageValue defaults in Storage.swift that this new step
         //      mutates, so a fresh install ends up in the same state as a migrated user.
 
-        // Step 1: Released in v3.0.0 (2025-07-07). Can be removed after 2026-07-07.
-        if Storage.shared.migrationStep.value < 1 {
-            Storage.shared.migrateStep1()
-            Storage.shared.migrationStep.value = 1
-        }
-
         // Step 2: Released in v3.1.0 (2025-07-21). Can be removed after 2026-07-21.
         if Storage.shared.migrationStep.value < 2 {
             Storage.shared.migrateStep2()
@@ -735,6 +734,11 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
             Storage.shared.migrateStep9()
             Storage.shared.migrationStep.value = 9
         }
+
+        if Storage.shared.migrationStep.value < 10 {
+            Storage.shared.migrateStep10()
+            Storage.shared.migrationStep.value = 10
+        }
     }
 
     @objc func appDidBecomeActive() {
@@ -757,8 +761,9 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
     }
 
     @objc func appCameToForeground() {
-        // BFU recovery (Storage.reloadAll) is driven by AppDelegate; this controller
-        // reacts via .bfuReloadCompleted in handleBFUReloadCompleted() above.
+        // BFU recovery (StorageReadiness.recover) is driven by AppDelegate before this
+        // controller exists (the readiness gate), so handleBFUReloadCompleted() above
+        // is a vestigial no-op in the gated flow.
 
         // reset screenlock state if needed
         UIApplication.shared.isIdleTimerDisabled = Storage.shared.screenlockSwitchState.value
@@ -1029,16 +1034,6 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
 
     func userNotificationCenter(_: UNUserNotificationCenter, didReceive _: UNNotificationResponse, withCompletionHandler _: @escaping () -> Void) {}
 
-    // User has scrolled the chart
-    func chartTranslated(_: ChartViewBase, dX _: CGFloat, dY _: CGFloat) {
-        let isViewingLatestData = abs(BGChart.highestVisibleX - BGChart.chartXMax) < 0.001
-        if isViewingLatestData {
-            autoScrollPauseUntil = nil // User is back at the latest data, allow auto-scrolling
-        } else {
-            autoScrollPauseUntil = Date().addingTimeInterval(5 * 60) // User is viewing historical data, pause auto-scrolling
-        }
-    }
-
     func calculateMaxBgGraphValue() -> Float {
         return max(Float(topBG), Float(topPredictionBG))
     }
@@ -1080,36 +1075,23 @@ class MainViewController: UIViewController, ChartViewDelegate, UNUserNotificatio
     }
 
     private func synchronizeInfoTypes() {
-        var sortArray = Storage.shared.infoSort.value
-        var visibleArray = Storage.shared.infoVisible.value
+        // Safety net: fold any leftover legacy infoSort/infoVisible into
+        // infoDisplayItems for users whose migrationStep predates that key.
+        Storage.shared.migrateInfoDisplayItems()
 
-        // Current valid indices based on InfoType
-        let currentValidIndices = InfoType.allCases.map { $0.rawValue }
+        var items = Storage.shared.infoDisplayItems.value
 
-        // Add missing indices to sortArray
-        for index in currentValidIndices {
-            if !sortArray.contains(index) {
-                sortArray.append(index)
-            }
+        // Drop items whose InfoType no longer exists.
+        let validTypes = Set(InfoType.allCases)
+        items.removeAll { !validTypes.contains($0.type) }
+
+        // Append any newly added InfoType.
+        let present = Set(items.map(\.type))
+        for type in InfoType.allCases where !present.contains(type) {
+            items.append(InfoDisplayItem(type: type, isVisible: type.defaultVisible, coloring: InfoColoring()))
         }
 
-        // Remove deprecated indices
-        sortArray = sortArray.filter { currentValidIndices.contains($0) }
-
-        // Ensure visibleArray is updated with new entries
-        if visibleArray.count < currentValidIndices.count {
-            for i in visibleArray.count ..< currentValidIndices.count {
-                visibleArray.append(InfoType(rawValue: i)?.defaultVisible ?? false)
-            }
-        }
-
-        // Trim excess elements if there are more than needed
-        if visibleArray.count > currentValidIndices.count {
-            visibleArray = Array(visibleArray.prefix(currentValidIndices.count))
-        }
-
-        Storage.shared.infoSort.value = sortArray
-        Storage.shared.infoVisible.value = visibleArray
+        Storage.shared.infoDisplayItems.value = items
     }
 
     // MARK: - First Time Setup

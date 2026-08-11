@@ -3,45 +3,44 @@
 
 import Foundation
 import HealthKit
-import UIKit
 
 extension MainViewController {
-    func DeviceStatusOpenAPS(formatter: ISO8601DateFormatter, lastDeviceStatus: [String: AnyObject]?, lastLoopRecord: [String: AnyObject]) {
+    func DeviceStatusOpenAPS(formatter: ISO8601DateFormatter, lastDeviceStatus: [String: AnyObject]?, lastLoopRecord: [String: AnyObject]) -> Bool {
         Storage.shared.device.value = lastDeviceStatus?["device"] as? String ?? ""
         if lastLoopRecord["failureReason"] != nil {
             Observable.shared.loopStatusText.value = "X"
             latestLoopStatusString = "X"
+            return false
         } else {
-            // Trio writes BOTH `suggested` (the current loop's recommendation:
-            // fresh bg / IOB / COB / ISF / CR / predBGs / reason / etc., but no
-            // timestamp or TDD) and `enacted` (the last actually-applied state:
-            // carries timestamp and TDD, but may linger at a previous loop's
-            // values if the new loop didn't change anything). We merge and prefer
-            // suggested on conflicts so each field reflects the latest loop's
-            // view, then fall back to enacted for fields suggested doesn't have.
-            let suggestedBlock = lastLoopRecord["suggested"] as? [String: AnyObject] ?? [:]
-            let enactedBlock = lastLoopRecord["enacted"] as? [String: AnyObject] ?? [:]
-            guard !suggestedBlock.isEmpty || !enactedBlock.isEmpty else {
+            // Suggested is the current loop's view, while enacted can carry
+            // fields such as TDD that are omitted when no new action was needed.
+            // Merge both and prefer suggested values on collisions.
+            let suggested = lastLoopRecord["suggested"] as? [String: AnyObject] ?? [:]
+            let enacted = lastLoopRecord["enacted"] as? [String: AnyObject] ?? [:]
+            guard !suggested.isEmpty || !enacted.isEmpty else {
                 Observable.shared.loopStatusText.value = "↻"
                 latestLoopStatusString = "↻"
-                return
+                return false
             }
-            let enactedOrSuggested = enactedBlock.merging(suggestedBlock) { _, suggestedValue in suggestedValue }
+            let enactedOrSuggested = enacted.merging(suggested) { _, suggestedValue in suggestedValue }
 
             var updatedTime: TimeInterval?
 
-            // For "Updated", prefer suggested.timestamp (latest loop's time), then
-            // the record's outer created_at (when NS received the upload — also
-            // ~latest loop's time), then enacted.timestamp (may be stale). We use
-            // NightscoutUtils.parseDate instead of ISO8601DateFormatter so we
-            // tolerate the trailing "Z" and fractional seconds NS often emits.
-            let timestampSource = (suggestedBlock["timestamp"] as? String)
-                ?? (lastDeviceStatus?["created_at"] as? String)
-                ?? (enactedBlock["timestamp"] as? String)
-            if let ts = timestampSource,
-               let parsedDate = NightscoutUtils.parseDate(ts)
-            {
-                let parsedTime = parsedDate.timeIntervalSince1970
+            // Prefer the current suggestion, then the outer Nightscout record,
+            // and finally the potentially older enacted timestamp. parseDate
+            // tolerates fractional seconds and the common trailing Z.
+            let timestampCandidates: [String?] = [
+                suggested["deliverAt"] as? String,
+                suggested["timestamp"] as? String,
+                lastDeviceStatus?["created_at"] as? String,
+                enacted["deliverAt"] as? String,
+                enacted["timestamp"] as? String,
+            ]
+            let parsedTime = timestampCandidates
+                .compactMap { $0.flatMap { SmoothedBgSeries.parseDate($0) } }
+                .first?
+                .timeIntervalSince1970
+            if let parsedTime {
                 updatedTime = parsedTime
                 let formattedTime = Localizer.formatTimestampToLocalString(parsedTime)
                 infoManager.updateInfoData(type: .updated, value: formattedTime)
@@ -133,22 +132,45 @@ extension MainViewController {
             }
 
             // Recommended Bolus
-            if let rec = InsulinMetric(from: lastLoopRecord, key: "recommendedBolus") {
-                infoManager.updateInfoData(type: .recBolus, value: rec)
-                Observable.shared.deviceRecBolus.value = rec.value
+            if let rec = lastLoopRecord["recommendedBolus"] as? Double {
+                infoManager.updateInfoData(type: .recBolus, value: InsulinFormatter.shared.string(rec))
+                Observable.shared.deviceRecBolus.value = rec
             } else {
+                infoManager.clearInfoData(type: .recBolus)
                 Observable.shared.deviceRecBolus.value = nil
             }
 
-            // Smoothed BG (Trio applies CGM smoothing and reports the smoothed value here).
-            // Append to in-memory history so each loop run's smoothed value can be matched to its glucose dot.
-            // Skip entirely when the feature toggle is off so we don't pay the parse / append cost.
-            if Storage.shared.displaySmoothedBG.value,
-               let smoothedBgValue = enactedOrSuggested["bg"] as? Double,
-               let updatedTime = updatedTime
-            {
-                appendSmoothedBgPoint(time: updatedTime, bgMgdl: smoothedBgValue)
-                infoManager.updateInfoData(type: .smoothedBg, value: Localizer.toDisplayUnits(String(smoothedBgValue)))
+            let smoothedBgPoint: SmoothedBgPoint? = {
+                if let bg = suggested["bg"] as? Double {
+                    return SmoothedBgSeries.point(
+                        bg: bg,
+                        timestampCandidates: [
+                            suggested["deliverAt"] as? String,
+                            suggested["timestamp"] as? String,
+                            lastDeviceStatus?["created_at"] as? String,
+                            enacted["deliverAt"] as? String,
+                            enacted["timestamp"] as? String,
+                        ]
+                    )
+                }
+                if let bg = enacted["bg"] as? Double {
+                    return SmoothedBgSeries.point(
+                        bg: bg,
+                        timestampCandidates: [
+                            enacted["deliverAt"] as? String,
+                            enacted["timestamp"] as? String,
+                            lastDeviceStatus?["created_at"] as? String,
+                        ]
+                    )
+                }
+                return nil
+            }()
+            if Storage.shared.displaySmoothedBG.value, let smoothedBgPoint {
+                appendSmoothedBgPoint(time: smoothedBgPoint.time, bgMgdl: smoothedBgPoint.bgMgdl)
+                infoManager.updateInfoData(
+                    type: .smoothedBg,
+                    value: Localizer.toDisplayUnits(String(smoothedBgPoint.bgMgdl))
+                )
             }
 
             // Eventual BG
@@ -192,7 +214,9 @@ extension MainViewController {
             }
 
             // TDD
-            if let tddMetric = InsulinMetric(from: enactedOrSuggested, key: "TDD") {
+            if let tddMetric = InsulinMetric(from: enactedOrSuggested, key: "TDD")
+                ?? InsulinMetric(from: lastLoopRecord["enacted"], key: "TDD")
+            {
                 infoManager.updateInfoData(type: .tdd, value: tddMetric)
                 Storage.shared.lastTdd.value = tddMetric.value
             }
@@ -269,6 +293,7 @@ extension MainViewController {
             // Live Activity storage
             Storage.shared.lastIOB.value = latestIOB?.value
             Storage.shared.lastCOB.value = latestCOB?.value
+            return updatedTime != nil
         }
     }
 }
