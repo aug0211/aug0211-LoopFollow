@@ -420,7 +420,7 @@ struct RemoteSettingsView: View {
                     unit: HKUnit.gram(),
                     allowDecimalSeparator: true,
                     minValue: HKQuantity(unit: .gram(), doubleValue: 0),
-                    maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
+                    maxValue: HKQuantity(unit: .gram(), doubleValue: 200),
                     onValidationError: { message in
                         handleValidationError(message)
                     }
@@ -440,7 +440,7 @@ struct RemoteSettingsView: View {
                         unit: HKUnit.gram(),
                         allowDecimalSeparator: true,
                         minValue: HKQuantity(unit: .gram(), doubleValue: 0),
-                        maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
+                        maxValue: HKQuantity(unit: .gram(), doubleValue: 200),
                         onValidationError: { message in
                             handleValidationError(message)
                         }
@@ -459,7 +459,7 @@ struct RemoteSettingsView: View {
                         unit: HKUnit.gram(),
                         allowDecimalSeparator: true,
                         minValue: HKQuantity(unit: .gram(), doubleValue: 0),
-                        maxValue: HKQuantity(unit: .gram(), doubleValue: 100),
+                        maxValue: HKQuantity(unit: .gram(), doubleValue: 200),
                         onValidationError: { message in
                             handleValidationError(message)
                         }
