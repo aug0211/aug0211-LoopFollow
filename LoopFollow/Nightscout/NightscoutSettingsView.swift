@@ -16,6 +16,7 @@ struct NightscoutSettingsView: View {
             urlSection
             tokenSection
             statusSection
+            webSocketSection
 
             if viewModel.isFreshSetup {
                 continueSection
@@ -48,16 +49,43 @@ struct NightscoutSettingsView: View {
     }
 
     private var tokenSection: some View {
-        Section(header: Text("Token")) {
+        Section {
             HStack {
                 Text("Access Token")
                 TogglableSecureInput(
-                    placeholder: "Enter Token",
+                    placeholder: "Token or API secret",
                     text: $viewModel.nightscoutToken,
                     style: .singleLine,
                     textContentType: .password
                 )
             }
+
+            if viewModel.tokenIsVerifiedSecret || viewModel.isProvisioningToken {
+                Button {
+                    viewModel.createReadOnlyToken(fromSecret: viewModel.nightscoutToken)
+                } label: {
+                    HStack {
+                        if viewModel.isProvisioningToken {
+                            ProgressView()
+                            Text("Creating read-only token…")
+                        } else {
+                            Image(systemName: "wand.and.stars")
+                            Text("That's your API secret — create a read-only token")
+                        }
+                    }
+                }
+                .disabled(viewModel.isProvisioningToken)
+            }
+
+            if let error = viewModel.tokenProvisionError {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundColor(.red)
+            }
+        } header: {
+            Text("Token")
+        } footer: {
+            Text("Paste a Nightscout token. If your site needs one and you only have the API secret, paste that instead — LoopFollow can create a read-only token for you.")
         }
     }
 
@@ -93,6 +121,59 @@ struct NightscoutSettingsView: View {
             .buttonStyle(.borderedProminent)
             .disabled(!viewModel.isConnected)
             .listRowBackground(Color.clear)
+        }
+    }
+
+    @State private var showWebSocketInfo = false
+
+    private var webSocketSection: some View {
+        Section(header: webSocketSectionHeader) {
+            Toggle("Enable WebSocket", isOn: $viewModel.webSocketEnabled)
+            if viewModel.webSocketEnabled {
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Text(viewModel.webSocketStatus)
+                        .foregroundColor(viewModel.webSocketStatusColor)
+                }
+            }
+        }
+        .sheet(isPresented: $showWebSocketInfo) {
+            NavigationStack {
+                ScrollView {
+                    Text("""
+                    When enabled, LoopFollow maintains a live connection to your Nightscout server using WebSocket while the app is in the foreground. Data updates (new glucose readings, treatments, device status) arrive within seconds instead of waiting for the next polling cycle.
+
+                    The WebSocket disconnects when LoopFollow moves to the background and reconnects when you return to the app. Polling continues to handle updates while the app is in the background.
+
+                    In the foreground, polling continues at a reduced frequency as a safety net. If the WebSocket connection drops, normal polling resumes immediately.
+                    """)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .navigationTitle("Real-time Updates")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showWebSocketInfo = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var webSocketSectionHeader: some View {
+        HStack(spacing: 4) {
+            Text("Real-time Updates")
+            Button {
+                showWebSocketInfo = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
         }
     }
 

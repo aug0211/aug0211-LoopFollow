@@ -3,73 +3,70 @@
 
 import AVFoundation
 import SwiftUI
-import UIKit
 
 struct ImportExportSettingsView: View {
     @StateObject private var viewModel = ImportExportSettingsViewModel()
 
     var body: some View {
-        NavigationView {
-            List {
-                // MARK: - Import Section
+        List {
+            // MARK: - Import Section
 
-                Section("Import Settings") {
+            Section("Import Settings") {
+                Button(action: {
+                    viewModel.isShowingQRCodeScanner = true
+                }) {
+                    HStack {
+                        Image(systemName: "qrcode.viewfinder")
+                            .foregroundColor(.blue)
+                        Text("Scan QR Code to Import Settings")
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            // MARK: - Export Section
+
+            Section("Export Settings To QR Code") {
+                ForEach(ImportExportSettingsViewModel.ExportType.allCases, id: \.self) { exportType in
                     Button(action: {
-                        viewModel.isShowingQRCodeScanner = true
+                        if exportType == .alarms {
+                            viewModel.showAlarmSelection()
+                        } else {
+                            viewModel.exportType = exportType
+                            if let qrString = viewModel.generateQRCodeForExport() {
+                                viewModel.qrCodeString = qrString
+                                viewModel.isShowingQRCodeDisplay = true
+                            }
+                        }
                     }) {
                         HStack {
-                            Image(systemName: "qrcode.viewfinder")
+                            Image(systemName: exportType.icon)
                                 .foregroundColor(.blue)
-                            Text("Scan QR Code to Import Settings")
+                            Text("Export \(exportType.rawValue)")
+                            Spacer()
+                            Image(systemName: exportType == .alarms ? "list.bullet" : "qrcode")
+                                .foregroundColor(.secondary)
                         }
                     }
                     .buttonStyle(.plain)
                 }
+            }
 
-                // MARK: - Export Section
+            // MARK: - Status Message
 
-                Section("Export Settings To QR Code") {
-                    ForEach(ImportExportSettingsViewModel.ExportType.allCases, id: \.self) { exportType in
-                        Button(action: {
-                            if exportType == .alarms {
-                                viewModel.showAlarmSelection()
-                            } else {
-                                viewModel.exportType = exportType
-                                if let qrString = viewModel.generateQRCodeForExport() {
-                                    viewModel.qrCodeString = qrString
-                                    viewModel.isShowingQRCodeDisplay = true
-                                }
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: exportType.icon)
-                                    .foregroundColor(.blue)
-                                Text("Export \(exportType.rawValue)")
-                                Spacer()
-                                Image(systemName: exportType == .alarms ? "list.bullet" : "qrcode")
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+            if !viewModel.qrCodeErrorMessage.isEmpty {
+                Section {
+                    let isSuccess = viewModel.qrCodeErrorMessage.contains("successfully") || viewModel.qrCodeErrorMessage.contains("Successfully imported")
+                    let displayText = isSuccess ? "✅ \(viewModel.qrCodeErrorMessage)" : viewModel.qrCodeErrorMessage
 
-                // MARK: - Status Message
-
-                if !viewModel.qrCodeErrorMessage.isEmpty {
-                    Section {
-                        let isSuccess = viewModel.qrCodeErrorMessage.contains("successfully") || viewModel.qrCodeErrorMessage.contains("Successfully imported")
-                        let displayText = isSuccess ? "✅ \(viewModel.qrCodeErrorMessage)" : viewModel.qrCodeErrorMessage
-
-                        Text(displayText)
-                            .foregroundColor(isSuccess ? .green : .red)
-                            .font(.caption)
-                    }
+                    Text(displayText)
+                        .foregroundColor(isSuccess ? .green : .red)
+                        .font(.caption)
                 }
             }
-            .navigationTitle("Import/Export Settings")
-            .navigationBarTitleDisplayMode(.inline)
         }
+        .navigationTitle("Import/Export Settings")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $viewModel.isShowingQRCodeScanner) {
             SimpleQRCodeScannerView { result in
                 viewModel.handleQRCodeScanResult(result)
@@ -85,7 +82,7 @@ struct ImportExportSettingsView: View {
                         )
                         .padding()
 
-                        Text("Scan this QR code with another LoopFollow app to import \(viewModel.exportType.rawValue.lowercased())")
+                        Text("Scan this QR code with another LoopFollow app to import \(viewModel.exportType.importDescription)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -189,6 +186,15 @@ struct ImportConfirmationView: View {
                                     color: .red
                                 )
                             }
+
+                            if let apnsKeyId = preview.apnsKeyId, !apnsKeyId.isEmpty {
+                                SettingRowView(
+                                    icon: "key.horizontal",
+                                    title: "APNS Key ID",
+                                    value: apnsKeyId,
+                                    color: .purple
+                                )
+                            }
                         }
                         .padding(.horizontal)
                     }
@@ -208,6 +214,13 @@ struct ImportConfirmationView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
+
+                    if let apnsKeyId = viewModel.importPreview?.apnsKeyId, !apnsKeyId.isEmpty {
+                        Text("APNS warning: importing APNS settings will overwrite your existing APNS Key ID and APNS Key.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(.horizontal)
 
