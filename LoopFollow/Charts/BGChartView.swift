@@ -762,12 +762,15 @@ private struct MainBGChart: View {
         }
     }
 
-    private func forEachBGAnchor(_ body: (BGChartModel.BGPoint) -> Void) {
-        for group in [model.bg, model.prediction, model.ztPrediction,
-                      model.iobPrediction, model.cobPrediction, model.uamPrediction]
+    private func forEachBGAnchor(_ body: (BGChartModel.BGPoint, Bool) -> Void) {
+        for point in model.bg {
+            body(point, true)
+        }
+        for group in [model.prediction, model.ztPrediction, model.iobPrediction,
+                      model.cobPrediction, model.uamPrediction]
         {
             for point in group {
-                body(point)
+                body(point, false)
             }
         }
     }
@@ -779,7 +782,17 @@ private struct MainBGChart: View {
 
     /// Pill entry for a BG reading. Shared by the scrub lookup and the tap hit test.
     private func bgPillText(for point: BGChartModel.BGPoint) -> String {
-        "BG\n\(Localizer.toDisplayUnits(String(Int(point.value))))"
+        "BG\n\(Localizer.toDisplayUnits(String(Int(point.value))))\n\(model.pillTimeString(for: point.date))"
+    }
+
+    /// Real BG points retain any target-specific pill enrichment (for example,
+    /// the fork's smoothed value), while forecast points always show their own
+    /// raw value. Time is rendered once by `PillLabel` for both paths.
+    private func selectionPillText(for point: BGChartModel.BGPoint, isActualBG: Bool) -> String {
+        guard isActualBG else {
+            return "BG\n\(Localizer.toDisplayUnits(String(Int(point.value))))"
+        }
+        return withoutTrailingTime(bgPillText(for: point))
     }
 
     private func onBoardSelection(near date: Date) -> OnBoardSelection? {
@@ -922,14 +935,14 @@ private struct MainBGChart: View {
         captured.sort { $0.date < $1.date }
 
         var nearestBG: Item?
-        forEachBGAnchor { p in
+        forEachBGAnchor { p, isActualBG in
             let d = abs(p.date.timeIntervalSince(selected))
             if d < (nearestBG?.distance ?? .greatestFiniteMagnitude) {
                 nearestBG = Item(
                     date: p.date,
                     timestamp: p.date,
                     value: p.value,
-                    text: bgPillText(for: p),
+                    text: selectionPillText(for: p, isActualBG: isActualBG),
                     distance: d
                 )
             }
@@ -1024,12 +1037,12 @@ private struct MainBGChart: View {
         forEachTreatmentAnchor { date, timestamp, value, text in
             consider(date, timestamp: timestamp, value: value, text: text)
         }
-        forEachBGAnchor { point in
+        forEachBGAnchor { point, isActualBG in
             consider(
                 point.date,
                 timestamp: point.date,
                 value: point.value,
-                text: bgPillText(for: point)
+                text: selectionPillText(for: point, isActualBG: isActualBG)
             )
         }
         if let best = nearestBGChartTapCandidate(primaryCandidates, within: radius) {
