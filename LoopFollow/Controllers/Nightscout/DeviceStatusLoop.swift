@@ -1,10 +1,9 @@
 // LoopFollow
 // DeviceStatusLoop.swift
 
-import Charts
 import Foundation
 import HealthKit
-import UIKit
+import SwiftUI
 
 extension MainViewController {
     func DeviceStatusLoop(formatter: ISO8601DateFormatter, lastLoopRecord: [String: AnyObject]) {
@@ -18,7 +17,7 @@ extension MainViewController {
         let lastLoopTime = Observable.shared.alertLastLoopTime.value ?? 0
 
         if lastLoopRecord["failureReason"] != nil {
-            LoopStatusLabel.text = "X"
+            Observable.shared.loopStatusText.value = "X"
             latestLoopStatusString = "X"
         } else {
             var wasEnacted = false
@@ -67,9 +66,9 @@ extension MainViewController {
 
             if let predictdata = lastLoopRecord["predicted"] as? [String: AnyObject] {
                 let prediction = predictdata["values"] as! [Double]
-                PredictionLabel.text = Localizer.toDisplayUnits(String(Int(round(prediction.last!))))
-                PredictionLabel.textColor = UIColor.systemPurple
-                if Storage.shared.downloadPrediction.value, previousLastLoopTime < lastLoopTime {
+                Observable.shared.predictionText.value = Localizer.toDisplayUnits(String(Int(round(prediction.last!))))
+                Observable.shared.predictionColor.value = .purple
+                if Storage.shared.downloadPrediction.value, previousLastLoopTime < lastLoopTime || predictionData.isEmpty {
                     predictionData.removeAll()
                     var predictionTime = lastLoopTime
                     let toLoad = Int(Storage.shared.predictionToLoad.value * 12)
@@ -102,9 +101,11 @@ extension MainViewController {
                 updatePredictionGraph()
             }
             if let recBolus = lastLoopRecord["recommendedBolus"] as? Double {
-                let formattedRecBolus = String(format: "%.2fU", recBolus)
-                infoManager.updateInfoData(type: .recBolus, value: formattedRecBolus)
+                infoManager.updateInfoData(type: .recBolus, value: InsulinFormatter.shared.string(recBolus), numericValue: recBolus)
                 Observable.shared.deviceRecBolus.value = recBolus
+            } else {
+                infoManager.clearInfoData(type: .recBolus)
+                Observable.shared.deviceRecBolus.value = nil
             }
             if let loopStatus = lastLoopRecord["recommendedTempBasal"] as? [String: AnyObject] {
                 if let tempBasalTime = formatter.date(from: (loopStatus["timestamp"] as! String))?.timeIntervalSince1970 {
@@ -113,15 +114,15 @@ extension MainViewController {
                         lastBGTime = bgData[bgData.count - 1].date
                     }
                     if tempBasalTime > lastBGTime, !wasEnacted {
-                        LoopStatusLabel.text = "⏀"
+                        Observable.shared.loopStatusText.value = "⏀"
                         latestLoopStatusString = "⏀"
                     } else {
-                        LoopStatusLabel.text = "↻"
+                        Observable.shared.loopStatusText.value = "↻"
                         latestLoopStatusString = "↻"
                     }
                 }
             } else {
-                LoopStatusLabel.text = "↻"
+                Observable.shared.loopStatusText.value = "↻"
                 latestLoopStatusString = "↻"
             }
 
