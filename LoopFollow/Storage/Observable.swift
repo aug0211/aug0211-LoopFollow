@@ -20,7 +20,7 @@ class Observable {
     /// End of the active temp target as Unix epoch seconds; nil = no active temp target.
     var tempTargetEndAt = ObservableValue<TimeInterval?>(default: nil)
 
-    var minAgoText = ObservableValue<String>(default: "?? min ago")
+    var minAgoText = ObservableValue<String>(default: "?? ago")
     var bgText = ObservableValue<String>(default: "BG")
     var bg = ObservableValue<Int?>(default: nil)
     var bgStale = ObservableValue<Bool>(default: true)
