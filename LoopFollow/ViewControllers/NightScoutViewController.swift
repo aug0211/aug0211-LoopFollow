@@ -6,12 +6,28 @@ import UIKit
 import WebKit
 
 class NightscoutViewController: UIViewController {
-    @IBOutlet var webView: WKWebView!
+    var webView: WKWebView!
     private var cancellables = Set<AnyCancellable>()
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .systemBackground
         overrideUserInterfaceStyle = Storage.shared.appearanceMode.value.userInterfaceStyle
+
+        // Create WKWebView programmatically
+        let webConfiguration = WKWebViewConfiguration()
+        webConfiguration.mediaTypesRequiringUserActionForPlayback = []
+        webView = WKWebView(frame: .zero, configuration: webConfiguration)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(webView)
+
+        let safeArea = view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: safeArea.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: safeArea.bottomAnchor),
+        ])
 
         // Listen for appearance setting changes
         Storage.shared.appearanceMode.$value
@@ -21,22 +37,12 @@ class NightscoutViewController: UIViewController {
             }
             .store(in: &cancellables)
 
-        // Listen for system appearance changes (when in System mode)
-        NotificationCenter.default.publisher(for: .appearanceDidChange)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.overrideUserInterfaceStyle = Storage.shared.appearanceMode.value.userInterfaceStyle
-            }
-            .store(in: &cancellables)
-
-        var url = Storage.shared.url.value
-        let token = Storage.shared.token.value
-
-        if token != "" {
-            url = url + "?token=" + token
-        }
-
-        guard let myUrl = URL(string: url) else { return }
+        guard let myUrl = NightscoutUtils.constructURL(
+            baseURL: Storage.shared.url.value,
+            token: Storage.shared.token.value,
+            endpoint: "",
+            parameters: [:]
+        ) else { return }
 
         let webpagePreferences = WKWebpagePreferences()
         webpagePreferences.allowsContentJavaScript = true
@@ -55,16 +61,6 @@ class NightscoutViewController: UIViewController {
         clearWebCache()
         webView.reload()
         sender.endRefreshing()
-    }
-
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-
-        if Storage.shared.appearanceMode.value == .system,
-           previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle
-        {
-            overrideUserInterfaceStyle = Storage.shared.appearanceMode.value.userInterfaceStyle
-        }
     }
 
     func clearWebCache() {

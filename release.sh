@@ -14,7 +14,6 @@ VERSION_FILE="Config.xcconfig"
 MARKETING_KEY="LOOP_FOLLOW_MARKETING_VERSION"
 DEV_BRANCH="dev"
 MAIN_BRANCH="main"
-PATCH_DIR="../${APP_NAME}_update_patches"
 # ---------------------------------------
 
 # --- functions here ---
@@ -24,44 +23,50 @@ echo_run()  { echo "+ $*"; "$@"; }
 push_cmds=()
 queue_push() { push_cmds+=("git -C \"$(pwd)\" $*"); echo "+ [queued] (in $(pwd)) git $*"; }
 
-queue_push_tag () {
-  local tag="$1"
-  queue_push push origin "refs/tags/$tag"
-}
-
 update_follower () {
   local DIR="$1"
+  local build_minute="$2"                     # staggered Sunday-build minute (see calls below)
+  local suffix=".${DIR#${APP_NAME}_}"        # LoopFollow_Second  -> .Second
+  local display="$DIR"                        # LoopFollow_Second
+  local upstream="loopandlearn/${DIR}"        # loopandlearn/LoopFollow_Second
+
   echo; echo "🔄  Updating $DIR …"
   cd "$DIR"
-
-  echo; echo "If there are custom changes needed to the patch, make the change before continuing"
-  pause
 
   # 1 · Make sure we’re on a clean, up-to-date main
   echo_run git switch "$MAIN_BRANCH"
   echo_run git fetch
   echo_run git pull
 
-  # 2 · Apply the patch
-  if ! git apply --whitespace=nowarn "$PATCH_FILE"; then
-    echo "‼️  Some changes could not be applied, so no changes were made."
-    echo "The command used was: git apply --whitespace=nowarn $PATCH_FILE"
-    echo; echo "Use a different terminal to fix and apply the patch before continuing"
-    pause
+  # 2 · Full mirror of the release tree from the primary repo.
+  #     Every tracked file (including the overlay files) is synced; only git
+  #     metadata and local/build dirs are protected. --delete makes the tree an
+  #     exact mirror, auto-correcting any drift.
+  echo_run rsync -a --delete \
+    --exclude='.git/' \
+    --exclude='.claude/' \
+    --exclude='build/' \
+    "$PRIMARY_ABS_PATH"/ ./
+
+  # 3 · Re-apply this instance's overlay on top of the mirror
+  perl -i -pe "s|^app_suffix\s*=.*|app_suffix = ${suffix}|"      LoopFollowDisplayNameConfig.xcconfig
+  perl -i -pe "s|^display_name\s*=.*|display_name = ${display}|" LoopFollowDisplayNameConfig.xcconfig
+  perl -i -pe "s|^(\s*)UPSTREAM_REPO:.*|\${1}UPSTREAM_REPO: ${upstream}|" .github/workflows/build_LoopFollow.yml
+  perl -i -pe "s|^(\s*)- cron:.*|\${1}- cron: \"${build_minute} 10 * * 0\" # Sunday at UTC 10:${build_minute}|" .github/workflows/build_LoopFollow.yml
+
+  # 4 · Rename the synced workspace to this instance's name
+  rm -rf "${DIR}.xcworkspace"
+  if [ -d "${APP_NAME}.xcworkspace" ]; then
+    mv "${APP_NAME}.xcworkspace" "${DIR}.xcworkspace"
   fi
 
-  # 3 · Pause if any conflict markers remain
-  if git ls-files -u | grep -q .; then
-    echo "⚠️  Conflicts detected."
-    echo "    If Fastfile or build_LoopFollow.yml were modified, these are expected."
-    echo "    Open your merge tool, resolve, then press Enter."
-    pause
+  # 5 · Single commit capturing the mirror + overlay
+  git add -A
+  if git diff --cached --quiet; then
+    echo "✓  $DIR already up to date — nothing to commit."
+  else
+    echo_run git commit -m "transfer v${new_ver} updates from LF to ${DIR}"
   fi
-
-  # 4 · Single commit capturing all staged changes
-  git add -u
-  git add $(git ls-files --others --exclude-standard) 2>/dev/null || true
-  git commit -m "transfer v${new_ver} updates from LF to ${DIR}"
 
   echo_run git status
   echo "💻  Build & test $DIR now."; pause  # build & test checkpoint
@@ -72,6 +77,18 @@ update_follower () {
 # ---------- PRIMARY REPO ----------
 PRIMARY_ABS_PATH="$(pwd -P)"
 echo "🏁  Working in $PRIMARY_ABS_PATH …"
+
+# --- guard: make sure we're running the latest release.sh from origin/dev ----
+# The release flow assumes the newest script. If this copy differs from the one
+# on origin/dev, we're likely running a stale version — abort and tell the user.
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+echo_run git fetch origin "$DEV_BRANCH"
+if ! diff -q <(git show "origin/${DEV_BRANCH}:release.sh") "$SCRIPT_PATH" >/dev/null 2>&1; then
+  echo "❌  This release.sh does not match origin/${DEV_BRANCH}:release.sh."
+  echo "    You're likely running an outdated copy of the release script."
+  echo "    Switch to the latest '${DEV_BRANCH}' (git switch ${DEV_BRANCH} && git pull) and re-run. Aborting."
+  exit 1
+fi
 
 # --- start out in main to capture old_ver ---- 
 echo_run git switch "$MAIN_BRANCH"
@@ -97,35 +114,33 @@ esac
 
 echo "🔢  Bumping version: $old_ver  →  $new_ver"
 
-# --- switch to dev branch ----
+# --- switch to dev so the release branch is cut from latest dev ----
 echo_run git switch "$DEV_BRANCH"
 echo_run git fetch
 echo_run git pull
 
-# --- update version number ----
+# --- create release branch from dev's tip ----
+RELEASE_BRANCH="release/v${new_ver}"
+echo_run git switch -c "$RELEASE_BRANCH"
+
+# --- bump version on the release branch ----
 sed -i '' "s/${MARKETING_KEY}[[:space:]]*=.*/${MARKETING_KEY} = ${new_ver}/" "$VERSION_FILE"
 echo_run git diff "$VERSION_FILE"; pause
-echo_run git commit -m "update version to ${new_ver} [skip ci]" "$VERSION_FILE"
+# No [skip ci] here on purpose: it would skip the required SwiftFormat lint check
+# (leaving the release PRs blocked) and the tag_on_main workflow (no auto-tag).
+# auto_version_dev already avoids re-bumping via its "Config.xcconfig changed" guard.
+echo_run git commit -m "update version to ${new_ver}" "$VERSION_FILE"
 
-echo "💻  Build & test dev branch now."; pause
-queue_push push origin "$DEV_BRANCH"
+echo "💻  Build & test release branch now."; pause
+queue_push push origin "$RELEASE_BRANCH"
 
-# --- create a patch  ---------------------------
-mkdir -p "$PATCH_DIR"
-PATCH_FILE="${PATCH_DIR}/LF_diff_${old_ver}_to_${new_ver}.patch"
-
-git diff -M --binary "$MAIN_BRANCH" "$DEV_BRANCH"  \
-  > "$PATCH_FILE"
-
-# --- merge dev into main for new release
-echo_run git switch "$MAIN_BRANCH"
-echo_run git merge "$DEV_BRANCH"
-echo "💻  Build & test main branch now."; pause
-queue_push push origin "$MAIN_BRANCH"
-
+# --- mirror the release tree into the sister repos ----
+# Second arg = each app's scheduled browser-build minute (Sundays at 10:xx UTC),
+# staggered from the main app (:17) so a user who forked all three apps doesn't
+# trigger three simultaneous builds.
 cd ..
-update_follower "$SECOND_DIR"
-update_follower "$THIRD_DIR"
+update_follower "$SECOND_DIR" "27"
+update_follower "$THIRD_DIR"  "40"
 
 # ---------- GitHub Actions Test ---------
 echo; 
@@ -136,24 +151,47 @@ pause
 cd ${PRIMARY_ABS_PATH}
 
 # ---------- push queue ----------
-echo; echo "🚀  Ready to tag and push changes upstream."
+echo; echo "🚀  Ready to push changes upstream and open the release PR."
 echo_run git log --oneline -2
-
-read -rp "▶▶  Ready to tag? (y/n): " confirm
-if [[ $confirm =~ ^[Yy]$ ]]; then
-  git tag -a "v${new_ver}" -m "v${new_ver}"
-  queue_push_tag "v${new_ver}"
-  echo_run git log --oneline -2
-else
-  echo "🚫  tag skipped, can add later"
-fi
 
 read -rp "▶▶  Push everything now? (y/n): " confirm
 if [[ $confirm =~ ^[Yy]$ ]]; then
   for cmd in "${push_cmds[@]}"; do echo "+ $cmd"; bash -c "$cmd"; done
   echo "🎉  All pushes completed."
-  echo; echo "🎉  All repos updated to v${new_ver} (local)."
-  echo "👉  Remember to create a GitHub release for tag v${new_ver}."
+
+  # --- resolve the GitHub repo explicitly so gh doesn't depend on a default ----
+  # Clones with multiple remotes have no inferred default repo, which makes
+  # `gh pr create` fail. Derive owner/repo from the origin remote URL.
+  # Handles both https://github.com/owner/repo(.git) and git@github.com:owner/repo(.git)
+  REPO_SLUG="$(git remote get-url origin | sed -E -e 's#\.git$##' -e 's#^.*github\.com[:/]##')"
+
+  echo; echo "📝  Opening sync PR ${RELEASE_BRANCH} → ${DEV_BRANCH} …"
+  gh pr create \
+    --repo "$REPO_SLUG" \
+    --base "$DEV_BRANCH" \
+    --head "$RELEASE_BRANCH" \
+    --title "Sync v${new_ver} version bump to dev" \
+    --body "Syncs the v${new_ver} version bump from the release branch back to \`dev\` so subsequent auto-bumps on \`dev\` continue from the released minor.
+
+\`auto_version_dev\` detects that \`Config.xcconfig\` was changed in this push and skips re-bumping.
+
+⚠️ **Use \"Create a merge commit\"** (not squash or rebase) so \`dev\` and \`main\` share the same release lineage."
+
+  echo; echo "📝  Opening release PR ${RELEASE_BRANCH} → ${MAIN_BRANCH} …"
+  gh pr create \
+    --repo "$REPO_SLUG" \
+    --base "$MAIN_BRANCH" \
+    --head "$RELEASE_BRANCH" \
+    --title "Release v${new_ver}" \
+    --body "Release v${new_ver}.
+
+Merging this PR triggers the tagging workflow, which creates tag \`v${new_ver}\` from \`LOOP_FOLLOW_MARKETING_VERSION\` in \`Config.xcconfig\`.
+
+⚠️ **Use \"Create a merge commit\"** (not squash or rebase) so \`main\` keeps the original feature-PR commits."
+
+  echo; echo "🎉  All repos updated to v${new_ver} (local). Release PRs opened (sync → dev, release → main)."
+  echo "👉  Review and merge both PRs — the tag will be created automatically by .github/workflows/tag_on_main.yml."
+  echo "👉  Remember to create a GitHub release for tag v${new_ver} after the tag exists."
 else
   echo "🚫  Pushes skipped.  Run manually if needed:"; printf '   %s\n' "${push_cmds[@]}"
   echo "🚫  Release not completed, pushes to GitHub were skipped"

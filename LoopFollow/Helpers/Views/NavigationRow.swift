@@ -3,23 +3,26 @@
 
 import SwiftUI
 
-struct NavigationRow: View {
+struct NavigationRow<Value: Hashable>: View {
     let title: String
+    var subtitle: String? = nil
     let icon: String
     var iconTint: Color = .white
-    let action: () -> Void
+    let value: Value
 
     var body: some View {
-        Button(action: action) {
+        NavigationLink(value: value) {
             HStack {
                 Glyph(symbol: icon, tint: iconTint)
-                Text(title)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundColor(Color(uiColor: .tertiaryLabel))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 }
