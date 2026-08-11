@@ -98,10 +98,17 @@ extension MainViewController {
             }
 
             // COB
-            if let cobMetric = CarbMetric(from: enactedOrSuggested, key: "COB") {
+            let cobRecords = [
+                lastLoopRecord["suggested"] as? [String: AnyObject],
+                lastLoopRecord["enacted"] as? [String: AnyObject],
+            ].compactMap { $0 }
+            if let cobMetric = cobRecords.compactMap({ CarbMetric(from: $0, key: "COB") }).first {
                 infoManager.updateInfoData(type: .cob, value: cobMetric)
                 latestCOB = cobMetric
-            } else if let reasonString = enactedOrSuggested["reason"] as? String {
+            } else if let reasonString = cobRecords
+                .compactMap({ $0["reason"] as? String })
+                .first(where: { $0.range(of: "COB:") != nil })
+            {
                 // Fallback: Extract COB from reason string
                 let cobPattern = "COB: (\\d+(?:\\.\\d+)?)"
                 if let cobRegex = try? NSRegularExpression(pattern: cobPattern),
