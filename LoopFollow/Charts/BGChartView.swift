@@ -90,6 +90,14 @@ private func chartYDomainUpperBound(_ maxBG: Double) -> Double {
     return clampedMax + topPadding
 }
 
+/// Keeps the last usable plot geometry while SwiftUI remounts the gesture
+/// subtree. Preference propagation may briefly report `.zero` during that
+/// transition; accepting it would make every tap fail its geometry guard.
+func retainedBGChartPlotFrame(current: CGRect, incoming: CGRect) -> CGRect {
+    guard incoming.width > 0, incoming.height > 0 else { return current }
+    return incoming
+}
+
 struct BGChartView: View {
     enum Config {
         case small
@@ -104,12 +112,17 @@ struct BGChartView: View {
     /// attachments while BGChartInteraction preserves the viewport.
     @State private var gestureMountEpoch = 0
 
+    /// Plot geometry must outlive the gesture-only remount above. If this
+    /// state lives in MainBGChart, foregrounding resets it to zero and all
+    /// mark taps are discarded until the app is relaunched.
+    @State private var plotFrame: CGRect = .zero
+
     var body: some View {
         Group {
             if config == .small {
                 SmallBGChart(model: model, interaction: model.interaction)
             } else {
-                MainBGChart(model: model, interaction: model.interaction)
+                MainBGChart(model: model, interaction: model.interaction, plotFrame: $plotFrame)
             }
         }
         .id(gestureMountEpoch)
@@ -137,6 +150,7 @@ struct BGChartView: View {
 private struct MainBGChart: View {
     @ObservedObject var model: BGChartModel
     @ObservedObject var interaction: BGChartInteraction
+    @Binding private var plotFrame: CGRect
 
     /// Rendered slice of the domain. The canvas covers only this window
     /// (visible ± `renderWindowPadFactor` viewports), bounding canvas width
@@ -144,19 +158,16 @@ private struct MainBGChart: View {
     @State private var renderWindowStart: Date
     @State private var renderWindowEnd: Date
 
-    init(model: BGChartModel, interaction: BGChartInteraction) {
+    init(model: BGChartModel, interaction: BGChartInteraction, plotFrame: Binding<CGRect>) {
         _model = ObservedObject(wrappedValue: model)
         _interaction = ObservedObject(wrappedValue: interaction)
+        _plotFrame = plotFrame
         // Seed the render window around the current viewport so a remount's
         // first frame draws in place.
         let pad = BGChartConfig.renderWindowPadFactor * interaction.visibleSeconds
         _renderWindowStart = State(initialValue: interaction.scrollPosition.addingTimeInterval(-pad))
         _renderWindowEnd = State(initialValue: interaction.scrollPosition.addingTimeInterval(interaction.visibleSeconds + pad))
     }
-
-    /// Plot area of the static axis overlay, in shell coordinates. The
-    /// selection overlay uses it for its value-to-pixel maps.
-    @State private var plotFrame: CGRect = .zero
 
     /// Measured size of the visible selection pill (see PillSizePreferenceKey).
     @State private var pillSize: CGSize = .zero
@@ -292,7 +303,9 @@ private struct MainBGChart: View {
                     }
                 }
         )
-        .onPreferenceChange(PlotFramePreferenceKey.self) { plotFrame = $0 }
+        .onPreferenceChange(PlotFramePreferenceKey.self) {
+            plotFrame = retainedBGChartPlotFrame(current: plotFrame, incoming: $0)
+        }
         .onPreferenceChange(PillSizePreferenceKey.self) { pillSize = $0 }
         .onChange(of: interaction.scrollPosition) { _, _ in
             updateRenderWindow()
