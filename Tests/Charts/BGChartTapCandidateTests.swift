@@ -1,6 +1,7 @@
 // LoopFollow
 // BGChartTapCandidateTests.swift
 
+import CoreGraphics
 @testable import LoopFollow
 import Testing
 
@@ -43,5 +44,22 @@ struct BGChartTapCandidateTests {
         ]
 
         #expect(nearestBGChartTapCandidate(candidates, within: 30) == "first")
+    }
+}
+
+struct BGChartLifecycleTests {
+    @Test("foreground remount does not erase valid plot geometry")
+    func zeroFrameIsIgnored() {
+        let valid = CGRect(x: 34, y: 0, width: 589, height: 279)
+
+        #expect(retainedBGChartPlotFrame(current: valid, incoming: .zero) == valid)
+    }
+
+    @Test("new valid plot geometry replaces the retained frame")
+    func validFrameIsUpdated() {
+        let old = CGRect(x: 34, y: 0, width: 589, height: 279)
+        let resized = CGRect(x: 28, y: 0, width: 700, height: 320)
+
+        #expect(retainedBGChartPlotFrame(current: old, incoming: resized) == resized)
     }
 }
