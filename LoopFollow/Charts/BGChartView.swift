@@ -351,8 +351,8 @@ private struct MainBGChart: View {
            model.currentIOB != nil || model.currentCOB != nil
         {
             OnBoardHistoryLegend(iob: model.currentIOB, cob: model.currentCOB)
-                .padding(.trailing, 42)
-                .padding(.bottom, max(viewport.height - plotFrame.maxY + 4, 4))
+                .padding(.trailing, 4)
+                .padding(.bottom, max(viewport.height - plotFrame.maxY + 14, 14))
                 .frame(
                     width: max(viewport.width, 1),
                     height: max(viewport.height, 1),
@@ -1952,7 +1952,7 @@ private struct OnBoardHistoryLegend: View {
     let cob: Double?
 
     var body: some View {
-        HStack(spacing: 7) {
+        VStack(alignment: .leading, spacing: 1) {
             if let iob {
                 item(
                     color: Color("Insulin"),
