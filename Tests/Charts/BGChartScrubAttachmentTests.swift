@@ -8,8 +8,11 @@ import Testing
 struct BGChartScrubAttachmentTests {
     private enum Event: Equatable {
         case smb(Int)
+        case carb(Int)
+        case bolus(Int)
         case bg(Int)
         case cob(Int)
+        case composite
     }
 
     @Test("closer BG wins while an SMB remains inside the capture radius")
@@ -74,6 +77,17 @@ struct BGChartScrubAttachmentTests {
         #expect(resolve(current: current, proposals: Array(proposals.reversed()), cursorX: 140) == .bg(140))
     }
 
+    @Test("an explicit treatment wins a same-position composite proposal")
+    func explicitTreatmentWinsCompositeTie() {
+        let current = candidate(.bg(100), x: 100)
+        let proposals = [
+            candidate(.bolus(2), x: 140),
+            candidate(.composite, x: 140),
+        ]
+
+        #expect(resolve(current: current, proposals: proposals, cursorX: 140) == .bolus(2))
+    }
+
     @Test("an exact horizontal tie preserves the attached event type")
     func tiePreservesCurrentEvent() {
         let current = candidate(.cob(20), x: 140)
@@ -98,6 +112,27 @@ struct BGChartScrubAttachmentTests {
         )
     }
 
+    @Test("each sparse treatment kind remains reachable by horizontal position")
+    func treatmentKindsRemainReachable() {
+        let candidates = [
+            candidate(.smb(1), x: 100),
+            candidate(.carb(20), x: 130),
+            candidate(.bolus(2), x: 160),
+        ]
+
+        #expect(nearest(in: candidates, cursorX: 100)?.value == .smb(1))
+        #expect(nearest(in: candidates, cursorX: 130)?.value == .carb(20))
+        #expect(nearest(in: candidates, cursorX: 160)?.value == .bolus(2))
+    }
+
+    @Test("a treatment outside the horizontal capture radius is ignored")
+    func distantTreatmentIsIgnored() {
+        let candidates = [candidate(.bolus(1), x: 100)]
+
+        #expect(nearest(in: candidates, cursorX: 131) == nil)
+        #expect(nearest(in: candidates, cursorX: 130)?.value == .bolus(1))
+    }
+
     private func candidate(_ value: Event, x: CGFloat) -> BGChartHorizontalScrubCandidate<Event> {
         BGChartHorizontalScrubCandidate(value: value, plotX: x)
     }
@@ -112,6 +147,18 @@ struct BGChartScrubAttachmentTests {
             current: current,
             proposals: proposals,
             cursorX: cursorX,
+            captureRadius: radius
+        )
+    }
+
+    private func nearest(
+        in candidates: [BGChartHorizontalScrubCandidate<Event>],
+        cursorX: CGFloat,
+        radius: CGFloat = 30
+    ) -> BGChartHorizontalScrubCandidate<Event>? {
+        nearestBGChartHorizontalScrubCandidate(
+            in: candidates,
+            to: cursorX,
             captureRadius: radius
         )
     }
