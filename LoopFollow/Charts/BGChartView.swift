@@ -527,7 +527,14 @@ private struct MainBGChart: View {
     }
 
     private func updateSelection(at location: CGPoint, viewportWidth: CGFloat) {
-        selection = tappedAnchor(at: location, viewportWidth: viewportWidth)
+        let trackedPlotY = selection.map { yPosition(forValue: $0.value) }
+        let probeLocation = bgChartScrubProbeLocation(
+            fingerLocation: location,
+            trackedPlotY: trackedPlotY
+        )
+        let proposed = tappedAnchor(at: probeLocation, viewportWidth: viewportWidth)
+        selection = retainedBGChartScrubSelection(current: selection, proposed: proposed)
+
         // A featherlight tick whenever the finger moves onto a different mark.
         if let anchor = selection, anchor.date != lastHapticAnchorDate {
             lastHapticAnchorDate = anchor.date
