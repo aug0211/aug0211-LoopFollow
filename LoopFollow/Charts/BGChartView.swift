@@ -148,8 +148,8 @@ private struct MainBGChart: View {
     /// Leading edge captured when a one-finger drag transitions into panning.
     @State private var panBaseline: Date?
 
-    /// Date under the user's finger while inspecting, else nil.
-    @State private var selection: Date?
+    /// Exact plotted event under the user's finger while inspecting, else nil.
+    @State private var selection: SelectionAnchor?
 
     /// Anchor selected by tapping a mark; sticky until the user taps empty
     /// space, taps another mark, or starts a pan/zoom/inspect.
@@ -439,7 +439,7 @@ private struct MainBGChart: View {
                 }
 
                 if isInspectLatched {
-                    updateSelection(atViewportX: value.location.x, viewportWidth: viewportWidth)
+                    updateSelection(at: value.location, viewportWidth: viewportWidth)
                     return
                 }
 
@@ -521,20 +521,15 @@ private struct MainBGChart: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             scrubHaptic.prepare()
             if let location = lastTouchLocation {
-                updateSelection(atViewportX: location.x, viewportWidth: viewportWidth)
+                updateSelection(at: location, viewportWidth: viewportWidth)
             }
         }
     }
 
-    private func updateSelection(atViewportX x: CGFloat, viewportWidth: CGFloat) {
-        let fraction = min(max(x / viewportWidth, 0), 1)
-        let date = interaction.scrollPosition.addingTimeInterval(
-            interaction.visibleSeconds * TimeInterval(fraction)
-        )
-        selection = date
-        // A featherlight tick whenever the indicator snaps to a different item.
-        let captureWindow = scrubCaptureWindow(viewportWidth: viewportWidth)
-        if let anchor = selectionAnchor(for: date, captureWindow: captureWindow), anchor.date != lastHapticAnchorDate {
+    private func updateSelection(at location: CGPoint, viewportWidth: CGFloat) {
+        selection = tappedAnchor(at: location, viewportWidth: viewportWidth)
+        // A featherlight tick whenever the finger moves onto a different mark.
+        if let anchor = selection, anchor.date != lastHapticAnchorDate {
             lastHapticAnchorDate = anchor.date
             scrubHaptic.selectionChanged()
             scrubHaptic.prepare()
@@ -854,9 +849,9 @@ private struct MainBGChart: View {
     }
 
     /// The anchor the overlay should show: a live scrub wins over a sticky tap.
-    private func activeAnchor(viewportWidth: CGFloat) -> SelectionAnchor? {
-        if isInspectLatched, let selected = selection {
-            return selectionAnchor(for: selected, captureWindow: scrubCaptureWindow(viewportWidth: viewportWidth))
+    private func activeAnchor(viewportWidth _: CGFloat) -> SelectionAnchor? {
+        if isInspectLatched {
+            return selection
         }
         return tapped
     }
