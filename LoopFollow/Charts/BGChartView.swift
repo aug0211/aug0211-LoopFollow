@@ -527,13 +527,37 @@ private struct MainBGChart: View {
     }
 
     private func updateSelection(at location: CGPoint, viewportWidth: CGFloat) {
-        let trackedPlotY = selection.map { yPosition(forValue: $0.value) }
-        let probeLocation = bgChartScrubProbeLocation(
-            fingerLocation: location,
-            trackedPlotY: trackedPlotY
-        )
-        let proposed = tappedAnchor(at: probeLocation, viewportWidth: viewportWidth)
-        selection = retainedBGChartScrubSelection(current: selection, proposed: proposed)
+        if let current = selection {
+            let laneProbe = CGPoint(x: location.x, y: yPosition(forValue: current.value))
+            let cursorDate = interaction.scrollPosition.addingTimeInterval(
+                interaction.visibleSeconds * TimeInterval(location.x / viewportWidth)
+            )
+            let proposals = [
+                tappedAnchor(at: laneProbe, viewportWidth: viewportWidth),
+                selectionAnchor(for: cursorDate, captureWindow: 0),
+            ].compactMap { anchor in
+                anchor.map {
+                    BGChartHorizontalScrubCandidate(
+                        value: $0,
+                        plotX: xPosition(for: $0.date, viewportWidth: viewportWidth)
+                    )
+                }
+            }
+
+            selection = horizontallyAdvancedBGChartScrubSelection(
+                current: BGChartHorizontalScrubCandidate(
+                    value: current,
+                    plotX: xPosition(for: current.date, viewportWidth: viewportWidth)
+                ),
+                proposals: proposals,
+                cursorX: location.x,
+                captureRadius: BGChartConfig.tapHitRadius
+            )
+        } else {
+            // The first contact stays fully 2D so overlapping event types can
+            // still be selected by touching their visible symbol.
+            selection = tappedAnchor(at: location, viewportWidth: viewportWidth)
+        }
 
         // A featherlight tick whenever the finger moves onto a different mark.
         if let anchor = selection, anchor.date != lastHapticAnchorDate {

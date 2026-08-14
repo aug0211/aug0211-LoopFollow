@@ -3,17 +3,26 @@
 
 import CoreGraphics
 
-func bgChartScrubProbeLocation(
-    fingerLocation: CGPoint,
-    trackedPlotY: CGFloat?
-) -> CGPoint {
-    guard let trackedPlotY, trackedPlotY.isFinite else { return fingerLocation }
-    return CGPoint(x: fingerLocation.x, y: trackedPlotY)
+struct BGChartHorizontalScrubCandidate<Value> {
+    let value: Value
+    let plotX: CGFloat
 }
 
-func retainedBGChartScrubSelection<Value>(
-    current: Value?,
-    proposed: Value?
-) -> Value? {
-    proposed ?? current
+func horizontallyAdvancedBGChartScrubSelection<Value>(
+    current: BGChartHorizontalScrubCandidate<Value>,
+    proposals: [BGChartHorizontalScrubCandidate<Value>],
+    cursorX: CGFloat,
+    captureRadius: CGFloat
+) -> Value {
+    var best = current
+    var bestDistance = abs(current.plotX - cursorX)
+
+    for proposal in proposals {
+        let distance = abs(proposal.plotX - cursorX)
+        guard distance <= captureRadius, distance < bestDistance else { continue }
+        best = proposal
+        bestDistance = distance
+    }
+
+    return best.value
 }
