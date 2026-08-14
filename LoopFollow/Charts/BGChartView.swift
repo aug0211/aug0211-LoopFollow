@@ -728,8 +728,12 @@ private struct MainBGChart: View {
                 interaction.visibleSeconds * TimeInterval(location.x / viewportWidth)
             )
             let proposals = [
+                nearestTreatmentScrubAnchor(atViewportX: location.x, viewportWidth: viewportWidth),
                 tappedAnchor(at: laneProbe, viewportWidth: viewportWidth),
-                selectionAnchor(for: cursorDate, captureWindow: 0),
+                // Treatments are proposed independently above. A negative
+                // window keeps this dense-series lookup from rebuilding the
+                // old multi-treatment popup at an exact timestamp.
+                selectionAnchor(for: cursorDate, captureWindow: -1),
             ].compactMap { anchor in
                 anchor.map {
                     BGChartHorizontalScrubCandidate(
@@ -760,6 +764,49 @@ private struct MainBGChart: View {
             scrubHaptic.selectionChanged()
             scrubHaptic.prepare()
         }
+    }
+
+    /// Finds the closest treatment by rendered X only, then resolves its pill
+    /// through the normal 2-D hit test at the mark's exact plotted position.
+    /// This keeps sparse SMB, carb, and bolus marks reachable after the scrub
+    /// has detached vertically from the finger.
+    private func nearestTreatmentScrubAnchor(
+        atViewportX cursorX: CGFloat,
+        viewportWidth: CGFloat
+    ) -> SelectionAnchor? {
+        let groups = [
+            model.boluses,
+            model.carbs,
+            model.smbs,
+            model.bgChecks,
+            model.notes,
+            model.suspends,
+            model.resumes,
+            model.sensorStarts,
+        ]
+        let candidates = groups.flatMap { group in
+            group.map { treatment in
+                BGChartHorizontalScrubCandidate(
+                    value: treatment,
+                    plotX: xPosition(for: treatment.drawnDate, viewportWidth: viewportWidth)
+                )
+            }
+        }
+        guard let nearest = nearestBGChartHorizontalScrubCandidate(
+            in: candidates,
+            to: cursorX,
+            captureRadius: BGChartConfig.tapHitRadius
+        ) else {
+            return nil
+        }
+
+        return tappedAnchor(
+            at: CGPoint(
+                x: nearest.plotX,
+                y: yPosition(forValue: nearest.value.sgv)
+            ),
+            viewportWidth: viewportWidth
+        )
     }
 
     /// Deceleration after a flick. Mutates only scrollPosition (a transform),
