@@ -132,7 +132,10 @@ struct TreatmentsView: View {
                                             .padding(.bottom, 2)
                                             .background(Color(.systemBackground))
                                     } else if let treatment = row.treatment {
-                                        TreatmentRow(treatment: treatment)
+                                        TreatmentRow(
+                                            treatment: treatment,
+                                            rootMealTreatment: viewModel.loadedFPURoot(for: treatment)
+                                        )
                                     }
                                 }
                             } header: {
@@ -496,6 +499,7 @@ extension TreatmentDetailRequest {
 
 struct TreatmentDetailView: View {
     let treatment: Treatment
+    let rootMealTreatment: Treatment?
     @StateObject private var viewModel = TreatmentDetailViewModel()
     @ObservedObject private var remoteType = Storage.shared.remoteType
     @ObservedObject private var device = Storage.shared.device
@@ -503,6 +507,11 @@ struct TreatmentDetailView: View {
     @State private var isShowingMealEditor = false
     @State private var isShowingDeleteConfirmation = false
     @State private var mutationErrorMessage: String?
+
+    init(treatment: Treatment, rootMealTreatment: Treatment? = nil) {
+        self.treatment = treatment
+        self.rootMealTreatment = rootMealTreatment
+    }
 
     var body: some View {
         List {
@@ -544,9 +553,21 @@ struct TreatmentDetailView: View {
                     }
 
                     if meal.isGeneratedFPU {
-                        Label("Generated FPU entry — manage its root meal instead.", systemImage: "info.circle")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        if let rootMealTreatment {
+                            NavigationLink(destination: TreatmentDetailView(treatment: rootMealTreatment)) {
+                                generatedFPUNotice(
+                                    detail: "Tap here to manage the root meal entry.",
+                                    isAction: true
+                                )
+                            }
+                            .accessibilityLabel("Generated FPU entry. Manage root meal entry")
+                            .accessibilityHint("Opens the original meal that generated this FPU entry.")
+                        } else {
+                            generatedFPUNotice(
+                                detail: "Its root meal entry isn’t currently available. Return to Treatments, then refresh or load more.",
+                                isAction: false
+                            )
+                        }
                     }
                 }
 
@@ -761,6 +782,24 @@ struct TreatmentDetailView: View {
         } message: {
             Text(mutationErrorMessage ?? "")
         }
+    }
+
+    private func generatedFPUNotice(detail: String, isAction: Bool) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "info.circle")
+                .foregroundColor(.secondary)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Generated FPU entry.")
+                    .foregroundColor(.secondary)
+                Text(detail)
+                    .foregroundColor(isAction ? .accentColor : .secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .font(.subheadline)
     }
 
     private func shouldShowRemoteMealActions(for meal: TrioMealTreatment) -> Bool {
@@ -1112,9 +1151,18 @@ class TreatmentDetailViewModel: ObservableObject {
 
 struct TreatmentRow: View {
     let treatment: Treatment
+    let rootMealTreatment: Treatment?
+
+    init(treatment: Treatment, rootMealTreatment: Treatment? = nil) {
+        self.treatment = treatment
+        self.rootMealTreatment = rootMealTreatment
+    }
 
     var body: some View {
-        NavigationLink(destination: TreatmentDetailView(treatment: treatment)) {
+        NavigationLink(destination: TreatmentDetailView(
+            treatment: treatment,
+            rootMealTreatment: rootMealTreatment
+        )) {
             HStack {
                 Image(systemName: treatment.icon)
                     .foregroundColor(treatment.color)
@@ -1262,6 +1310,35 @@ class TreatmentsViewModel: ObservableObject {
     private var oldestFetchedDate: Date? // Track the oldest treatment date we've fetched
     private let pageSize = 100
     private var isFetching = false
+
+    func loadedFPURoot(for treatment: Treatment) -> Treatment? {
+        Self.uniqueFPURoot(for: treatment, among: allTreatments)
+    }
+
+    static func uniqueFPURoot(for treatment: Treatment, among candidates: [Treatment]) -> Treatment? {
+        guard let meal = treatment.trioMeal,
+              case let .generatedChild(fpuID) = meal.fpuClassification
+        else {
+            return nil
+        }
+
+        var matchingRoot: Treatment?
+        for candidate in candidates {
+            guard let candidateMeal = candidate.trioMeal,
+                  case let .familyRoot(candidateFPUID) = candidateMeal.fpuClassification,
+                  candidateFPUID == fpuID
+            else {
+                continue
+            }
+
+            guard matchingRoot == nil else {
+                return nil
+            }
+            matchingRoot = candidate
+        }
+
+        return matchingRoot
+    }
 
     func loadInitialTreatments() {
         guard !isInitialLoading, !isFetching else {
