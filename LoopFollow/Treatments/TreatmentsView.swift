@@ -60,7 +60,10 @@ struct TreatmentsView: View {
             VStack {
                 NavigationLink(isActive: treatmentDetailIsPresented) {
                     if let routedTreatment {
-                        TreatmentDetailView(treatment: routedTreatment)
+                        TreatmentDetailView(
+                            treatment: routedTreatment,
+                            rootMealTreatment: viewModel.loadedFPURoot(for: routedTreatment)
+                        )
                     }
                 } label: {
                     EmptyView()
