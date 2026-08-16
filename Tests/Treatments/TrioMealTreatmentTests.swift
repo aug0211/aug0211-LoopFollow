@@ -119,6 +119,64 @@ struct TrioMealTreatmentTests {
         #expect(unmarked.hasLegacyFPUAmbiguity)
     }
 
+    @Test("Generated FPU entries resolve only a unique loaded family root")
+    func resolvesUniqueLoadedFPURoot() throws {
+        let root = try treatment(
+            nightscoutID: "root-treatment",
+            fpuID: fpuID
+        )
+        let child = try treatment(
+            nightscoutID: "generated-child",
+            mealID: fpuID.lowercased(),
+            fpuID: fpuID
+        )
+        let sibling = try treatment(
+            nightscoutID: "generated-sibling",
+            mealID: fpuID,
+            fpuID: fpuID
+        )
+        let unrelatedRoot = try treatment(
+            nightscoutID: "unrelated-root",
+            fpuID: "BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF"
+        )
+        let unmarkedRoot = try treatment(nightscoutID: "unmarked-root")
+
+        let resolved = TreatmentsViewModel.uniqueFPURoot(
+            for: child,
+            among: [sibling, unrelatedRoot, unmarkedRoot, root]
+        )
+
+        #expect(resolved?.id == root.id)
+        #expect(TreatmentsViewModel.uniqueFPURoot(
+            for: child,
+            among: [sibling, unrelatedRoot, unmarkedRoot]
+        ) == nil)
+        #expect(TreatmentsViewModel.uniqueFPURoot(for: root, among: [root]) == nil)
+    }
+
+    @Test("Ambiguous generated FPU roots fail closed")
+    func ambiguousFPURootsFailClosed() throws {
+        let root = try treatment(
+            nightscoutID: "first-root",
+            fpuID: fpuID
+        )
+        let duplicateRoot = try treatment(
+            nightscoutID: "second-root",
+            mealID: "22222222-3333-4444-5555-666666666666",
+            fpuID: fpuID
+        )
+        let child = try treatment(
+            nightscoutID: "generated-child",
+            mealID: fpuID,
+            fpuID: fpuID
+        )
+
+        #expect(TreatmentsViewModel.uniqueFPURoot(
+            for: child,
+            among: [root, duplicateRoot]
+        ) == nil)
+    }
+
     @Test("Mutation eligibility uses the closed symmetric twelve-hour window and excludes generated children")
     func mutationEligibilityBoundaries() throws {
         let root = try #require(TrioMealTreatment(nightscoutEntry: entry()))
@@ -271,5 +329,25 @@ struct TrioMealTreatmentTests {
             result["foodType"] = foodType as AnyObject
         }
         return result
+    }
+
+    private func treatment(
+        nightscoutID: String,
+        mealID: String? = nil,
+        fpuID: String? = nil
+    ) throws -> Treatment {
+        let source = entry(
+            nightscoutID: nightscoutID,
+            mealID: mealID,
+            fpuID: fpuID
+        )
+        let meal = try #require(TrioMealTreatment(nightscoutEntry: source))
+        return try #require(TreatmentsViewModel.makeCarbTreatment(
+            from: source,
+            trioMeal: meal,
+            nightscoutID: meal.nightscoutID,
+            timestamp: meal.mealTime,
+            actualBG: 100
+        ))
     }
 }
