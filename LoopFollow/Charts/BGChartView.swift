@@ -2318,8 +2318,8 @@ private struct PillSizePreferenceKey: PreferenceKey {
 }
 
 private enum SelectionPillLayout {
-    static let width: CGFloat = 148
-    static let height: CGFloat = 64
+    static let width: CGFloat = 152
+    static let height: CGFloat = 72
 }
 
 private struct SelectionPillLayoutSizeKey: EnvironmentKey {
