@@ -16,6 +16,10 @@ private enum BGChartConfig {
     static let maxVisibleSeconds: TimeInterval = 24 * 3600
     /// Double-tap cycles the visible window through these presets.
     static let zoomPresets: [TimeInterval] = [3600, 3 * 3600, 6 * 3600, 12 * 3600, 24 * 3600]
+    /// Buttons additionally expose the legacy feature's 2-hour preset.
+    static let buttonZoomPresets: [TimeInterval] = [3600, 2 * 3600, 3 * 3600, 6 * 3600, 12 * 3600, 24 * 3600]
+    /// Increment used by the magnifying-glass buttons.
+    static let buttonZoomFactor = 1.5
     /// Anchor of the geometric grid pinch commits quantize to.
     static let zoomGridBaseSeconds: TimeInterval = 3600
     /// Geometric grid for pinch commits (~4 % per step). Every committed zoom
@@ -191,10 +195,143 @@ private struct MainBGChart: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            chart(viewport: geo.size)
+        VStack(spacing: 8) {
+            zoomControls
+
+            GeometryReader { geo in
+                chart(viewport: geo.size)
+            }
         }
         .background(Color(.systemBackground))
+    }
+
+    private var zoomControls: some View {
+        HStack(spacing: 8) {
+            zoomInButton
+
+            HStack(spacing: 4) {
+                zoomPresetButtons
+            }
+            .frame(maxWidth: .infinity)
+
+            zoomOutButton
+        }
+        .frame(height: 32)
+    }
+
+    private var zoomPresetButtons: some View {
+        ForEach(BGChartConfig.buttonZoomPresets, id: \.self) { seconds in
+            zoomPresetButton(seconds: seconds)
+        }
+    }
+
+    private var zoomInButton: some View {
+        zoomStepButton(
+            systemName: "plus.magnifyingglass",
+            accessibilityLabel: "Zoom in",
+            factor: 1 / BGChartConfig.buttonZoomFactor,
+            disabled: interaction.visibleSeconds <= BGChartConfig.minVisibleSeconds
+        )
+    }
+
+    private var zoomOutButton: some View {
+        zoomStepButton(
+            systemName: "minus.magnifyingglass",
+            accessibilityLabel: "Zoom out",
+            factor: BGChartConfig.buttonZoomFactor,
+            disabled: interaction.visibleSeconds >= BGChartConfig.maxVisibleSeconds
+        )
+    }
+
+    private func zoomStepButton(
+        systemName: String,
+        accessibilityLabel: String,
+        factor: Double,
+        disabled: Bool
+    ) -> some View {
+        Button {
+            applyButtonZoom(interaction.visibleSeconds * factor, anchorToNow: false)
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .medium))
+                .frame(width: 50, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(uiColor: .systemGray5))
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue("\(durationDescription(interaction.visibleSeconds)) visible")
+    }
+
+    private func zoomPresetButton(seconds: TimeInterval) -> some View {
+        let selected = abs(interaction.visibleSeconds - seconds) < 1
+        let title = "\(Int(seconds / 3600))h"
+
+        return Button {
+            applyButtonZoom(seconds, anchorToNow: true)
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(selected ? Color.white : Color.accentColor)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(selected ? Color.accentColor : Color(uiColor: .systemGray5))
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show \(durationDescription(seconds)) on chart")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func durationDescription(_ seconds: TimeInterval) -> String {
+        let totalMinutes = Int((seconds / 60).rounded())
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        let hourText = hours == 1 ? "1 hour" : "\(hours) hours"
+        let minuteText = minutes == 1 ? "1 minute" : "\(minutes) minutes"
+
+        if hours == 0 { return minuteText }
+        if minutes == 0 { return hourText }
+        return "\(hourText), \(minuteText)"
+    }
+
+    /// Changes the visible window through the native Swift Charts interaction
+    /// state. Presets return to live data; incremental zoom keeps the current
+    /// viewport centered, matching direct pinch behavior.
+    private func applyButtonZoom(_ proposedSeconds: TimeInterval, anchorToNow: Bool) {
+        let oldCenter = interaction.scrollPosition.addingTimeInterval(interaction.visibleSeconds / 2)
+        let seconds = min(
+            max(proposedSeconds, BGChartConfig.minVisibleSeconds),
+            BGChartConfig.maxVisibleSeconds
+        )
+
+        momentumTask?.cancel()
+        momentumTask = nil
+        resetGestureState()
+        tapped = nil
+
+        interaction.visibleSeconds = seconds
+        if anchorToNow {
+            interaction.followLatest = true
+            autoFollowPausedUntil = nil
+            interaction.scrollPosition = clampedLeadingEdge(
+                model.now.addingTimeInterval(-seconds * BGChartConfig.followNowFraction)
+            )
+        } else {
+            interaction.scrollPosition = clampedLeadingEdge(
+                oldCenter.addingTimeInterval(-seconds / 2)
+            )
+            updateFollowState()
+        }
+        updateRenderWindow(force: true)
+        interaction.persistZoom()
     }
 
     private func chart(viewport: CGSize) -> some View {
