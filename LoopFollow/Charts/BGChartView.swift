@@ -227,6 +227,9 @@ private struct MainBGChart: View {
                 anchor: pinchScaleAnchor(viewportWidth: viewportWidth, canvasWidth: canvasWidth)
             )
 
+            overrideBandsOverlay(viewportWidth: viewportWidth)
+                .allowsHitTesting(false)
+
             // Pinned y-axis labels (BG trailing, basal leading) over the
             // scrolling canvas. The canvas's own y-axis is hidden — its
             // trailing edge sits far off-screen on the wide canvas.
@@ -236,9 +239,6 @@ private struct MainBGChart: View {
                 .allowsHitTesting(false)
 
             selectionOverlay(viewportWidth: viewportWidth)
-                .allowsHitTesting(false)
-
-            overrideBandLabelsOverlay(viewportWidth: viewportWidth)
                 .allowsHitTesting(false)
 
             if !interaction.followLatest {
@@ -882,8 +882,13 @@ private struct MainBGChart: View {
         return Double(min(max(fraction, 0), 1)) * yMax
     }
 
+    /// Override bands and their labels, drawn as one unit in the shell.
+    /// Tape and text share the same coordinate maps, so they cannot drift
+    /// apart the way a canvas-drawn band and an overlay label could when the
+    /// cached plot frame went stale; the label still slides along the visible
+    /// part of the band while panning.
     @ViewBuilder
-    private func overrideBandLabelsOverlay(viewportWidth: CGFloat) -> some View {
+    private func overrideBandsOverlay(viewportWidth: CGFloat) -> some View {
         if plotFrame.height > 0 {
             let visibleStart = interaction.scrollPosition
             let visibleEnd = interaction.scrollPosition.addingTimeInterval(interaction.visibleSeconds)
@@ -895,6 +900,12 @@ private struct MainBGChart: View {
                 let xEnd = xPosition(for: visibleBandEnd, viewportWidth: viewportWidth)
                 let bandWidth = max(0, xEnd - xStart)
                 let y = yPosition(forValue: (band.yBottom + band.yTop) / 2)
+                let bandHeight = abs(yPosition(forValue: band.yBottom) - yPosition(forValue: band.yTop))
+
+                Rectangle()
+                    .fill(model.overrideColor.opacity(0.6))
+                    .frame(width: bandWidth, height: bandHeight)
+                    .position(x: xStart + bandWidth / 2, y: y)
 
                 if bandWidth > 24 {
                     Text(band.label)
@@ -1201,14 +1212,18 @@ private struct BGChartCanvas: View, Equatable {
 
     @ChartContentBuilder
     private var bgBandMarks: some ChartContent {
-        ForEach(model.overrides.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
-            RectangleMark(
-                xStart: .value("start", band.start),
-                xEnd: .value("end", band.end),
-                yStart: .value("yBottom", band.yBottom),
-                yEnd: .value("yTop", band.yTop)
-            )
-            .foregroundStyle(model.overrideColor.opacity(0.6))
+        // The main chart draws override bands in its shell overlay, glued to
+        // their labels; the small chart has no overlay, so it keeps them here.
+        if isSmall {
+            ForEach(model.overrides.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
+                RectangleMark(
+                    xStart: .value("start", band.start),
+                    xEnd: .value("end", band.end),
+                    yStart: .value("yBottom", band.yBottom),
+                    yEnd: .value("yTop", band.yTop)
+                )
+                .foregroundStyle(model.overrideColor.opacity(0.6))
+            }
         }
 
         ForEach(model.tempTargets.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
