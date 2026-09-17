@@ -882,6 +882,9 @@ private struct MainBGChart: View {
         return Double(min(max(fraction, 0), 1)) * yMax
     }
 
+    /// Override bands and their labels. Both are drawn here, from the same
+    /// coordinates, so a stale plot frame can shift the pair but can never
+    /// slide the text off its band.
     @ViewBuilder
     private func overrideBandLabelsOverlay(viewportWidth: CGFloat) -> some View {
         if plotFrame.height > 0 {
@@ -895,6 +898,12 @@ private struct MainBGChart: View {
                 let xEnd = xPosition(for: visibleBandEnd, viewportWidth: viewportWidth)
                 let bandWidth = max(0, xEnd - xStart)
                 let y = yPosition(forValue: (band.yBottom + band.yTop) / 2)
+                let bandHeight = abs(yPosition(forValue: band.yTop) - yPosition(forValue: band.yBottom))
+
+                Rectangle()
+                    .fill(model.overrideColor.opacity(0.6))
+                    .frame(width: bandWidth, height: bandHeight)
+                    .position(x: xStart + bandWidth / 2, y: y)
 
                 if bandWidth > 24 {
                     Text(band.label)
@@ -1201,7 +1210,9 @@ private struct BGChartCanvas: View, Equatable {
 
     @ChartContentBuilder
     private var bgBandMarks: some ChartContent {
-        ForEach(model.overrides.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
+        // Only the small chart draws override bands here; the main chart draws
+        // them in its label overlay so tape and text cannot drift apart.
+        ForEach(model.overrides.filter { isSmall && $0.end >= windowStart && $0.start <= windowEnd }) { band in
             RectangleMark(
                 xStart: .value("start", band.start),
                 xEnd: .value("end", band.end),
