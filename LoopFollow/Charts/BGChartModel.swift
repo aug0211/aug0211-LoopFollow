@@ -204,6 +204,7 @@ final class BGChartModel: ObservableObject {
     @Published var showMidnight: Bool = false
     @Published var showIOBCOBHistory: Bool = true
     @Published var smallGraphTreatments: Bool = true
+    @Published var showPriorDayTime: Bool = false
 
     private static let doseFormatter: NumberFormatter = {
         let nf = NumberFormatter()
@@ -537,6 +538,7 @@ final class BGChartModel: ObservableObject {
         showMidnight = Storage.shared.showMidnightLines.value
         showIOBCOBHistory = Storage.shared.showIOBCOBHistory.value
         smallGraphTreatments = Storage.shared.smallGraphTreatments.value
+        showPriorDayTime = Storage.shared.showPriorDayTimeLines.value
 
         // Advanced-settings visibility toggles. The Nightscout controllers
         // collect the data regardless (it also feeds the info rows), so hidden

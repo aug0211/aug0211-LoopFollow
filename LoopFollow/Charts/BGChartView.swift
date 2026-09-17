@@ -1717,7 +1717,9 @@ private struct BGChartCanvas: View, Equatable {
             if showTreatments {
                 treatmentMarks
             }
-            priorDayTimeRuleMarks
+            if model.showPriorDayTime {
+                priorDayTimeRuleMarks
+            }
             if !isSmall {
                 ruleMarks
             } else if model.showMidnight {
