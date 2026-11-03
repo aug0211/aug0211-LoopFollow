@@ -175,9 +175,11 @@ private struct MainBGChart: View {
 
     /// Measured size of the visible selection pill (see PillSizePreferenceKey).
     @State private var pillSize: CGSize = .zero
+    @State private var overrideCanvasGeometry: OverrideCanvasGeometry?
 
     @ScaledMetric(relativeTo: .caption) private var scaledPillWidth = SelectionPillLayout.width
     @ScaledMetric(relativeTo: .caption) private var scaledPillHeight = SelectionPillLayout.height
+    @ScaledMetric(relativeTo: .caption2) private var overrideBannerHeight: CGFloat = 22
 
     // Pinch state: live preview stretch plus the anchor captured at pinch
     // start so the zoom stays anchored under the pinch centroid.
@@ -406,6 +408,9 @@ private struct MainBGChart: View {
                 anchor: pinchScaleAnchor(viewportWidth: viewportWidth, canvasWidth: canvasWidth)
             )
 
+            overrideBannersOverlay(viewportWidth: viewportWidth)
+                .allowsHitTesting(false)
+
             // Pinned y-axis labels (BG trailing, basal leading) over the
             // scrolling canvas. The canvas's own y-axis is hidden — its
             // trailing edge sits far off-screen on the wide canvas.
@@ -420,9 +425,6 @@ private struct MainBGChart: View {
             selectionOverlay(viewportWidth: viewportWidth)
                 .environment(\.treatmentPillAction, activeTreatmentPillAction)
                 .environment(\.selectionPillLayoutSize, selectionPillLayoutSize(viewportWidth: viewportWidth))
-
-            overrideBandLabelsOverlay(viewportWidth: viewportWidth)
-                .allowsHitTesting(false)
 
             if !interaction.followLatest {
                 jumpToNowButton
@@ -449,6 +451,9 @@ private struct MainBGChart: View {
         )
         .onPreferenceChange(PlotFramePreferenceKey.self) {
             plotFrame = retainedBGChartPlotFrame(current: plotFrame, incoming: $0)
+        }
+        .onPreferenceChange(OverrideCanvasGeometryPreferenceKey.self) { geometry in
+            if let geometry { overrideCanvasGeometry = geometry }
         }
         .onPreferenceChange(PillSizePreferenceKey.self) { pillSize = $0 }
         .onChange(of: interaction.scrollPosition) { _, _ in
@@ -1101,19 +1106,8 @@ private struct MainBGChart: View {
         return texts
     }
 
-    /// Band (override / temp target) under the given date+value, if any.
+    /// Temp-target band under the given date+value. Overrides use their banner rect.
     private func bandAnchor(at date: Date, value: Double) -> SelectionAnchor? {
-        for band in model.overrides where date >= band.start && date <= band.end {
-            if value >= band.yBottom, value <= band.yTop {
-                let midY = (band.yTop + band.yBottom) / 2
-                return SelectionAnchor(
-                    date: date,
-                    value: midY,
-                    texts: [withoutTrailingTime(band.pillText)],
-                    timestamp: band.start
-                )
-            }
-        }
         for band in model.tempTargets where date >= band.start && date <= band.end {
             if value >= band.yBottom, value <= band.yTop {
                 let midY = (band.yTop + band.yBottom) / 2
@@ -1245,10 +1239,33 @@ private struct MainBGChart: View {
         return nil
     }
 
-    /// Tap hit test (screen-space, 2D). The nearest treatment, BG, or forecast
-    /// sample wins; on-board traces and bands are fallbacks.
+    /// Tap hit test (screen-space, 2D). Visible override banners win, followed by
+    /// the nearest treatment/BG/forecast sample, then on-board traces and targets.
     /// Returns nil when the tap lands on nothing — which clears the pill.
     private func tappedAnchor(at location: CGPoint, viewportWidth: CGFloat) -> SelectionAnchor? {
+        // The banner is above the chart marks, so its exact visible rect wins.
+        for band in model.overrides.reversed() {
+            if let rect = overrideBannerRect(for: band, viewportWidth: viewportWidth), rect.contains(location),
+               let geometry = overrideCanvasGeometry, let canvasRect = geometry.rects[band.id]
+            {
+                let anchorX = (pinchAnchor?.anchorFraction ?? 0.5) * viewportWidth
+                let windowSeconds = geometry.windowEnd.timeIntervalSince(geometry.windowStart)
+                let offsetX = CGFloat(interaction.scrollPosition.timeIntervalSince(geometry.windowStart) / windowSeconds)
+                    * geometry.canvasWidth
+                let canvasX = anchorX + (location.x - anchorX) / pinchScale + offsetX
+                let fraction = min(max((canvasX - canvasRect.minX) / canvasRect.width, 0), 1)
+                let measuredStart = max(band.start, geometry.windowStart)
+                let measuredEnd = min(band.end, geometry.windowEnd)
+                let date = measuredStart.addingTimeInterval(measuredEnd.timeIntervalSince(measuredStart) * TimeInterval(fraction))
+                return SelectionAnchor(
+                    date: min(max(date, band.start), band.end),
+                    value: (band.yBottom + band.yTop) / 2,
+                    texts: [withoutTrailingTime(band.pillText)],
+                    timestamp: band.start
+                )
+            }
+        }
+
         let radius = BGChartConfig.tapHitRadius
         var primaryCandidates: [BGChartTapCandidate<SelectionAnchor>] = []
 
@@ -1440,31 +1457,49 @@ private struct MainBGChart: View {
         return Double(min(max(fraction, 0), 1)) * yMax
     }
 
-    @ViewBuilder
-    private func overrideBandLabelsOverlay(viewportWidth: CGFloat) -> some View {
-        if plotFrame.height > 0 {
-            let visibleStart = interaction.scrollPosition
-            let visibleEnd = interaction.scrollPosition.addingTimeInterval(interaction.visibleSeconds)
+    private func overrideBannerRect(for band: BGChartModel.BandRect, viewportWidth: CGFloat) -> CGRect? {
+        let windowSeconds = renderWindowEnd.timeIntervalSince(renderWindowStart)
+        guard windowSeconds > 0,
+              let geometry = overrideCanvasGeometry,
+              geometry.generation == model.generation,
+              geometry.windowStart == renderWindowStart,
+              geometry.windowEnd == renderWindowEnd,
+              geometry.canvasWidth == viewportWidth * CGFloat(windowSeconds / interaction.visibleSeconds),
+              let canvasRect = geometry.rects[band.id]
+        else { return nil }
 
-            ForEach(model.overrides.filter { $0.end >= visibleStart && $0.start <= visibleEnd }) { band in
-                let visibleBandStart = max(band.start, visibleStart)
-                let visibleBandEnd = min(band.end, visibleEnd)
-                let xStart = xPosition(for: visibleBandStart, viewportWidth: viewportWidth)
-                let xEnd = xPosition(for: visibleBandEnd, viewportWidth: viewportWidth)
-                let bandWidth = max(0, xEnd - xStart)
-                let y = yPosition(forValue: (band.yBottom + band.yTop) / 2)
+        let canvasOffsetX = CGFloat(
+            interaction.scrollPosition.timeIntervalSince(renderWindowStart) / windowSeconds
+        ) * geometry.canvasWidth
+        return bgChartOverrideBannerRect(
+            canvasRect: canvasRect,
+            canvasOffsetX: canvasOffsetX,
+            pinchScale: pinchScale,
+            pinchAnchorX: (pinchAnchor?.anchorFraction ?? 0.5) * viewportWidth,
+            viewportWidth: viewportWidth,
+            plotFrame: geometry.plotFrame,
+            minimumHeight: overrideBannerHeight
+        )
+    }
 
-                if bandWidth > 24 {
-                    Text(band.label)
-                        .font(.caption2)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .padding(.trailing, 10)
-                        .frame(width: max(0, bandWidth - 6), alignment: .trailing)
-                        .clipped()
-                        .position(x: xStart + bandWidth / 2, y: y)
-                }
+    private func overrideBannersOverlay(viewportWidth: CGFloat) -> some View {
+        ForEach(model.overrides) { band in
+            if let rect = overrideBannerRect(for: band, viewportWidth: viewportWidth) {
+                Rectangle()
+                    .fill(model.overrideColor.opacity(0.6))
+                    .overlay(alignment: .trailing) {
+                        if rect.width > 24 {
+                            Text(band.label)
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .padding(.horizontal, 6)
+                        }
+                    }
+                    .frame(width: rect.width, height: rect.height)
+                    .clipped()
+                    .position(x: rect.midX, y: rect.midY)
             }
         }
     }
@@ -1730,6 +1765,14 @@ private struct BGChartCanvas: View, Equatable {
         .chartYScale(domain: 0 ... chartYDomainUpperBound(model.maxBG))
         .chartLegend(.hidden)
         .chartYAxis(.hidden)
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: OverrideCanvasGeometryPreferenceKey.self,
+                    value: measuredOverrideGeometry(proxy: proxy, geometry: geo)
+                )
+            }
+        }
 
         return Group {
             if isSmall {
@@ -1824,16 +1867,43 @@ private struct BGChartCanvas: View, Equatable {
 
     // MARK: Marks
 
+    private func measuredOverrideGeometry(proxy: ChartProxy, geometry: GeometryProxy) -> OverrideCanvasGeometry? {
+        guard !isSmall, let anchor = proxy.plotFrame else { return nil }
+        let frame = geometry[anchor]
+        guard frame.width > 0, frame.height > 0 else { return nil }
+
+        var rects: [String: CGRect] = [:]
+        for band in model.overrides where band.end >= windowStart && band.start <= windowEnd {
+            guard let startX = proxy.position(forX: max(band.start, windowStart)),
+                  let endX = proxy.position(forX: min(band.end, windowEnd)),
+                  let topY = proxy.position(forY: band.yTop),
+                  let bottomY = proxy.position(forY: band.yBottom)
+            else { continue }
+            rects[band.id] = CGRect(
+                x: frame.minX + startX,
+                y: frame.minY + min(topY, bottomY),
+                width: endX - startX,
+                height: abs(bottomY - topY)
+            )
+        }
+        return OverrideCanvasGeometry(
+            generation: generation, windowStart: windowStart, windowEnd: windowEnd,
+            canvasWidth: canvasWidth, canvasHeight: height, plotFrame: frame, rects: rects
+        )
+    }
+
     @ChartContentBuilder
     private var bgBandMarks: some ChartContent {
-        ForEach(model.overrides.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
-            RectangleMark(
-                xStart: .value("start", band.start),
-                xEnd: .value("end", band.end),
-                yStart: .value("yBottom", band.yBottom),
-                yEnd: .value("yTop", band.yTop)
-            )
-            .foregroundStyle(model.overrideColor.opacity(0.6))
+        if isSmall {
+            ForEach(model.overrides.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
+                RectangleMark(
+                    xStart: .value("start", band.start),
+                    xEnd: .value("end", band.end),
+                    yStart: .value("yBottom", band.yBottom),
+                    yEnd: .value("yTop", band.yTop)
+                )
+                .foregroundStyle(model.overrideColor.opacity(0.6))
+            }
         }
 
         ForEach(model.tempTargets.filter { $0.end >= windowStart && $0.start <= windowEnd }) { band in
@@ -2307,6 +2377,23 @@ private struct PlotFramePreferenceKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
+    }
+}
+
+private struct OverrideCanvasGeometry: Equatable {
+    let generation: Int
+    let windowStart: Date
+    let windowEnd: Date
+    let canvasWidth: CGFloat
+    let canvasHeight: CGFloat
+    let plotFrame: CGRect
+    let rects: [String: CGRect]
+}
+
+private struct OverrideCanvasGeometryPreferenceKey: PreferenceKey {
+    static var defaultValue: OverrideCanvasGeometry?
+    static func reduce(value: inout OverrideCanvasGeometry?, nextValue: () -> OverrideCanvasGeometry?) {
+        if let next = nextValue() { value = next }
     }
 }
 
