@@ -15,6 +15,7 @@ struct PendingMealData {
 struct WatchBolusView: View {
     let config: WatchConfig
     @ObservedObject var bgFetcher: BGFetcher
+    @ObservedObject private var session = WatchSessionManager.shared
     var pendingMeal: PendingMealData?
     var popToRoot: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
@@ -25,6 +26,8 @@ struct WatchBolusView: View {
     @State private var resultMessage: String?
     @State private var isError = false
     @State private var showCalcDetail = false
+    @State private var showBolusOptions = false
+    @State private var bolusMode: BolusCalculatorMode = .standard
     @State private var showCelebration = false
     @State private var isRefreshing = true
 
@@ -33,6 +36,30 @@ struct WatchBolusView: View {
         let scaled = rawCrown * 0.25
         let snapped = (scaled / 0.05).rounded() * 0.05
         return min(max(snapped, 0), config.maxBolus)
+    }
+
+    private var calculatorSettings: BolusCalculatorSettings {
+        session.config?.bolusCalculatorSettings ?? config.bolusCalculatorSettings
+    }
+
+    private var calculatedRecommendation: Double? {
+        // Preserve the existing standalone Bolus flow. Meal adjustments are
+        // layered on top of the unchanged watch calculator only for meals.
+        guard pendingMeal != nil else { return bgFetcher.recommendedBolus }
+        guard bgFetcher.bolusCalc != nil || bgFetcher.loopStatus?.recommendedBolus != nil else { return nil }
+        return BolusCalculatorAdjustment.recommendation(
+            base: bgFetcher.recommendedBolus,
+            fullBolus: bgFetcher.bolusCalc?.fullBolus,
+            scheduledBasal: bgFetcher.lookupScheduleValue(bgFetcher.basalSchedule),
+            mode: bolusMode,
+            settings: calculatorSettings,
+            maxBolus: config.maxBolus
+        )
+    }
+
+    private var calculatedText: String {
+        guard let recommendation = calculatedRecommendation else { return "Calculated: Unavailable" }
+        return String(format: "Calculated: %.2f U", recommendation)
     }
 
     var body: some View {
@@ -95,23 +122,25 @@ struct WatchBolusView: View {
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                    .padding(.top, pendingMeal == nil ? 16 : 4)
 
                     Text(String(format: "%.2f U", amount))
-                        .font(.system(size: 60, weight: .bold, design: .rounded))
+                        .font(.system(size: pendingMeal == nil ? 60 : 48, weight: .bold, design: .rounded))
                         .foregroundColor(.blue)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
 
                     HStack(spacing: 6) {
-                        Text("Calculated: \(String(format: "%.2f", bgFetcher.recommendedBolus))U")
+                        Text(calculatedText)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.blue)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                             .onTapGesture {
-                                rawCrown = min(bgFetcher.recommendedBolus, config.maxBolus) / 0.25
+                                guard let recommendation = calculatedRecommendation else { return }
+                                rawCrown = min(recommendation, config.maxBolus) / 0.25
                             }
+                            .opacity(calculatedRecommendation == nil ? 0.5 : 1)
                         if bgFetcher.bolusCalc != nil {
                             Button {
                                 showCalcDetail = true
@@ -127,6 +156,22 @@ struct WatchBolusView: View {
                     .padding(.leading, 8)
                     .padding(.top, -8)
 
+                    if pendingMeal != nil, calculatorSettings.availableModes.count > 1 {
+                        Button {
+                            showBolusOptions = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(calculatorSettings.shortLabel(for: bolusMode))
+                                Image(systemName: "chevron.down")
+                            }
+                            .font(.system(size: 13))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal, 8)
+                    }
+
                     Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {
                         confirmedAmount = amount
                         showConfirm = true
@@ -137,7 +182,7 @@ struct WatchBolusView: View {
                 }
             }
             .modifier(CrownRotationModifier(
-                isActive: !showConfirm && resultMessage == nil,
+                isActive: !showConfirm && !showBolusOptions && !showCalcDetail && resultMessage == nil,
                 value: $rawCrown,
                 from: 0,
                 through: config.maxBolus / 0.25,
@@ -153,8 +198,38 @@ struct WatchBolusView: View {
             }
             .sheet(isPresented: $showCalcDetail) {
                 if let calc = bgFetcher.bolusCalc {
-                    BolusCalcDetailView(calc: calc, recommended: bgFetcher.recommendedBolus)
+                    BolusCalcDetailView(
+                        calc: calc, recommended: calculatedRecommendation,
+                        adjustmentDescription: pendingMeal == nil ? nil : calculatorSettings.detail(for: bolusMode)
+                    )
                 }
+            }
+            .sheet(isPresented: $showBolusOptions) {
+                List {
+                    ForEach(calculatorSettings.availableModes) { mode in
+                        Button {
+                            bolusMode = mode
+                            showBolusOptions = false
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(mode.title)
+                                    Text(calculatorSettings.detail(for: mode))
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if calculatorSettings.validMode(bolusMode) == mode {
+                                    Image(systemName: "checkmark").foregroundColor(.blue)
+                                }
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("Bolus Option")
+            }
+            .onChange(of: calculatorSettings) { settings in
+                bolusMode = settings.validMode(bolusMode)
             }
             .navigationBarBackButtonHidden(showConfirm)
             .toolbar {
@@ -308,7 +383,8 @@ struct WatchBolusView: View {
 
 private struct BolusCalcDetailView: View {
     let calc: BolusCalculation
-    let recommended: Double
+    let recommended: Double?
+    let adjustmentDescription: String?
 
     var body: some View {
         ScrollView {
@@ -353,11 +429,17 @@ private struct BolusCalcDetailView: View {
                         .foregroundColor(calc.fullBolus >= 0 ? .green : .red)
                 }
 
+                if let adjustmentDescription = adjustmentDescription {
+                    Text(adjustmentDescription)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+
                 HStack {
                     Text("Recommended")
                         .font(.system(size: 11, weight: .semibold))
                     Spacer()
-                    Text("\(fmt(recommended)) U")
+                    Text(recommended.map { "\(fmt($0)) U" } ?? "Unavailable")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundColor(.blue)
                 }
