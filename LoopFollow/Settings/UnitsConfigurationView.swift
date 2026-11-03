@@ -78,6 +78,7 @@ struct UnitsConfigurationView: View {
                 .onChange(of: rangeMode) { newValue in
                     UnitSettingsStore.shared.timeInRangeMode = newValue
                     Observable.shared.chartSettingsChanged.value = true
+                    PhoneSessionManager.shared.sendConfig()
                 }
 
                 if rangeMode == .custom {

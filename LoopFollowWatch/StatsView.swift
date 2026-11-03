@@ -11,8 +11,8 @@ struct StatsView: View {
     var body: some View {
         let stats = StatsCompute.compute(
             history: bgFetcher.bgHistory,
-            lowLine: config.lowLine,
-            highLine: config.highLine
+            lowLine: config.bgColorLow,
+            highLine: config.bgColorHigh
         )
 
         // Pie at the top (.padding(.top, 30) clears the status bar),
@@ -140,18 +140,6 @@ struct StatsView: View {
         }
         return String(format: "%.2f", mgdl)
     }
-
-    /// Display the first in-range value on either side of a threshold,
-    /// nudged by `delta` mg/dL (±1 for Low/High labels). E.g. with
-    /// lowLine=69 and delta=+1 this yields "70"; with highLine=181 and
-    /// delta=-1 it yields "180". mmol/L users get a 0.1 mmol nudge.
-    private func rangeEdgeDisplay(_ mgdl: Double, delta: Int) -> String {
-        if config.units == "mmol/L" {
-            let mmol = mgdl / 18.0182 + 0.1 * Double(delta)
-            return String(format: "%.1f", mmol)
-        }
-        return "\(Int(mgdl.rounded()) + delta)"
-    }
 }
 
 // MARK: - Stat cell
@@ -225,7 +213,7 @@ struct StatsResult {
 
 enum StatsCompute {
     /// Compute 24h distribution / averages from an in-memory BG history.
-    /// Matches LoopFollow/Controllers/Stats.swift formulas exactly.
+    /// Uses the same inclusive range boundaries as the iPhone statistics.
     /// Returns nil when the 24h window is empty.
     static func compute(
         history: [BGReading],
@@ -243,9 +231,9 @@ enum StatsCompute {
         for reading in window {
             let bg = Double(reading.bgValue)
             totalGlucose += reading.bgValue
-            if bg <= lowLine {
+            if bg < lowLine {
                 countLow += 1
-            } else if bg >= highLine {
+            } else if bg > highLine {
                 countHigh += 1
             } else {
                 countRange += 1
