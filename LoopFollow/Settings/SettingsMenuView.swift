@@ -53,6 +53,7 @@ enum SettingsRoute: Hashable, Identifiable {
     case units
     case nightscout, dexcom
     case backgroundRefresh
+    case bolusCalculator
     case general, graph
     case tabSettings
     case infoDisplay
@@ -78,6 +79,7 @@ enum SettingsRoute: Hashable, Identifiable {
         switch self {
         case .nightscout: return "Nightscout"
         case .dexcom: return "Dexcom"
+        case .bolusCalculator: return "Bolus Calculator"
         case .general: return "General"
         case .graph: return "Graph"
         case .infoDisplay: return "Information Display"
@@ -102,6 +104,7 @@ enum SettingsRoute: Hashable, Identifiable {
         switch self {
         case .nightscout: return "network"
         case .dexcom: return "sensor.tag.radiowaves.forward"
+        case .bolusCalculator: return "calculator"
         case .general: return "gearshape"
         case .graph: return "chart.xyaxis.line"
         case .infoDisplay: return "info.circle"
@@ -125,6 +128,7 @@ enum SettingsRoute: Hashable, Identifiable {
     /// Extra synonyms so search finds a page by related terms, not just its title.
     var keywords: [String] {
         switch self {
+        case .bolusCalculator: return ["insulin", "reduced", "super", "percentage", "meal"]
         case .graph: return ["chart"]
         case .units: return ["mmol", "mgdl", "metrics"]
         case .infoDisplay: return ["info"]
@@ -152,6 +156,13 @@ enum SettingsRoute: Hashable, Identifiable {
                 SettingsLeaf("User Name", ["username"]),
                 SettingsLeaf("Password"),
                 SettingsLeaf("Server"),
+            ]
+        case .bolusCalculator: return [
+                SettingsLeaf("Recommended Bolus Percentage"),
+                SettingsLeaf("Enable Reduced Bolus Option"),
+                SettingsLeaf("Reduced Bolus Percentage"),
+                SettingsLeaf("Enable Super Bolus Option"),
+                SettingsLeaf("Super Bolus Percentage"),
             ]
         case .general: return [
                 SettingsLeaf("Display App Badge", ["badge"]),
@@ -273,7 +284,7 @@ enum SettingsRoute: Hashable, Identifiable {
         }
         display += [.units, .tabSettings]
 
-        var app: [SettingsRoute] = [.backgroundRefresh, .importExport, .apn]
+        var app: [SettingsRoute] = [.bolusCalculator, .backgroundRefresh, .importExport, .apn]
         #if !targetEnvironment(macCatalyst)
             app.append(.liveActivity)
         #endif
@@ -299,6 +310,7 @@ enum SettingsRoute: Hashable, Identifiable {
         case .nightscout: NightscoutSettingsView(viewModel: .init())
         case .dexcom: DexcomSettingsView(viewModel: .init())
         case .backgroundRefresh: BackgroundRefreshSettingsView(viewModel: .init())
+        case .bolusCalculator: BolusCalculatorSettingsView()
         case .general: GeneralSettingsView()
         case .graph: GraphSettingsView()
         case .tabSettings: TabCustomizationModal()

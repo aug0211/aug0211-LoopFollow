@@ -63,6 +63,7 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             "dynamicBGColor": Storage.shared.dynamicBGColor.value,
             "bgColorLow": bgColorThresholds.low,
             "bgColorHigh": bgColorThresholds.high,
+            "bolusCalculatorSettings": Storage.shared.bolusCalculatorSettings.value.dictionary,
             "mealWithFatProtein": Storage.shared.mealWithFatProtein.value,
             "maxProtein": Storage.shared.maxProtein.value.doubleValue(for: .gram()),
             "maxFat": Storage.shared.maxFat.value.doubleValue(for: .gram()),

@@ -15,9 +15,17 @@ struct Glyph: View {
                 .fill(Color(uiColor: .systemGray))
                 .frame(width: 28, height: 28)
 
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(tint)
+            if symbol == "calculator" {
+                Image("calculator")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(tint)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(tint)
+            }
         }
         .frame(width: 36, height: 36)
     }

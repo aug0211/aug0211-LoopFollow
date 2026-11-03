@@ -50,6 +50,7 @@ struct WatchConfig: Equatable {
     var bgColorHigh: Double
 
     // Meal settings (synced from iPhone)
+    var bolusCalculatorSettings: BolusCalculatorSettings
     var mealWithFatProtein: Bool
     var maxProtein: Double
     var maxFat: Double
@@ -108,6 +109,7 @@ struct WatchConfig: Equatable {
             "dynamicBGColor": dynamicBGColor,
             "bgColorLow": bgColorLow,
             "bgColorHigh": bgColorHigh,
+            "bolusCalculatorSettings": bolusCalculatorSettings.dictionary,
             "mealWithFatProtein": mealWithFatProtein,
             "maxProtein": maxProtein,
             "maxFat": maxFat,
@@ -145,6 +147,7 @@ struct WatchConfig: Equatable {
         dynamicBGColor = dict["dynamicBGColor"] as? Bool ?? false
         bgColorLow = dict["bgColorLow"] as? Double ?? 70.0
         bgColorHigh = dict["bgColorHigh"] as? Double ?? 180.0
+        bolusCalculatorSettings = BolusCalculatorSettings(dictionary: dict["bolusCalculatorSettings"] as? [String: Any] ?? [:])
         mealWithFatProtein = dict["mealWithFatProtein"] as? Bool ?? false
         maxProtein = dict["maxProtein"] as? Double ?? 30.0
         maxFat = dict["maxFat"] as? Double ?? 30.0

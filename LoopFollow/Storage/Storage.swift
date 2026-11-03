@@ -28,6 +28,8 @@ class Storage {
     var maxProtein = SecureStorageValue<HKQuantity>(key: "maxProtein", defaultValue: HKQuantity(unit: .gram(), doubleValue: 30.0))
     var maxFat = SecureStorageValue<HKQuantity>(key: "maxFat", defaultValue: HKQuantity(unit: .gram(), doubleValue: 30.0))
 
+    var bolusCalculatorSettings = StorageValue<BolusCalculatorSettings>(key: "bolusCalculatorSettings", defaultValue: BolusCalculatorSettings())
+
     var mealWithBolus = StorageValue<Bool>(key: "mealWithBolus", defaultValue: false)
     var mealWithFatProtein = StorageValue<Bool>(key: "mealWithFatProtein", defaultValue: false)
 

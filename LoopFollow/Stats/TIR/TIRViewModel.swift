@@ -29,6 +29,7 @@ class TIRViewModel: ObservableObject {
         case .custom:
             UnitSettingsStore.shared.timeInRangeMode = .tir
         }
+        PhoneSessionManager.shared.sendConfig()
         calculateTIR()
     }
 
