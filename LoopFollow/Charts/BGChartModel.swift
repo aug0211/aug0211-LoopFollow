@@ -294,9 +294,9 @@ final class BGChartModel: ObservableObject {
         if Storage.shared.dynamicBGColor.value {
             return bgDynamicColor(Double(sgv))
         }
-        if Double(sgv) >= thresholds.high {
+        if Double(sgv) > thresholds.high {
             return .yellow
-        } else if Double(sgv) <= thresholds.low {
+        } else if Double(sgv) < thresholds.low {
             return .red
         } else {
             return .green

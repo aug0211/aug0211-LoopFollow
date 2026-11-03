@@ -28,8 +28,8 @@ struct BGColorSettings {
     /// graph, which does not consult "Color BG Text".
     func pointColor(_ bg: Double) -> Color {
         guard dynamicBGColor else {
-            if bg >= high { return .yellow }
-            if bg <= low { return .red }
+            if bg > high { return .yellow }
+            if bg < low { return .red }
             return .green
         }
         return bgDynamicColor(bg)
