@@ -13,7 +13,8 @@ struct StatsDisplayView: View {
             StatsPieChartView(
                 pieLow: model.pieLow,
                 pieRange: model.pieRange,
-                pieHigh: model.pieHigh
+                pieHigh: model.pieHigh,
+                displayedInRangePercent: model.inRangePercent
             )
             .frame(width: 80, height: 80)
             .padding(.leading, 8)
@@ -53,6 +54,7 @@ struct StatsPieChartView: View {
     var pieLow: Double
     var pieRange: Double
     var pieHigh: Double
+    var displayedInRangePercent: String
 
     private struct Slice: Identifiable {
         let id: String
@@ -70,9 +72,8 @@ struct StatsPieChartView: View {
 
     var body: some View {
         Group {
-            // Use the unrounded percentages so empty data and values that
-            // only round to 100% keep the normal chart.
-            if pieRange == 100, pieLow == 0, pieHigh == 0 {
+            // Celebrate whenever the percentage shown to the user is 100%.
+            if displayedInRangePercent == String(format: "%.1f%%", 100.0) {
                 GeometryReader { geo in
                     let side = min(geo.size.width, geo.size.height)
                     ZStack {

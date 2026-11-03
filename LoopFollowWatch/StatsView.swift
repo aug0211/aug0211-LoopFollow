@@ -55,8 +55,8 @@ struct StatsView: View {
     @ViewBuilder
     private func pieChart(stats: StatsResult?) -> some View {
         if let stats = stats, stats.count > 0 {
-            if stats.countRange == stats.count {
-                // 100% in range — celebrate with a shades emoji inside
+            if percentText(stats.percentRange) == percentText(100) {
+                // Displayed 100% in range — celebrate with a shades emoji inside
                 // a solid green ring (xdrip4ios-inspired). GeometryReader
                 // sizes the emoji proportionally to the pie so it fills
                 // the ring cleanly on every watch size.
