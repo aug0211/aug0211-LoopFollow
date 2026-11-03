@@ -106,7 +106,7 @@ struct WatchBolusView: View {
                         .buttonStyle(.plain)
 
                         Text(String(format: "%.2f U", amount))
-                            .font(.system(size: pendingMeal == nil ? 60 : 48, weight: .bold, design: .rounded))
+                            .font(.system(size: 60, weight: .bold, design: .rounded))
                             .foregroundColor(.blue)
                             .lineLimit(1)
                             .minimumScaleFactor(0.55)
@@ -151,6 +151,7 @@ struct WatchBolusView: View {
                         }
                     }
                     .padding(.leading, 8)
+                    .padding(.top, pendingMeal == nil ? 0 : 4)
 
                     if pendingMeal != nil, calculatorSettings.availableModes.count > 1 {
                         Button {
