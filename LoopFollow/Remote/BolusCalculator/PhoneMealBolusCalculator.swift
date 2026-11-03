@@ -13,6 +13,13 @@ final class PhoneMealBolusCalculator: ObservableObject {
 
     @Published private(set) var recommendedBolus: Double = 0
     @Published private(set) var fullBolus: Double?
+    @Published private(set) var bolusCalc: PhoneMealCalculationState.BolusCalculation?
+    @Published private(set) var pendingInsulin: Double = 0
+    @Published private(set) var glucoseTimestamp: Date?
+    @Published private(set) var deviceStatusTimestamp: Date?
+    @Published private(set) var upstreamRecommendedBolus: Double?
+    @Published private(set) var remoteIOB: Double?
+    @Published private(set) var calculationUpdatedAt: Date?
     @Published private(set) var scheduledBasal: Double?
     @Published private(set) var isLoading = false
     @Published private(set) var hasCalculation = false
@@ -27,7 +34,8 @@ final class PhoneMealBolusCalculator: ObservableObject {
     private var active = false
     private var profileLoaded = false
 
-    /// Called by the meal sheet, on the main thread.
+    /// Called by a calculator sheet, on the main thread. A correction sheet must
+    /// call setCarbs(0) first so an unfinished meal cannot affect its calculation.
     func start() {
         stopRequests()
         active = true
@@ -74,6 +82,13 @@ final class PhoneMealBolusCalculator: ObservableObject {
         state.updateRecommendedBolus()
         recommendedBolus = state.recommendedBolus
         fullBolus = state.bolusCalc?.fullBolus
+        bolusCalc = state.bolusCalc
+        pendingInsulin = state.pendingInsulin
+        glucoseTimestamp = state.currentBG?.timestamp
+        deviceStatusTimestamp = state.deviceStatusTimestamp
+        upstreamRecommendedBolus = state.loopStatus?.recommendedBolus
+        remoteIOB = state.loopStatus?.iob
+        calculationUpdatedAt = Date()
         scheduledBasal = state.lookupScheduleValue(state.basalSchedule)
         hasCalculation = state.bolusCalc != nil || state.loopStatus?.recommendedBolus != nil
     }
@@ -195,6 +210,7 @@ final class PhoneMealCalculationState {
     var currentBG: BGReading?
     var bgHistory: [BGReading] = []
     var loopStatus: LoopStatus?
+    var deviceStatusTimestamp: Date?
     var pendingCarbs: Double = 0
     var pendingInsulin: Double = 0
     var basalSchedule: [(timeAsSeconds: Double, value: Double)] = []
@@ -341,6 +357,7 @@ final class PhoneMealCalculationState {
             if let cobData = loopRecord["cob"] as? [String: Any],
                let cobValue = cobData["cob"] as? Double { cob = cobValue }
             loopStatus = LoopStatus(iob: iob, cob: cob, recommendedBolus: loopRecord["recommendedBolus"] as? Double, isf: nil, carbRatio: nil, currentTarget: nil)
+            deviceStatusTimestamp = Self.diagnosticTimestamp(loopRecord["timestamp"])
         } else if let openapsRecord = lastEntry["openaps"] as? [String: Any] {
             var iob: Double?
             var cob: Double?
@@ -370,11 +387,23 @@ final class PhoneMealCalculationState {
                 }
             }
             loopStatus = LoopStatus(iob: iob, cob: cob, recommendedBolus: nil, isf: isf, carbRatio: carbRatio, currentTarget: currentTarget)
+            deviceStatusTimestamp = Self.diagnosticTimestamp(enactedOrSuggested?["timestamp"])
         } else { return false }
         // Preserve watch accounting: each successfully parsed device status resets
         // local pending insulin; the base algorithm then uses the fetched IOB.
         pendingInsulin = 0
         return true
+    }
+
+    /// Diagnostics only: an absent or malformed source timestamp has unknown
+    /// freshness. Never substitute fetch time or calculation time for source time.
+    /// This does not affect the watch's copied calculation or input selection.
+    private static func diagnosticTimestamp(_ value: Any?) -> Date? {
+        guard let text = value as? String else { return nil }
+        let formatter = ISO8601DateFormatter()
+        if let timestamp = formatter.date(from: text) { return timestamp }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: text)
     }
 
     @discardableResult

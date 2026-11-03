@@ -37,6 +37,21 @@ struct BolusCalculatorAdjustmentTests {
         ) == 2.15)
     }
 
+    @Test("Raw 0.82 U gives 0.80 U at 100 percent and 0.65 U at the default 80 percent")
+    func smallRecommendationPercentageBeforeRounding() {
+        var settings = BolusCalculatorSettings()
+        #expect(BolusCalculatorAdjustment.recommendation(
+            base: 0.80, fullBolus: 0.82, scheduledBasal: nil,
+            mode: .standard, settings: settings, maxBolus: 10
+        ) == 0.65)
+
+        settings.recommendedPercentage = 100
+        #expect(BolusCalculatorAdjustment.recommendation(
+            base: 0.80, fullBolus: 0.82, scheduledBasal: nil,
+            mode: .standard, settings: settings, maxBolus: 10
+        ) == 0.80)
+    }
+
     @Test("A negative base is not percentage-reduced before Super adds basal")
     func negativeFullBolus() {
         #expect(BolusCalculatorAdjustment.recommendation(

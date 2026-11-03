@@ -163,13 +163,16 @@ struct WatchBolusView: View {
                             HStack(spacing: 4) {
                                 Text(calculatorSettings.shortLabel(for: bolusMode))
                                 Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
                             }
                             .font(.system(size: 13))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
+                            .foregroundColor(.blue)
+                            .frame(minHeight: 32)
+                            .padding(.horizontal, 10)
+                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.bordered)
-                        .padding(.horizontal, 8)
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 2)
                     }
 
                     Button(amount > 0 ? "Confirm" : (pendingMeal != nil ? "Skip" : "Confirm")) {

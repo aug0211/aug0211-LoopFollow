@@ -156,4 +156,87 @@ struct BolusCalculatorBackendTests {
         #expect(state.recommendedBolus == 0)
         #expect(state.bolusCalc == nil)
     }
+
+    @Test("Correction clears entered meal carbs while keeping remote COB and pending insulin")
+    func mealToCorrection() throws {
+        let state = state()
+        state.pendingCarbs = 30
+        state.pendingInsulin = 0.25
+        state.updateRecommendedBolus()
+        #expect(state.recommendedBolus == 3.95)
+        state.pendingCarbs = 0
+        state.updateRecommendedBolus()
+        let calc = try #require(state.bolusCalc)
+        #expect(calc.pendingCarbs == 0)
+        #expect(calc.cob == 10)
+        #expect(calc.cobEffect == 1)
+        #expect(calc.iob == 1.55)
+        #expect(state.pendingInsulin == 0.25)
+        #expect(state.recommendedBolus == 0.95)
+    }
+
+    @Test("Breakdown retains the exact terms summed before watch final rounding")
+    func breakdownTotals() throws {
+        let state = state(bg: 130, isf: 75, cr: 9, iob: 0.719, cob: 0)
+        state.bgHistory = [state.currentBG!]
+        state.pendingCarbs = 21
+        state.updateRecommendedBolus()
+        let calc = try #require(state.bolusCalc)
+        #expect(calc.fullBolus == calc.glucoseEffect + calc.iobEffect + calc.cobEffect + calc.deltaEffect)
+        #expect(calc.pendingCarbs == 21)
+        #expect(calc.cr == 9)
+        #expect(calc.isf == 75)
+        #expect(calc.bg == 130)
+        #expect(calc.target == 100)
+        #expect(calc.fullBolus > state.recommendedBolus)
+    }
+
+    @Test("Status metadata uses the same suggested block as calculator inputs")
+    func suggestedStatusTimestamp() throws {
+        let state = PhoneMealCalculationState()
+        let data = Data(#"[{"created_at":"2026-11-03T13:00:00Z","openaps":{"suggested":{"timestamp":"2026-11-03T12:59:00Z","ISF":50,"reason":"CR: 10"},"enacted":{"timestamp":"2026-11-03T12:54:00Z","ISF":60}}}]"#.utf8)
+        #expect(state.parseDeviceStatus(data: data))
+        let expected = try #require(ISO8601DateFormatter().date(from: "2026-11-03T12:59:00Z"))
+        #expect(state.deviceStatusTimestamp == expected)
+        #expect(state.loopStatus?.isf == 50)
+        #expect(!state.parseDeviceStatus(data: Data(#"[{"created_at":"2026-11-03T13:05:00Z"}]"#.utf8)))
+        #expect(state.deviceStatusTimestamp == expected)
+        #expect(state.loopStatus?.isf == 50)
+    }
+
+    @Test("Loop passthrough exposes the upstream amount and its own timestamp")
+    func loopStatusMetadata() throws {
+        let state = PhoneMealCalculationState()
+        let data = Data(#"[{"created_at":"2026-11-03T13:00:00Z","loop":{"timestamp":"2026-11-03T12:58:00Z","recommendedBolus":0.875,"iob":{"iob":1.25}}}]"#.utf8)
+        #expect(state.parseDeviceStatus(data: data))
+        state.pendingInsulin = 0.1
+        state.updateRecommendedBolus()
+        #expect(state.deviceStatusTimestamp == ISO8601DateFormatter().date(from: "2026-11-03T12:58:00Z"))
+        #expect(state.loopStatus?.recommendedBolus == 0.875)
+        #expect(state.loopStatus?.iob == 1.25)
+        #expect(abs(state.recommendedBolus - 0.775) < 0.0000001)
+        #expect(state.bolusCalc == nil)
+    }
+
+    @Test("Missing and malformed status timestamps have unknown freshness")
+    func unknownStatusTimestamp() {
+        let state = PhoneMealCalculationState()
+        #expect(state.parseDeviceStatus(data: Data(#"[{"openaps":{"suggested":{"timestamp":"2026-11-03T12:59:00Z","ISF":50}}}]"#.utf8)))
+        #expect(state.deviceStatusTimestamp != nil)
+        #expect(state.parseDeviceStatus(data: Data(#"[{"openaps":{"suggested":{"ISF":50},"enacted":{"timestamp":"2026-11-03T12:54:00Z"}}}]"#.utf8)))
+        #expect(state.deviceStatusTimestamp == nil)
+        #expect(state.parseDeviceStatus(data: Data(#"[{"loop":{"timestamp":"not a date","recommendedBolus":0.875}}]"#.utf8)))
+        #expect(state.deviceStatusTimestamp == nil)
+        state.updateRecommendedBolus()
+        #expect(state.recommendedBolus == 0.875)
+    }
+
+    @Test("Fractional status timestamps retain source precision")
+    func fractionalStatusTimestamp() throws {
+        let state = PhoneMealCalculationState()
+        #expect(state.parseDeviceStatus(data: Data(#"[{"openaps":{"suggested":{"timestamp":"2026-11-03T12:59:00.750Z","ISF":50}}}]"#.utf8)))
+        let wholeSecond = try #require(ISO8601DateFormatter().date(from: "2026-11-03T12:59:00Z"))
+        let timestamp = try #require(state.deviceStatusTimestamp)
+        #expect(abs(timestamp.timeIntervalSince(wholeSecond) - 0.75) < 0.000001)
+    }
 }

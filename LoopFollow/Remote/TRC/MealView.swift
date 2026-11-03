@@ -24,6 +24,8 @@ struct MealView: View {
     @ObservedObject private var calculator = PhoneMealBolusCalculator.shared
     @ObservedObject private var calculatorSettings = Storage.shared.bolusCalculatorSettings
     @State private var bolusMode: BolusCalculatorMode = .standard
+    @State private var showCalculationInfo = false
+    @State private var didInitialize = false
 
     @FocusState private var carbsFieldIsFocused: Bool
     @FocusState private var proteinFieldIsFocused: Bool
@@ -160,6 +162,19 @@ struct MealView: View {
                                     Text(calculator.isLoading ? "Calculating…" : "Unavailable")
                                         .foregroundColor(.secondary)
                                 }
+                                Button {
+                                    UIApplication.shared.endEditing()
+                                    DispatchQueue.main.async {
+                                        calculator.setCarbs(carbs.doubleValue(for: .gram()))
+                                        showCalculationInfo = true
+                                    }
+                                } label: {
+                                    Image(systemName: "info.circle")
+                                        .foregroundColor(.blue)
+                                        .frame(minWidth: 32, minHeight: 32)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Show bolus calculation details")
                             }
                             if isScheduling {
                                 HStack {
@@ -259,9 +274,12 @@ struct MealView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
             .onAppear {
-                selectedTime = nil
-                isScheduling = false
-                bolusMode = .standard
+                if !didInitialize {
+                    selectedTime = nil
+                    isScheduling = false
+                    bolusMode = .standard
+                    didInitialize = true
+                }
                 calculator.setCarbs(carbs.doubleValue(for: .gram()))
                 if mealWithBolus.value { calculator.start() }
 
@@ -274,7 +292,19 @@ struct MealView: View {
                     showFatProteinOrderBanner = true
                 }
             }
-            .onDisappear { calculator.stop() }
+            .onDisappear {
+                // A calculation sheet can cover this view in compact layouts.
+                // Keep its entered carbs and live inputs until the meal closes.
+                if !showCalculationInfo { calculator.stop() }
+            }
+            .sheet(isPresented: $showCalculationInfo) {
+                PhoneBolusCalculationInfoView(
+                    calculator: calculator,
+                    mode: bolusMode,
+                    settings: calculatorSettings.value,
+                    maximumBolus: maxBolus.value.doubleValue(for: .internationalUnit())
+                )
+            }
             .onChange(of: carbs.doubleValue(for: .gram())) { value in
                 calculator.setCarbs(value)
             }
@@ -296,6 +326,7 @@ struct MealView: View {
             }
             .onChange(of: mealWithBolus.value) { enabled in
                 if enabled {
+                    calculator.setCarbs(carbs.doubleValue(for: .gram()))
                     calculator.start()
                 } else {
                     bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: 0)
