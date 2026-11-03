@@ -19,7 +19,7 @@ struct PhoneBolusCalculationInfoView: View {
                 if let calc = calculator.bolusCalc {
                     Section(header: Text("Base Calculation"), footer: Text("Glucose, target, and delta use mg/dL. Glucose, carb, and delta contributions are each rounded down to 0.01 U before adding them.")) {
                         formulaRow("Glucose", "(\(number(calc.bg)) − \(number(calc.target))) ÷ \(number(calc.isf))", result: calc.glucoseEffect)
-                        formulaRow("Insulin on Board", "−(\(number(calculator.remoteIOB ?? 0)) IOB + \(number(calculator.pendingInsulin)) pending U)", result: calc.iobEffect)
+                        formulaRow("Insulin on Board", "−(\(insulinNumber(calculator.remoteIOB ?? 0)) IOB + \(insulinNumber(calculator.pendingInsulin)) pending U)", result: calc.iobEffect)
                         if calc.cr > 0 {
                             formulaRow("Carbs", "(\(number(calc.cob)) COB + \(number(calc.pendingCarbs)) entered g) ÷ \(number(calc.cr)) g/U", result: calc.cobEffect)
                         } else {
@@ -106,7 +106,7 @@ struct PhoneBolusCalculationInfoView: View {
         valueRow("Bolus Option", mode.title)
         valueRow("Recommended Percentage", "\(number(settings.recommendedPercentage))%")
         if rawAmount > 0 {
-            formulaRow("Standard", "\(number(rawAmount)) × \(number(settings.recommendedPercentage))%", result: standardAmount)
+            formulaRow("Standard", "\(insulinNumber(rawAmount)) × \(number(settings.recommendedPercentage))%", result: standardAmount)
         } else {
             Text("A zero or negative full bolus is not percentage-reduced.")
                 .font(.footnote)
@@ -115,12 +115,12 @@ struct PhoneBolusCalculationInfoView: View {
         if mode == .reduced {
             valueRow("Reduced Percentage", "\(number(settings.reducedPercentage))%")
             if standardAmount > 0 {
-                formulaRow("Reduced", "\(number(standardAmount)) × \(number(settings.reducedPercentage))%", result: amountBeforeRounding)
+                formulaRow("Reduced", "\(insulinNumber(standardAmount)) × \(number(settings.reducedPercentage))%", result: amountBeforeRounding)
             }
         } else if mode == .superBolus {
             valueRow("Super Percentage", "\(number(settings.superPercentage))%")
             if let basal = calculator.scheduledBasal {
-                formulaRow("Super Addition", "One hour × \(number(basal)) U/h × \(number(settings.superPercentage))%", result: basal * settings.superPercentage / 100)
+                formulaRow("Super Addition", "One hour × \(insulinNumber(basal)) U/h × \(number(settings.superPercentage))%", result: basal * settings.superPercentage / 100)
                 valueRow("Adjusted Total", units(amountBeforeRounding))
             } else {
                 Text("Scheduled basal is unavailable, so a Super bolus cannot be calculated.")
@@ -192,8 +192,11 @@ struct PhoneBolusCalculationInfoView: View {
     }
 
     private func number(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(0 ... 5)))
+        // Match the Watch detail view: whole inputs have no decimal places,
+        // fractional glucose/carb inputs have one, and insulin always has two.
+        value == value.rounded() ? String(format: "%.0f", value) : String(format: "%.1f", value)
     }
 
-    private func units(_ value: Double) -> String { "\(number(value)) U" }
+    private func insulinNumber(_ value: Double) -> String { String(format: "%.2f", value) }
+    private func units(_ value: Double) -> String { "\(insulinNumber(value)) U" }
 }

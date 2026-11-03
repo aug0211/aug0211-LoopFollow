@@ -86,7 +86,12 @@ struct WatchBolusView: View {
                     }
 
                 } else {
-                    HStack {
+                    Text("Bolus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .padding(.top, pendingMeal == nil ? 16 : 4)
+
+                    // Keep dose controls below the navigation back button.
+                    HStack(spacing: 4) {
                         Button {
                             rawCrown = max(rawCrown - 1.0, 0)
                             WKInterfaceDevice.current().play(.click)
@@ -99,14 +104,13 @@ struct WatchBolusView: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.leading, 8)
 
-                        Spacer()
-
-                        Text("Bolus")
-                            .font(.system(size: 16, weight: .semibold))
-
-                        Spacer()
+                        Text(String(format: "%.2f U", amount))
+                            .font(.system(size: pendingMeal == nil ? 60 : 48, weight: .bold, design: .rounded))
+                            .foregroundColor(.blue)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.55)
+                            .frame(maxWidth: .infinity)
 
                         Button {
                             rawCrown = min(rawCrown + 1.0, config.maxBolus / 0.25)
@@ -121,14 +125,7 @@ struct WatchBolusView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, pendingMeal == nil ? 16 : 4)
-
-                    Text(String(format: "%.2f U", amount))
-                        .font(.system(size: pendingMeal == nil ? 60 : 48, weight: .bold, design: .rounded))
-                        .foregroundColor(.blue)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 8)
 
                     HStack(spacing: 6) {
                         Text(calculatedText)
