@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-        BC2026110300000000000001 /* BolusCalculatorSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2026110300000000000002 /* BolusCalculatorSettings.swift */; };
 		37A4BDDB2F5B6B4A00EEB289 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37A4BDDA2F5B6B4A00EEB289 /* WidgetKit.framework */; };
 		37A4BDDD2F5B6B4A00EEB289 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37A4BDDC2F5B6B4A00EEB289 /* SwiftUI.framework */; };
 		37A4BDE82F5B6B4C00EEB289 /* LoopFollowLAExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 37A4BDD92F5B6B4A00EEB289 /* LoopFollowLAExtensionExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		BB0100000000000B000000AA /* LoopFollowWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BB01000000000001000000AA /* LoopFollowWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		CC01000000000001000000AA /* LoopFollowWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CC01000000000002000000AA /* LoopFollowWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		3F1335F351590E573D8E6962 /* Pods_LoopFollow.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A7D55B42A22051DAD69E89D0 /* Pods_LoopFollow.framework */; };
+		BB0100000000000B000000AA /* LoopFollowWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = BB01000000000001000000AA /* LoopFollowWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BC2026110300000000000001 /* Shared/BolusCalculatorSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2026110300000000000002 /* Shared/BolusCalculatorSettings.swift */; };
+		CC01000000000001000000AA /* LoopFollowWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CC01000000000002000000AA /* LoopFollowWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DD50C10A2F60A00000000001 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = DD50C10A2F60A00000000003 /* SocketIO */; };
 		DDB0AF552BB1B24A00AFA48B /* BuildDetails.plist in Resources */ = {isa = PBXBuildFile; fileRef = DDB0AF542BB1B24A00AFA48B /* BuildDetails.plist */; };
 		DDCFCAF22B17273200BE5751 /* LoopFollowDisplayNameConfig.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = DDCFCAF12B17273200BE5751 /* LoopFollowDisplayNameConfig.xcconfig */; };
@@ -90,7 +90,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-        BC2026110300000000000002 /* BolusCalculatorSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/BolusCalculatorSettings.swift; sourceTree = SOURCE_ROOT; };
 		059B0FA59AABFE72FE13DDDA /* Pods-LoopFollow.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LoopFollow.release.xcconfig"; path = "Target Support Files/Pods-LoopFollow/Pods-LoopFollow.release.xcconfig"; sourceTree = "<group>"; };
 		374DAACA2F5B924B00BB663B /* LoopFollowLAExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LoopFollowLAExtensionExtension.entitlements; sourceTree = "<group>"; };
 		37A4BDD92F5B6B4A00EEB289 /* LoopFollowLAExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LoopFollowLAExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -98,6 +97,7 @@
 		37A4BDDC2F5B6B4A00EEB289 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
 		A7D55B42A22051DAD69E89D0 /* Pods_LoopFollow.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_LoopFollow.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB01000000000001000000AA /* LoopFollowWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LoopFollowWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC2026110300000000000002 /* Shared/BolusCalculatorSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/BolusCalculatorSettings.swift; sourceTree = SOURCE_ROOT; };
 		CC01000000000002000000AA /* LoopFollowWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LoopFollowWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DDB0AF502BB1A84500AFA48B /* capture-build-details.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "capture-build-details.sh"; sourceTree = "<group>"; };
 		DDB0AF542BB1B24A00AFA48B /* BuildDetails.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BuildDetails.plist; sourceTree = "<group>"; };
@@ -113,21 +113,21 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		BB01000000000011000000AA /* Exceptions for "LoopFollowWatch" folder in "LoopFollowWatch" target */ = {
+		BB01000000000011000000AA /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = BB01000000000003000000AA /* LoopFollowWatch */;
 		};
-		CC01000000000011000000AA /* Exceptions for "LoopFollowWidgets" folder in "LoopFollowWidgets" target */ = {
+		CC01000000000011000000AA /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = CC01000000000003000000AA /* LoopFollowWidgets */;
 		};
-		D736FE5E8494B2581A4EA95F /* Exceptions for "LoopFollow" folder in "LoopFollow" target */ = {
+		D736FE5E8494B2581A4EA95F /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -137,67 +137,12 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		37A4BDDE2F5B6B4A00EEB289 /* LoopFollowLAExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = LoopFollowLAExtension;
-			sourceTree = "<group>";
-		};
-		9555FE45F7FAEFA6142D04CA /* LoopFollow */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				D736FE5E8494B2581A4EA95F /* Exceptions for "LoopFollow" folder in "LoopFollow" target */,
-			);
-			path = LoopFollow;
-			sourceTree = "<group>";
-		};
-		BC0FBFD3754955D028EF6631 /* Shared */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			path = Shared;
-			sourceTree = "<group>";
-		};
-		BB01000000000002000000AA /* LoopFollowWatch */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BB01000000000011000000AA /* Exceptions for "LoopFollowWatch" folder in "LoopFollowWatch" target */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = LoopFollowWatch;
-			sourceTree = "<group>";
-		};
-		CC01000000000004000000AA /* LoopFollowWidgets */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				CC01000000000011000000AA /* Exceptions for "LoopFollowWidgets" folder in "LoopFollowWidgets" target */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = LoopFollowWidgets;
-			sourceTree = "<group>";
-		};
-		DDCC3AD72DDE1790006F1C10 /* Tests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = Tests;
-			sourceTree = "<group>";
-		};
+		37A4BDDE2F5B6B4A00EEB289 /* LoopFollowLAExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LoopFollowLAExtension; sourceTree = "<group>"; };
+		9555FE45F7FAEFA6142D04CA /* LoopFollow */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (D736FE5E8494B2581A4EA95F /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = LoopFollow; sourceTree = "<group>"; };
+		BB01000000000002000000AA /* LoopFollowWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (BB01000000000011000000AA /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = LoopFollowWatch; sourceTree = "<group>"; };
+		BC0FBFD3754955D028EF6631 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Shared; sourceTree = "<group>"; };
+		CC01000000000004000000AA /* LoopFollowWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (CC01000000000011000000AA /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = LoopFollowWidgets; sourceTree = "<group>"; };
+		DDCC3AD72DDE1790006F1C10 /* Tests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Tests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -244,6 +189,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		11D4EBF3309A313800A92CD6 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				BC2026110300000000000002 /* Shared/BolusCalculatorSettings.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		6A5880E0B811AF443B05AB02 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -292,6 +245,7 @@
 				6A5880E0B811AF443B05AB02 /* Frameworks */,
 				9555FE45F7FAEFA6142D04CA /* LoopFollow */,
 				BC0FBFD3754955D028EF6631 /* Shared */,
+				11D4EBF3309A313800A92CD6 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -461,7 +415,7 @@
 			);
 			mainGroup = FC97880B2485969B00A7906C;
 			packageReferences = (
-				DD50C10A2F60A00000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+				DD50C10A2F60A00000000002 /* XCRemoteSwiftPackageReference "socket" */,
 			);
 			productRefGroup = FC9788152485969B00A7906C /* Products */;
 			projectDirPath = "";
@@ -613,7 +567,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-                BC2026110300000000000001 /* BolusCalculatorSettings.swift in Sources */,
+				BC2026110300000000000001 /* Shared/BolusCalculatorSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1160,7 +1114,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		DD50C10A2F60A00000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+		DD50C10A2F60A00000000002 /* XCRemoteSwiftPackageReference "socket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
 			requirement = {
@@ -1173,7 +1127,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		DD50C10A2F60A00000000003 /* SocketIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DD50C10A2F60A00000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			package = DD50C10A2F60A00000000002 /* XCRemoteSwiftPackageReference "socket" */;
 			productName = SocketIO;
 		};
 /* End XCSwiftPackageProductDependency section */
