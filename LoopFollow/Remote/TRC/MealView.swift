@@ -595,10 +595,14 @@ struct MealView: View {
             fat = HKQuantity(unit: .gram(), doubleValue: min(meal.fat.rounded(), maxF))
             protein = HKQuantity(unit: .gram(), doubleValue: min(meal.protein.rounded(), maxP))
         }
-        if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
-            let maxB = maxBolus.value.doubleValue(for: .internationalUnit())
-            bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: min(meal.bolus, maxB))
-        }
+        let maxB = maxBolus.value.doubleValue(for: .internationalUnit())
+        let selectedBolus = MealBolusPolicy.amountToSend(
+            enteredAmount: meal.bolus,
+            isScheduling: isScheduling,
+            mealWithBolus: mealWithBolus.value
+        )
+        // Every Quick-Pick replaces the previous bolus, including meals with no insulin.
+        bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: min(selectedBolus, maxB))
     }
 
     private func handleValidationError(_ message: String) {

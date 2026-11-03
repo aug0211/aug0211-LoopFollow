@@ -30,9 +30,9 @@ struct BGReading {
 
     func bgColor(lowLine: Double, highLine: Double) -> Color {
         let bg = Double(bgValue)
-        if bg <= lowLine {
+        if bg < lowLine {
             return .red
-        } else if bg >= highLine {
+        } else if bg > highLine {
             return .yellow
         }
         return .green

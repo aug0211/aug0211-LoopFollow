@@ -12,8 +12,8 @@ extension WatchConfig {
     /// With it on, this is the continuous hue ramp in `bgDynamicColor`.
     func bgPointColor(_ bg: Double) -> Color {
         guard dynamicBGColor else {
-            if bg >= bgColorHigh { return .yellow }
-            if bg <= bgColorLow { return .red }
+            if bg > bgColorHigh { return .yellow }
+            if bg < bgColorLow { return .red }
             return .green
         }
         return bgDynamicColor(bg)
