@@ -151,7 +151,6 @@ struct WatchBolusView: View {
                         }
                     }
                     .padding(.leading, 8)
-                    .padding(.top, -8)
 
                     if pendingMeal != nil, calculatorSettings.availableModes.count > 1 {
                         Button {
