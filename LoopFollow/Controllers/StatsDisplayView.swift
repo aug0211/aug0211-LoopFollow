@@ -69,11 +69,30 @@ struct StatsPieChartView: View {
     }
 
     var body: some View {
-        Chart(slices) { slice in
-            SectorMark(angle: .value("share", slice.value))
-                .foregroundStyle(slice.color)
+        Group {
+            // Use the unrounded percentages so empty data and values that
+            // only round to 100% keep the normal chart.
+            if pieRange == 100, pieLow == 0, pieHigh == 0 {
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
+                    ZStack {
+                        Circle()
+                            .strokeBorder(Color.green, lineWidth: max(3, side * 0.05))
+                        Text("\u{1F60E}") // 😎
+                            .font(.system(size: side * 0.55))
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("100% in range")
+            } else {
+                Chart(slices) { slice in
+                    SectorMark(angle: .value("share", slice.value))
+                        .foregroundStyle(slice.color)
+                }
+                .chartLegend(.hidden)
+            }
         }
-        .chartLegend(.hidden)
         .allowsHitTesting(false)
     }
 }
