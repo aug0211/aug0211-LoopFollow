@@ -70,9 +70,22 @@ struct BolusCalculatorSettings: Codable, Equatable {
 }
 
 /// The existing watch calculator supplies `base` and its unrounded `fullBolus`.
-/// This optional meal adjustment layer leaves that calculator untouched. Trio's
+/// This percentage adjustment layer leaves that calculator untouched. Trio's
 /// percentages are applied before the watch's existing final rounding sequence.
 enum BolusCalculatorAdjustment {
+    /// Corrections use the configured standard percentage, without meal options.
+    /// Preserve their uncapped display; dose selection still enforces the maximum.
+    static func correctionRecommendation(
+        base: Double,
+        fullBolus: Double?,
+        settings: BolusCalculatorSettings
+    ) -> Double? {
+        recommendation(
+            base: base, fullBolus: fullBolus, scheduledBasal: nil,
+            mode: .standard, settings: settings, maxBolus: .greatestFiniteMagnitude
+        )
+    }
+
     static func recommendation(
         base: Double,
         fullBolus: Double?,

@@ -16,6 +16,7 @@ struct BolusView: View {
     @ObservedObject private var enactedOrSuggested = Observable.shared.enactedOrSuggested
     @ObservedObject private var quickPickBoluses = QuickPickBolusesManager.shared
     @ObservedObject private var calculator = PhoneMealBolusCalculator.shared
+    @ObservedObject private var calculatorSettings = Storage.shared.bolusCalculatorSettings
 
     @FocusState private var bolusFieldIsFocused: Bool
     @State private var showAlert = false
@@ -141,6 +142,7 @@ struct BolusView: View {
                     } footer: {
                         VStack(alignment: .leading, spacing: 4) {
                             if let calculated = calculatedBolus {
+                                Text("\(String(format: "%.0f", calculatorSettings.value.recommendedPercentage))% of the base calculation. Tap the calculated amount to use it.")
                                 let maximum = maxBolus.value.doubleValue(for: .internationalUnit())
                                 let capped = min(calculated, maximum)
                                 if calculated > maximum {
@@ -205,6 +207,7 @@ struct BolusView: View {
             .sheet(isPresented: $showCalculationInfo) {
                 PhoneBolusCalculationInfoView(
                     calculator: calculator,
+                    settings: calculatorSettings.value,
                     maximumBolus: maxBolus.value.doubleValue(for: .internationalUnit())
                 )
             }
@@ -278,14 +281,15 @@ struct BolusView: View {
 
     // MARK: - Recommended bolus UI
 
-    /// Standalone correction uses the watch's unadjusted base with no new meal carbs.
+    /// Apply the standard percentage to the unchanged Watch calculation, with no new meal carbs.
     private var calculatedBolus: Double? {
-        let recommendation = calculator.recommendedBolus
         let maximum = maxBolus.value.doubleValue(for: .internationalUnit())
-        guard calculator.hasCalculation, recommendation.isFinite, maximum.isFinite, maximum >= 0 else { return nil }
-        // The Watch displays the base before applying its maximum on selection.
-        // Keep that display identical; applySelectedBolus still enforces the cap.
-        return recommendation
+        guard calculator.hasCalculation, maximum.isFinite, maximum >= 0 else { return nil }
+        return BolusCalculatorAdjustment.correctionRecommendation(
+            base: calculator.recommendedBolus,
+            fullBolus: calculator.fullBolus,
+            settings: calculatorSettings.value
+        )
     }
 
     @ViewBuilder

@@ -13,7 +13,7 @@ struct BolusCalculatorSettingsView: View {
             } header: {
                 Text("Calculator Configuration")
             } footer: {
-                Text("Percentage of the base calculation suggested for a standard bolus.")
+                Text("Percentage of the base calculation suggested for standard meal and correction boluses.")
             }
 
             Section {

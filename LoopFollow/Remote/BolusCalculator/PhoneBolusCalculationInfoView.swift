@@ -8,7 +8,7 @@ import SwiftUI
 struct PhoneBolusCalculationInfoView: View {
     @ObservedObject var calculator: PhoneMealBolusCalculator
     var mode: BolusCalculatorMode? = nil
-    var settings = BolusCalculatorSettings()
+    let settings: BolusCalculatorSettings
     let maximumBolus: Double
 
     @Environment(\.dismiss) private var dismiss
@@ -38,12 +38,7 @@ struct PhoneBolusCalculationInfoView: View {
 
                 if calculator.hasCalculation {
                     Section(header: Text("Adjustments")) {
-                        if let mode = mode {
-                            mealAdjustmentRows(settings.validMode(mode))
-                        } else {
-                            Text("Correction bolus uses the Watch’s standalone calculation. Meal percentages do not apply.")
-                                .foregroundStyle(.secondary)
-                        }
+                        adjustmentRows(settings.validMode(mode ?? .standard))
                     }
 
                     Section(header: Text("Final Amount")) {
@@ -102,8 +97,8 @@ struct PhoneBolusCalculationInfoView: View {
     }
 
     @ViewBuilder
-    private func mealAdjustmentRows(_ mode: BolusCalculatorMode) -> some View {
-        valueRow("Bolus Option", mode.title)
+    private func adjustmentRows(_ selectedMode: BolusCalculatorMode) -> some View {
+        if mode != nil { valueRow("Bolus Option", selectedMode.title) }
         valueRow("Recommended Percentage", "\(number(settings.recommendedPercentage))%")
         if rawAmount > 0 {
             formulaRow("Standard", "\(insulinNumber(rawAmount)) × \(number(settings.recommendedPercentage))%", result: standardAmount)
@@ -112,12 +107,12 @@ struct PhoneBolusCalculationInfoView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-        if mode == .reduced {
+        if selectedMode == .reduced {
             valueRow("Reduced Percentage", "\(number(settings.reducedPercentage))%")
             if standardAmount > 0 {
                 formulaRow("Reduced", "\(insulinNumber(standardAmount)) × \(number(settings.reducedPercentage))%", result: amountBeforeRounding)
             }
-        } else if mode == .superBolus {
+        } else if selectedMode == .superBolus {
             valueRow("Super Percentage", "\(number(settings.superPercentage))%")
             if let basal = calculator.scheduledBasal {
                 formulaRow("Super Addition", "One hour × \(insulinNumber(basal)) U/h × \(number(settings.superPercentage))%", result: basal * settings.superPercentage / 100)
@@ -135,10 +130,9 @@ struct PhoneBolusCalculationInfoView: View {
     }
 
     // Intermediate values are for display only. The recommendation comes from
-    // the same adjustment helper used by the phone meal and Watch meal screens.
+    // the same adjustment helper used by the phone and Watch bolus screens.
     private var amountBeforeRounding: Double {
-        guard let mode = mode else { return rawAmount }
-        switch settings.validMode(mode) {
+        switch settings.validMode(mode ?? .standard) {
         case .standard: return standardAmount
         case .reduced: return standardAmount > 0 ? standardAmount * settings.reducedPercentage / 100 : standardAmount
         case .superBolus: return standardAmount + (calculator.scheduledBasal ?? 0) * settings.superPercentage / 100
@@ -146,13 +140,10 @@ struct PhoneBolusCalculationInfoView: View {
     }
 
     private var usesFinalRounding: Bool {
-        if let mode = mode {
-            if settings.validMode(mode) == .standard && settings.recommendedPercentage == 100 {
-                return calculator.bolusCalc != nil
-            }
-            return true
+        if settings.validMode(mode ?? .standard) == .standard && settings.recommendedPercentage == 100 {
+            return calculator.bolusCalc != nil
         }
-        return calculator.bolusCalc != nil
+        return true
     }
 
     private var recommendation: Double? {
@@ -164,8 +155,11 @@ struct PhoneBolusCalculationInfoView: View {
                 settings: settings, maxBolus: maximumBolus
             )
         }
-        guard calculator.recommendedBolus.isFinite, maximumBolus.isFinite, maximumBolus >= 0 else { return nil }
-        return calculator.recommendedBolus
+        guard maximumBolus.isFinite, maximumBolus >= 0 else { return nil }
+        return BolusCalculatorAdjustment.correctionRecommendation(
+            base: calculator.recommendedBolus, fullBolus: calculator.fullBolus,
+            settings: settings
+        )
     }
 
     private func formulaRow(_ title: String, _ formula: String, result: Double) -> some View {

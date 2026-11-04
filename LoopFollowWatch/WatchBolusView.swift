@@ -43,10 +43,16 @@ struct WatchBolusView: View {
     }
 
     private var calculatedRecommendation: Double? {
-        // Preserve the existing standalone Bolus flow. Meal adjustments are
-        // layered on top of the unchanged watch calculator only for meals.
-        guard pendingMeal != nil else { return bgFetcher.recommendedBolus }
         guard bgFetcher.bolusCalc != nil || bgFetcher.loopStatus?.recommendedBolus != nil else { return nil }
+        // Corrections use the same recommended percentage as a standard meal.
+        // The underlying calculator is unchanged; the cap still applies on selection.
+        guard pendingMeal != nil else {
+            return BolusCalculatorAdjustment.correctionRecommendation(
+                base: bgFetcher.recommendedBolus,
+                fullBolus: bgFetcher.bolusCalc?.fullBolus,
+                settings: calculatorSettings
+            )
+        }
         return BolusCalculatorAdjustment.recommendation(
             base: bgFetcher.recommendedBolus,
             fullBolus: bgFetcher.bolusCalc?.fullBolus,
@@ -200,7 +206,7 @@ struct WatchBolusView: View {
                 if let calc = bgFetcher.bolusCalc {
                     BolusCalcDetailView(
                         calc: calc, recommended: calculatedRecommendation,
-                        adjustmentDescription: pendingMeal == nil ? nil : calculatorSettings.detail(for: bolusMode)
+                        adjustmentDescription: calculatorSettings.detail(for: pendingMeal == nil ? .standard : bolusMode)
                     )
                 }
             }

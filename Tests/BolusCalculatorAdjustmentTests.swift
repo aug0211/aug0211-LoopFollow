@@ -52,6 +52,77 @@ struct BolusCalculatorAdjustmentTests {
         ) == 0.80)
     }
 
+    @Test("Correction applies 80 percent to the raw sum before rounding, exactly once")
+    func correctionPercentageBeforeRounding() {
+        // Regression: the screenshot's 0.63 U full sum previously displayed
+        // 0.60 U without applying 80%. Using the rounded 0.60 U instead of the
+        // full sum would also be wrong: it would produce 0.45 U, not 0.50 U.
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.60, fullBolus: 0.63, settings: BolusCalculatorSettings()
+        ) == 0.50)
+    }
+
+    @Test("Correction follows the configured percentage and preserves 100 percent passthrough")
+    func correctionConfiguredPercentage() {
+        var settings = BolusCalculatorSettings()
+        settings.recommendedPercentage = 50
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.60, fullBolus: 0.63, settings: settings
+        ) == 0.30)
+        settings.recommendedPercentage = 95
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.60, fullBolus: 0.63, settings: settings
+        ) == 0.60)
+        settings.recommendedPercentage = 100
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.60, fullBolus: 0.63, settings: settings
+        ) == 0.60)
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 2.123, fullBolus: nil, settings: settings
+        ) == 2.123)
+    }
+
+    @Test("Correction uses only the standard percentage and needs no scheduled basal")
+    func correctionIgnoresMealOptions() {
+        var settings = BolusCalculatorSettings()
+        settings.reducedPercentage = 5
+        settings.superPercentage = 200
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.60, fullBolus: 0.63, settings: settings
+        ) == 0.50)
+        settings.reducedEnabled = false
+        settings.superEnabled = false
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.60, fullBolus: 0.63, settings: settings
+        ) == 0.50)
+    }
+
+    @Test("Correction clamps negative totals to zero and applies the percentage to a passthrough base")
+    func correctionBoundaryInputs() {
+        let settings = BolusCalculatorSettings()
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0, fullBolus: -0.63, settings: settings
+        ) == 0)
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0, fullBolus: 0, settings: settings
+        ) == 0)
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 0.63, fullBolus: nil, settings: settings
+        ) == 0.50)
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: .nan, fullBolus: 0.63, settings: settings
+        ) == nil)
+    }
+
+    @Test("Correction display stays uncapped so the existing selection limit remains separate")
+    func correctionDisplayBeforeSelectionCap() {
+        // For a configured maximum of 4.5 U, the display is still 8.0 U;
+        // the existing selection handler, not this calculation, applies that cap.
+        #expect(BolusCalculatorAdjustment.correctionRecommendation(
+            base: 10, fullBolus: 10, settings: BolusCalculatorSettings()
+        ) == 8)
+    }
+
     @Test("A negative base is not percentage-reduced before Super adds basal")
     func negativeFullBolus() {
         #expect(BolusCalculatorAdjustment.recommendation(
