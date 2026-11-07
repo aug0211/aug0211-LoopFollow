@@ -56,7 +56,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         UNUserNotificationCenter.current().delegate = self
 
-        WatchSessionManager.shared.activate()
+        PhoneSessionManager.shared.startSession()
 
         // Only spin up Bluetooth if the user has chosen a BLE-based background
         // refresh. Initializing BLEManager creates a CBCentralManager, which

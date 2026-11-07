@@ -659,7 +659,6 @@ final class LiveActivityManager {
             DispatchQueue.main.async { self.refreshFromCurrentState(reason: reason) }
             return
         }
-        WatchSessionManager.shared.requestUpdate(reason: reason)
         refreshCoalescer.request(reason: reason)
     }
 
