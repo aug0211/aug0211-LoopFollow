@@ -1214,6 +1214,18 @@ private struct MainBGChart: View {
         return CGRect(x: center.x - pillW / 2, y: center.y - pillH / 2, width: pillW, height: pillH)
     }
 
+    /// Fill for a linked pill: the override color while an override was active at
+    /// `date` (it wins when both are active), else the temp target color, else blue.
+    private func pillLinkColor(at date: Date) -> Color {
+        if model.overrides.contains(where: { date >= $0.start && date <= $0.end }) {
+            return model.overrideColor
+        }
+        if model.tempTargets.contains(where: { date >= $0.start && date <= $0.end }) {
+            return model.tempTargetColor
+        }
+        return .blue
+    }
+
     /// The pill sits in a fixed spot: centered across the plot, just below
     /// the override banner lane, clamped inside the plot.
     private func pillPosition(pillW: CGFloat, pillH: CGFloat, viewportWidth: CGFloat) -> CGPoint {
@@ -1281,7 +1293,7 @@ private struct MainBGChart: View {
                     .position(x: x, y: (plotFrame.minY + lineBottom) / 2)
 
                 if let frame = pillFrame(for: anchor, viewportWidth: viewportWidth) {
-                    PillLabel(texts: anchor.texts, maxWidth: min(300, viewportWidth - 16), showsLink: anchor.detail != nil, size: frame.size)
+                    PillLabel(texts: anchor.texts, maxWidth: min(300, viewportWidth - 16), showsLink: anchor.detail != nil, size: frame.size, linkColor: pillLinkColor(at: anchor.date))
                         .position(x: frame.midX, y: frame.midY)
                 }
             }
@@ -2040,6 +2052,11 @@ private struct PillLabel: View {
     var showsLink = false
     /// Fixed pill size; nil lets the pill hug its text.
     var size: CGSize? = nil
+    /// Fill of a linked pill.
+    var linkColor: Color = .blue
+
+    /// Dark text on green, which is too light for white text.
+    private var linkTextColor: Color { linkColor == .green ? .black : .white }
 
     var body: some View {
         HStack(spacing: 5) {
@@ -2047,7 +2064,7 @@ private struct PillLabel: View {
             if showsLink {
                 Image(systemName: "chevron.right")
                     .font(.caption.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(linkTextColor)
                     .accessibilityHidden(true)
             }
         }
@@ -2057,7 +2074,7 @@ private struct PillLabel: View {
         .clipped()
         .background(
             RoundedRectangle(cornerRadius: showsLink ? 8 : 6)
-                .fill(showsLink ? Color.blue : Color(.secondarySystemBackground))
+                .fill(showsLink ? linkColor : Color(.secondarySystemBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: showsLink ? 8 : 6)
                         .strokeBorder(
@@ -2107,7 +2124,7 @@ private struct PillLabel: View {
     private func entry(_ text: String, lineLimit: Int) -> some View {
         Text(text)
             .font(.caption)
-            .foregroundColor(showsLink ? .white : .primary)
+            .foregroundColor(showsLink ? linkTextColor : .primary)
             .multilineTextAlignment(.center)
             .lineLimit(lineLimit)
     }
