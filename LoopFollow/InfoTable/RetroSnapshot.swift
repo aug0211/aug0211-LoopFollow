@@ -105,9 +105,9 @@ extension MainViewController {
                     bgColor = bgDynamicColor(Double(reading.sgv))
                 } else {
                     let thresholds = UnitSettingsStore.shared.effectiveThresholds()
-                    if Double(reading.sgv) >= thresholds.high {
+                    if Double(reading.sgv) > thresholds.high {
                         bgColor = .yellow
-                    } else if Double(reading.sgv) <= thresholds.low {
+                    } else if Double(reading.sgv) < thresholds.low {
                         bgColor = .red
                     } else {
                         bgColor = .green

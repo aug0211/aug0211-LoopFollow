@@ -862,9 +862,9 @@ class MainViewController: UIViewController, UNUserNotificationCenterDelegate {
                     Observable.shared.bgTextColor.value = bgDynamicColor(Double(latestBG))
                 } else {
                     let thresholds = UnitSettingsStore.shared.effectiveThresholds()
-                    if Double(latestBG) >= thresholds.high {
+                    if Double(latestBG) > thresholds.high {
                         Observable.shared.bgTextColor.value = .yellow
-                    } else if Double(latestBG) <= thresholds.low {
+                    } else if Double(latestBG) < thresholds.low {
                         Observable.shared.bgTextColor.value = .red
                     } else {
                         Observable.shared.bgTextColor.value = .green
