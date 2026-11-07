@@ -20,9 +20,10 @@ struct LoopAPNSRemoteView: View {
                 if viewModel.loopAPNSSetup {
                     // Show Loop APNS command buttons if APNS setup configured
                     LazyVGrid(columns: columns, spacing: 16) {
-                        CommandButtonView(command: "Meal", iconName: "fork.knife", destination: LoopAPNSCarbsView())
-                        CommandButtonView(command: "Bolus", iconName: "syringe", destination: LoopAPNSBolusView())
-                        CommandButtonView(command: "Overrides", iconName: "slider.horizontal.3", destination: OverridePresetsView(), isActive: activeOverrideNote.value != nil)
+                        // Same order, colors and glyphs as the Watch remote screen.
+                        CommandButtonView(command: "Bolus", iconName: "drop.fill", destination: LoopAPNSBolusView(), color: RemoteCommandColor.bolus)
+                        CommandButtonView(command: "Meal", iconName: "fork.knife", destination: LoopAPNSCarbsView(), color: RemoteCommandColor.meal)
+                        CommandButtonView(command: "Overrides", iconName: "bolt.fill", destination: OverridePresetsView(), isActive: activeOverrideNote.value != nil, color: RemoteCommandColor.override)
                         if loopRemoteCommands.value.contains(LoopProfile.switchCommand) {
                             CommandButtonView(command: "Profiles", iconName: "arrow.triangle.2.circlepath", destination: LoopProfilesView())
                         } else {

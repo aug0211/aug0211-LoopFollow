@@ -18,10 +18,11 @@ struct TrioRemoteControlView: View {
                 ]
 
                 LazyVGrid(columns: columns, spacing: 16) {
-                    CommandButtonView(command: "Meal", iconName: "fork.knife", destination: MealView())
-                    CommandButtonView(command: "Bolus", iconName: "syringe", destination: BolusView())
-                    CommandButtonView(command: "Temp Target", iconName: "scope", destination: TempTargetView(), isActive: activeTempTarget.value != nil)
-                    CommandButtonView(command: "Overrides", iconName: "slider.horizontal.3", destination: OverrideView(), isActive: activeOverrideNote.value != nil)
+                    // Same order, colors and glyphs as the Watch remote screen.
+                    CommandButtonView(command: "Bolus", iconName: "drop.fill", destination: BolusView(), color: RemoteCommandColor.bolus)
+                    CommandButtonView(command: "Meal", iconName: "fork.knife", destination: MealView(), color: RemoteCommandColor.meal)
+                    CommandButtonView(command: "Overrides", iconName: "bolt.fill", destination: OverrideView(), isActive: activeOverrideNote.value != nil, color: RemoteCommandColor.override)
+                    CommandButtonView(command: "Temp Target", iconName: "target", destination: TempTargetView(), isActive: activeTempTarget.value != nil, color: RemoteCommandColor.tempTarget)
                 }
                 .padding(.horizontal)
 
@@ -32,6 +33,14 @@ struct TrioRemoteControlView: View {
     }
 }
 
+/// Remote command colors, shared with the Watch remote screen.
+enum RemoteCommandColor {
+    static let bolus = Color.blue
+    static let meal = Color.yellow
+    static let override = Color.purple
+    static let tempTarget = Color(red: 0.2, green: 0.9, blue: 0.1)
+}
+
 struct CommandButtonView<Destination: View>: View {
     let command: String
     let iconName: String
@@ -39,6 +48,7 @@ struct CommandButtonView<Destination: View>: View {
     /// Lights the button up with a glow while the corresponding override /
     /// temp target is active.
     var isActive: Bool = false
+    var color: Color = .blue
 
     var body: some View {
         NavigationLink(destination: destination) {
@@ -48,19 +58,38 @@ struct CommandButtonView<Destination: View>: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 50, height: 50)
                 Text(command)
+                    .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity, minHeight: 100)
             .padding()
-            .background(Color.blue)
+            .background(
+                ZStack {
+                    // Lighter top, darker bottom, like the Watch tiles.
+                    LinearGradient(
+                        colors: [color, color.opacity(0.85)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    VStack {
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.08), Color.white.opacity(0)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 24)
+                        Spacer()
+                    }
+                }
+            )
             .foregroundColor(.white)
             .cornerRadius(8)
             .overlay {
                 if isActive {
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.green, lineWidth: 2.5)
+                        .stroke(Color.white, lineWidth: 2.5)
                 }
             }
-            .shadow(color: isActive ? Color.green.opacity(0.7) : .clear, radius: isActive ? 9 : 0)
+            .shadow(color: isActive ? color.opacity(0.8) : .clear, radius: isActive ? 9 : 0)
         }
         .buttonStyle(PlainButtonStyle())
     }
