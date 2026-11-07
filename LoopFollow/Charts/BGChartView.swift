@@ -169,6 +169,10 @@ private struct MainBGChart: View {
     /// Measured size of the visible selection pill (see PillSizePreferenceKey).
     @State private var pillSize: CGSize = .zero
 
+    /// Fixed pill size, scaled with Dynamic Type.
+    @ScaledMetric(relativeTo: .caption) private var scaledPillWidth: CGFloat = 152
+    @ScaledMetric(relativeTo: .caption) private var scaledPillHeight: CGFloat = 76
+
     // Pinch state: live preview stretch plus the anchor captured at pinch
     // start so the zoom stays anchored under the pinch centroid.
     @State private var pinchScale: CGFloat = 1
@@ -1187,22 +1191,19 @@ private struct MainBGChart: View {
         guard plotFrame.height > 0, let anchor, !anchor.texts.isEmpty else { return nil }
         let x = xPosition(for: anchor.date, viewportWidth: viewportWidth)
         guard x >= 0, x <= viewportWidth else { return nil }
-        // Measured size lags the text by one frame; fall back to a
-        // small nominal size until the first measurement lands.
-        let pillW = max(pillSize.width, 60)
-        let pillH = max(pillSize.height, 28)
-        let center = pillPosition(x: x, y: yPosition(forValue: anchor.value), pillW: pillW, pillH: pillH, viewportWidth: viewportWidth)
+        let pillW = max(min(scaledPillWidth, min(300, viewportWidth - 16)), 1)
+        let pillH = max(min(scaledPillHeight, plotFrame.height - 8), 1)
+        let center = pillPosition(pillW: pillW, pillH: pillH, viewportWidth: viewportWidth)
         return CGRect(x: center.x - pillW / 2, y: center.y - pillH / 2, width: pillW, height: pillH)
     }
 
-    /// Where the pill goes for an indicator at (x, y): under the anchor when
-    /// there is room, else above it.
-    private func pillPosition(x: CGFloat, y: CGFloat, pillW: CGFloat, pillH: CGFloat, viewportWidth: CGFloat) -> CGPoint {
-        let labelX = min(max(x, pillW / 2 + 4), viewportWidth - pillW / 2 - 4)
-        let below = y + 14 + pillH / 2
-        let above = y - 14 - pillH / 2
-        let fitsBelow = below + pillH / 2 <= plotFrame.maxY - 4
-        return CGPoint(x: labelX, y: fitsBelow ? below : max(above, plotFrame.minY + pillH / 2 + 4))
+    /// The pill sits in a fixed spot: centered across the plot, just below
+    /// the override banner lane, clamped inside the plot.
+    private func pillPosition(pillW: CGFloat, pillH: CGFloat, viewportWidth: CGFloat) -> CGPoint {
+        let x = min(max(plotFrame.midX, pillW / 2 + 4), viewportWidth - pillW / 2 - 4)
+        let preferredY = yPosition(forValue: model.maxBG - 25) + 8 + pillH / 2
+        let y = min(max(preferredY, plotFrame.minY + pillH / 2 + 4), plotFrame.maxY - pillH / 2 - 4)
+        return CGPoint(x: x, y: y)
     }
 
     /// The forecast the loop made from the scrubbed BG reading, drawn in the
@@ -1263,7 +1264,7 @@ private struct MainBGChart: View {
                     .position(x: x, y: (plotFrame.minY + lineBottom) / 2)
 
                 if let frame = pillFrame(for: anchor, viewportWidth: viewportWidth) {
-                    PillLabel(texts: anchor.texts, maxWidth: min(300, viewportWidth - 16), showsLink: anchor.detail != nil)
+                    PillLabel(texts: anchor.texts, maxWidth: min(300, viewportWidth - 16), showsLink: anchor.detail != nil, size: frame.size)
                         .position(x: frame.midX, y: frame.midY)
                 }
             }
@@ -1637,6 +1638,19 @@ private struct BGChartCanvas: View, Equatable {
     @ChartContentBuilder
     private var historyOverlayMarks: some ChartContent {
         if let overlay = model.historyOverlay {
+            // Shade under IOB and COB so the curves read clearly over the BG chart.
+            ForEach(overlay.series.filter(\.kind.fillsArea)) { series in
+                ForEach(windowedLine(series.points) { $0.date }) { pt in
+                    AreaMark(
+                        x: .value("time", pt.date),
+                        yStart: .value("baseline", 0),
+                        yEnd: .value(series.kind.title, pt.value),
+                        series: .value("series", "overlay-area-\(series.id)-\(pt.segment)")
+                    )
+                    .foregroundStyle(series.color.opacity(series.kind == .iob ? 0.14 : 0.2))
+                    .interpolationMethod(.linear)
+                }
+            }
             ForEach(overlay.series) { series in
                 ForEach(windowedLine(series.points) { $0.date }) { pt in
                     LineMark(
@@ -2000,27 +2014,40 @@ private struct PillLabel: View {
     /// readable over a busy cluster.
     let texts: [String]
     let maxWidth: CGFloat
-    /// The pill opens a Treatments list entry when tapped.
+    /// The pill opens a Treatments list entry when tapped; it then fills blue.
     var showsLink = false
+    /// Fixed pill size; nil lets the pill hug its text.
+    var size: CGSize? = nil
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             content
             if showsLink {
                 Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(.accentColor)
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
+        .frame(width: size?.width, height: size?.height)
+        .clipped()
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: showsLink ? 8 : 6)
+                .fill(showsLink ? Color.blue : Color(.secondarySystemBackground))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(showsLink ? Color.accentColor : Color.primary, lineWidth: showsLink ? 1 : 0.5)
+                    RoundedRectangle(cornerRadius: showsLink ? 8 : 6)
+                        .strokeBorder(
+                            showsLink ? Color.white.opacity(0.55) : Color.primary,
+                            lineWidth: showsLink ? 1 : 0.5
+                        )
                 )
+        )
+        .shadow(
+            color: showsLink ? Color.black.opacity(0.4) : .clear,
+            radius: showsLink ? 2 : 0,
+            y: showsLink ? 1 : 0
         )
         .background(
             GeometryReader { geo in
@@ -2057,8 +2084,8 @@ private struct PillLabel: View {
 
     private func entry(_ text: String, lineLimit: Int) -> some View {
         Text(text)
-            .font(.caption2)
-            .foregroundColor(.primary)
+            .font(.caption)
+            .foregroundColor(showsLink ? .white : .primary)
             .multilineTextAlignment(.center)
             .lineLimit(lineLimit)
     }
