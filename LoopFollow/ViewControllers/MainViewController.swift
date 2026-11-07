@@ -298,7 +298,9 @@ class MainViewController: UIViewController, UNUserNotificationCenterDelegate {
             .sink { [weak self] _ in
                 self?.updateBGGraphSettings()
                 self?.updateBGGraph()
-                LiveActivityManager.shared.refreshFromCurrentState(reason: "range mode changed")
+                #if !targetEnvironment(macCatalyst)
+                    LiveActivityManager.shared.refreshFromCurrentState(reason: "range mode changed")
+                #endif
                 self?.updateStats()
             }
             .store(in: &cancellables)
