@@ -1014,8 +1014,10 @@ class MainViewController: UIViewController, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_: UNUserNotificationCenter, didReceive _: UNNotificationResponse, withCompletionHandler _: @escaping () -> Void) {}
 
+    /// Top of the BG chart scale. Only real readings raise it above the
+    /// minimum scale setting; predictions that run higher are clipped.
     func calculateMaxBgGraphValue() -> Float {
-        return max(Float(topBG), Float(topPredictionBG))
+        return Float(topBG)
     }
 
     func loadDebugData() {

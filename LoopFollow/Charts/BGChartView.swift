@@ -1455,6 +1455,8 @@ private struct BGChartCanvas: View, Equatable {
         }
         .chartXScale(domain: windowStart ... windowEnd)
         .chartYScale(domain: 0 ... chartYDomainUpperBound(model.maxBG))
+        // Predictions don't raise the scale, so clip lines that run above it.
+        .chartPlotStyle { $0.clipped() }
         .chartLegend(.hidden)
         .chartYAxis(.hidden)
 
