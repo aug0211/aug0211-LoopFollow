@@ -101,13 +101,17 @@ extension MainViewController {
                 bgText = Localizer.toDisplayUnits(String(reading.sgv))
             }
             if Storage.shared.colorBGText.value {
-                let thresholds = UnitSettingsStore.shared.effectiveThresholds()
-                if Double(reading.sgv) >= thresholds.high {
-                    bgColor = .yellow
-                } else if Double(reading.sgv) <= thresholds.low {
-                    bgColor = .red
+                if Storage.shared.dynamicBGColor.value {
+                    bgColor = bgDynamicColor(Double(reading.sgv))
                 } else {
-                    bgColor = .green
+                    let thresholds = UnitSettingsStore.shared.effectiveThresholds()
+                    if Double(reading.sgv) >= thresholds.high {
+                        bgColor = .yellow
+                    } else if Double(reading.sgv) <= thresholds.low {
+                        bgColor = .red
+                    } else {
+                        bgColor = .green
+                    }
                 }
             }
             if let direction = reading.direction {
