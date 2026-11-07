@@ -42,6 +42,10 @@ extension MainViewController {
             } else if let profileISF = profileISF {
                 infoManager.updateInfoData(type: .isf, value: profileISF)
                 Storage.shared.lastIsfMgdlPerU.value = profileISF.doubleValue(for: .milligramsPerDeciliter)
+            } else if let enactedISF = enactedISF {
+                // No profile loaded (yet): show the loop's own value, as Nightscout does.
+                infoManager.updateInfoData(type: .isf, value: enactedISF)
+                Storage.shared.lastIsfMgdlPerU.value = enactedISF.doubleValue(for: .milligramsPerDeciliter)
             }
 
             // Carb Ratio (CR)
@@ -69,6 +73,9 @@ extension MainViewController {
             } else if let profileCR = profileCR {
                 infoManager.updateInfoData(type: .carbRatio, value: profileCR)
                 Storage.shared.lastCarbRatio.value = profileCR
+            } else if let enactedCR = enactedCR {
+                infoManager.updateInfoData(type: .carbRatio, value: enactedCR)
+                Storage.shared.lastCarbRatio.value = enactedCR
             }
 
             // IOB
@@ -165,9 +172,15 @@ extension MainViewController {
                 Storage.shared.lastTargetLowMgdl.value = effectiveMgdl
                 Storage.shared.lastTargetHighMgdl.value = effectiveMgdl
             } else if let profileTargetHigh = profileTargetHigh {
+                infoManager.updateInfoData(type: .target, value: profileTargetHigh)
                 let profileMgdl = profileTargetHigh.doubleValue(for: .milligramsPerDeciliter)
                 Storage.shared.lastTargetLowMgdl.value = profileMgdl
                 Storage.shared.lastTargetHighMgdl.value = profileMgdl
+            } else if let enactedTarget = enactedTarget {
+                infoManager.updateInfoData(type: .target, value: enactedTarget)
+                let effectiveMgdl = enactedTarget.doubleValue(for: .milligramsPerDeciliter)
+                Storage.shared.lastTargetLowMgdl.value = effectiveMgdl
+                Storage.shared.lastTargetHighMgdl.value = effectiveMgdl
             }
 
             // TDD

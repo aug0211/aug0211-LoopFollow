@@ -31,8 +31,14 @@ extension MainViewController {
         guard let store = profileData.store["default"] ?? profileData.store["Default"] else {
             return
         }
+        let isFirstProfile = profileManager.isfSchedule.isEmpty && profileManager.basalSchedule.isEmpty
         profileManager.loadProfile(from: profileData)
         infoManager.updateInfoData(type: .profile, value: profileData.defaultProfile)
+        // At launch the device status can arrive before the profile; refresh it
+        // so the ISF, CR and Target rows fill in now, not at the next loop.
+        if isFirstProfile {
+            TaskScheduler.shared.rescheduleTask(id: .deviceStatus, to: Date())
+        }
         Storage.shared.lastProfileName.value = profileData.defaultProfile
 
         // Mark profile data as loaded for initial loading state
