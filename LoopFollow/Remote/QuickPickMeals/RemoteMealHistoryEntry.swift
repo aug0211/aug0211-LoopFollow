@@ -36,4 +36,15 @@ struct RemoteMealHistoryEntry: Codable, Equatable {
         dayOfWeek = cal.component(.weekday, from: date)
         minuteOfDay = cal.component(.hour, from: date) * 60 + cal.component(.minute, from: date)
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        carbs = try container.decode(Double.self, forKey: .carbs)
+        fat = try container.decode(Double.self, forKey: .fat)
+        protein = try container.decode(Double.self, forKey: .protein)
+        bolus = try container.decodeIfPresent(Double.self, forKey: .bolus) ?? 0
+        date = try container.decode(Date.self, forKey: .date)
+        dayOfWeek = try container.decode(Int.self, forKey: .dayOfWeek)
+        minuteOfDay = try container.decode(Int.self, forKey: .minuteOfDay)
+    }
 }

@@ -13,6 +13,8 @@ struct BolusView: View {
     @ObservedObject private var bolusIncrement = Storage.shared.bolusIncrement
 
     @ObservedObject private var quickPickBoluses = QuickPickBolusesManager.shared
+    @ObservedObject private var calculator = PhoneMealBolusCalculator.shared
+    @ObservedObject private var calculatorSettings = Storage.shared.bolusCalculatorSettings
 
     @FocusState private var bolusFieldIsFocused: Bool
     @State private var showAlert = false
@@ -20,6 +22,8 @@ struct BolusView: View {
     @State private var alertMessage: String? = nil
     @State private var isLoading = false
     @State private var statusMessage: String? = nil
+    @State private var showCalculationInfo = false
+    @State private var confirmedBolusAmount: Double = 0
 
     private let pushNotificationManager = PushNotificationManager()
 
@@ -91,6 +95,36 @@ struct BolusView: View {
                     }
 
                     Section {
+                        HStack {
+                            Text("Calculated Bolus Amount")
+                            Spacer()
+                            if calculator.isLoading {
+                                ProgressView()
+                            } else if let calculated = calculatedBolus {
+                                Button {
+                                    applySelectedBolus(calculated)
+                                } label: {
+                                    Text(String(format: "%.2f U", calculated))
+                                        .foregroundColor(.blue)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isLoading)
+                                .accessibilityLabel("Use calculated bolus, \(String(format: "%.2f", calculated)) units")
+                            } else {
+                                Text("Unavailable")
+                                    .foregroundColor(.secondary)
+                            }
+                            Button {
+                                showCalculationInfo = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.blue)
+                                    .frame(minWidth: 30, minHeight: 36)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Bolus calculation details")
+                        }
+
                         HKQuantityInputView(
                             label: "Bolus Amount",
                             quantity: $bolusAmount,
@@ -103,17 +137,33 @@ struct BolusView: View {
                                 handleValidationError(message)
                             }
                         )
+                    } footer: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let calculated = calculatedBolus {
+                                Text("\(String(format: "%.0f", calculatorSettings.value.recommendedPercentage))% of the base calculation. Tap the calculated amount to use it.")
+                                let maximum = maxBolus.value.doubleValue(for: .internationalUnit())
+                                let capped = min(calculated, maximum)
+                                if calculated > maximum {
+                                    Text("Selecting this amount limits it to your maximum bolus of \(InsulinFormatter.shared.string(maximum)) U.")
+                                }
+                                if abs(roundedToStep(capped) - capped) > 1e-10 {
+                                    Text("Your \(InsulinFormatter.shared.string(stepU)) U bolus increment rounds the selected amount down to \(InsulinFormatter.shared.string(roundedToStep(capped))) U.")
+                                }
+                            }
+                        }
                     }
                 }
                 .safeAreaInset(edge: .bottom) {
                     Button {
                         bolusFieldIsFocused = false
+                        UIApplication.shared.endEditing()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             let rawValue = self.bolusAmount.doubleValue(for: .internationalUnit())
                             let steppedAmount = roundedToStep(rawValue)
 
                             if steppedAmount > 0 {
                                 bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: steppedAmount)
+                                confirmedBolusAmount = steppedAmount
                                 alertType = .confirmBolus
                                 showAlert = true
                             }
@@ -142,23 +192,36 @@ struct BolusView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
             .onAppear {
+                calculator.setCarbs(0)
+                calculator.start()
                 quickPickBoluses.refresh(
                     stepIncrement: stepU,
                     maxBolus: maxBolus.value.doubleValue(for: .internationalUnit())
                 )
             }
+            .onDisappear {
+                if !showCalculationInfo { calculator.stop() }
+            }
+            .sheet(isPresented: $showCalculationInfo) {
+                PhoneBolusCalculationInfoView(
+                    calculator: calculator,
+                    settings: calculatorSettings.value,
+                    maximumBolus: maxBolus.value.doubleValue(for: .internationalUnit())
+                )
+            }
             .alert(isPresented: $showAlert) {
                 switch alertType {
                 case .confirmBolus:
+                    let confirmedUnits = confirmedBolusAmount
                     return Alert(
                         title: Text("Confirm Bolus"),
-                        message: Text("Are you sure you want to send \(InsulinFormatter.shared.string(bolusAmount)) U?"),
+                        message: Text("Are you sure you want to send \(InsulinFormatter.shared.string(confirmedUnits)) U?"),
                         primaryButton: .default(Text("Confirm"), action: {
                             AuthService.authenticate(reason: "Confirm your identity to send bolus.") { result in
                                 DispatchQueue.main.async {
                                     switch result {
                                     case .success:
-                                        self.sendBolus()
+                                        self.sendBolus(units: confirmedUnits)
                                     case let .unavailable(message):
                                         self.alertMessage = message
                                         self.alertType = .validation
@@ -215,6 +278,17 @@ struct BolusView: View {
     }
 
     // MARK: - Recommended bolus UI
+
+    /// Apply the standard percentage to the unchanged Watch calculation, with no new meal carbs.
+    private var calculatedBolus: Double? {
+        let maximum = maxBolus.value.doubleValue(for: .internationalUnit())
+        guard calculator.hasCalculation, maximum.isFinite, maximum >= 0 else { return nil }
+        return BolusCalculatorAdjustment.correctionRecommendation(
+            base: calculator.recommendedBolus,
+            fullBolus: calculator.fullBolus,
+            settings: calculatorSettings.value
+        )
+    }
 
     @ViewBuilder
     private func recommendedBlocks(now: Date) -> some View {
@@ -288,17 +362,26 @@ struct BolusView: View {
     }
 
     private func applyQuickPickBolus(_ units: Double) {
-        let maxU = maxBolus.value.doubleValue(for: .internationalUnit())
-        let clamped = min(units, maxU)
-        let stepped = roundedToStep(clamped)
-        bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: stepped)
+        applySelectedBolus(units)
     }
 
     private func applyRecommendedBolus(_ rec: Double) {
-        let maxU = maxBolus.value.doubleValue(for: .internationalUnit())
-        let clamped = min(rec, maxU)
-        let stepped = roundedToStep(clamped)
-        bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: stepped)
+        applySelectedBolus(rec)
+    }
+
+    private func applySelectedBolus(_ units: Double) {
+        guard units.isFinite, !isLoading else { return }
+        bolusFieldIsFocused = false
+        UIApplication.shared.endEditing()
+        // UITextField queues its edit-end commit. Apply after that commit so a
+        // previously edited value cannot overwrite the explicit selection.
+        DispatchQueue.main.async {
+            guard !isLoading else { return }
+            let maxU = maxBolus.value.doubleValue(for: .internationalUnit())
+            let clamped = min(max(units, 0), maxU)
+            let stepped = roundedToStep(clamped)
+            bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: stepped)
+        }
     }
 
     private func presentableMinutesFormat(timeInterval: TimeInterval) -> String {
@@ -310,20 +393,21 @@ struct BolusView: View {
 
     // MARK: - Send
 
-    private func sendBolus() {
+    private func sendBolus(units sentUnits: Double) {
+        let submittedAmount = HKQuantity(unit: .internationalUnit(), doubleValue: sentUnits)
         isLoading = true
-        pushNotificationManager.sendBolusPushNotification(bolusAmount: bolusAmount) { success, errorMessage in
+        pushNotificationManager.sendBolusPushNotification(bolusAmount: submittedAmount) { success, errorMessage in
             DispatchQueue.main.async {
                 isLoading = false
                 if success {
-                    let sentUnits = bolusAmount.doubleValue(for: .internationalUnit())
                     if sentUnits > 0 {
                         QuickPickBolusesManager.shared.recordBolus(units: sentUnits)
+                        calculator.recordBolus(sentUnits)
                     }
                     statusMessage = RemoteCommandMessage.sent
                     LogManager.shared.log(
                         category: .apns,
-                        message: "sendBolusPushNotification succeeded - Bolus: \(InsulinFormatter.shared.string(bolusAmount)) U"
+                        message: "sendBolusPushNotification succeeded - Bolus: \(InsulinFormatter.shared.string(submittedAmount)) U"
                     )
                     bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: 0.0)
                     alertType = .statusSuccess
