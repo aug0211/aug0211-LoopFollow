@@ -266,6 +266,10 @@ class Storage {
 
     var remoteBolusHistory = StorageValue<[RemoteBolusHistoryEntry]>(key: "remoteBolusHistory", defaultValue: [])
     var remoteMealHistory = StorageValue<[RemoteMealHistoryEntry]>(key: "remoteMealHistory", defaultValue: [])
+    var namedMeals = StorageValue<[NamedMeal]>(key: "namedMeals", defaultValue: [])
+    var mealOccurrences = StorageValue<[MealOccurrence]>(key: "mealOccurrences", defaultValue: [])
+    /// Grams each of carbs, fat and protein may differ for a sent meal to match a saved one.
+    var mealMatchTolerance = StorageValue<Int>(key: "mealMatchTolerance", defaultValue: 5)
     // Statistics display preferences
     var showGMI = StorageValue<Bool>(key: "showGMI", defaultValue: true)
     var showStdDev = StorageValue<Bool>(key: "showStdDev", defaultValue: true)

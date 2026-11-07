@@ -10,6 +10,7 @@ struct RemoteSettingsView: View {
     @ObservedObject private var device = Storage.shared.device
     @ObservedObject var bolusIncrement = Storage.shared.bolusIncrement
     @ObservedObject private var watchRemoteCommands = Storage.shared.watchRemoteCommands
+    @ObservedObject private var mealMatchTolerance = Storage.shared.mealMatchTolerance
 
     @State private var showAlert: Bool = false
     @State private var alertType: AlertType? = nil
@@ -87,6 +88,17 @@ struct RemoteSettingsView: View {
 
                     Toggle("Meal with Fat/Protein", isOn: $viewModel.mealWithFatProtein)
                         .toggleStyle(SwitchToggleStyle())
+                }
+
+                Section(
+                    header: Text("Named Meals"),
+                    footer: Text("A sent meal matches a saved meal when its carbs, fat and protein are each within this many grams. 0 matches only identical meals.")
+                ) {
+                    Stepper(
+                        "Meal match tolerance: \(mealMatchTolerance.value) g",
+                        value: $mealMatchTolerance.value,
+                        in: NamedMealFormat.toleranceRange
+                    )
                 }
             }
 

@@ -26,6 +26,9 @@ struct MealView: View {
     @State private var bolusMode: BolusCalculatorMode = .standard
     @State private var showCalculationInfo = false
     @State private var didInitialize = false
+    /// The sent meal offered for naming after the success alert.
+    @State private var namingOccurrenceID: String?
+    @State private var showNamingSheet = false
 
     @FocusState private var carbsFieldIsFocused: Bool
     @FocusState private var proteinFieldIsFocused: Bool
@@ -252,6 +255,7 @@ struct MealView: View {
                 }
                 calculator.setCarbs(carbs.doubleValue(for: .gram()))
                 if mealWithBolus.value { calculator.start() }
+                NamedMealStore.shared.syncFromNightscout()
 
                 quickPickMeals.refresh(
                     maxCarbs: maxCarbs.value.doubleValue(for: .gram()),
@@ -303,6 +307,17 @@ struct MealView: View {
                     calculator.stop()
                 }
             }
+            .background(
+                // Offered after the success alert; closing it closes the meal screen.
+                Color.clear.sheet(isPresented: $showNamingSheet, onDismiss: {
+                    namingOccurrenceID = nil
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    if let namingOccurrenceID {
+                        MealNamingSheet(occurrenceID: namingOccurrenceID)
+                    }
+                }
+            )
             .alert(isPresented: $showAlert) {
                 switch alertType {
                 case .confirmMeal:
@@ -379,7 +394,14 @@ struct MealView: View {
                         title: Text("Command Sent"),
                         message: Text(statusMessage ?? ""),
                         dismissButton: .default(Text("OK"), action: {
-                            presentationMode.wrappedValue.dismiss()
+                            if namingOccurrenceID != nil {
+                                // Let the alert finish closing before presenting the sheet.
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                    showNamingSheet = true
+                                }
+                            } else {
+                                presentationMode.wrappedValue.dismiss()
+                            }
                         })
                     )
                 case .statusFailure:
@@ -509,6 +531,16 @@ struct MealView: View {
                 isLoading = false
                 if success {
                     let sentCarbs = submittedCarbs.doubleValue(for: .gram())
+                    let sentFat = submittedFat.doubleValue(for: .gram())
+                    let sentProtein = submittedProtein.doubleValue(for: .gram())
+                    if sentCarbs > 0 || sentFat > 0 || sentProtein > 0 {
+                        namingOccurrenceID = NamedMealStore.shared.recordSentMeal(
+                            carbs: sentCarbs,
+                            fat: sentFat,
+                            protein: sentProtein,
+                            mealTime: scheduledDate ?? Date()
+                        ).id
+                    }
                     if submittedBolus > 0 { calculator.recordBolus(submittedBolus) }
                     if sentCarbs > 0 {
                         QuickPickMealsManager.shared.recordMeal(

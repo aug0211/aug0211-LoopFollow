@@ -189,11 +189,13 @@ struct TreatmentsView: View {
                 .preferredColorScheme(Storage.shared.appearanceMode.value.colorScheme)
                 .refreshable {
                     viewModel.refreshTreatments()
+                    NamedMealStore.shared.syncFromNightscout()
                 }
                 .onAppear {
                     if viewModel.groupedTreatments.isEmpty {
                         viewModel.loadInitialTreatments()
                     }
+                    NamedMealStore.shared.syncFromNightscout()
                     normalizeSelectedFilter(for: device.value)
                 }
                 .onChange(of: device.value) { newValue in
@@ -406,6 +408,13 @@ struct TreatmentDetailView: View {
     @ObservedObject private var loopRemoteCommands = Storage.shared.loopRemoteCommands
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
+    @State private var showNamingSheet = false
+    @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
+
+    /// The LoopFollow-sent meal behind this entry, for naming and pre-bolus.
+    private var sentMealOccurrence: MealOccurrence? {
+        commandMeal.flatMap { NamedMealStore.shared.occurrence(for: $0) }
+    }
 
     /// The Trio meal remote commands act on: the root meal for an FPU child whose root is loaded.
     private var commandMeal: TrioMealTreatment? {
@@ -446,6 +455,9 @@ struct TreatmentDetailView: View {
                 let controlActive = TrioMealTreatment.remoteControlActive(remoteType: remoteType.value, device: device.value)
                 let actionsAvailable = TrioMealTreatment.remoteActionsAvailable(remoteType: remoteType.value, device: device.value, remoteCommands: remoteCommands.value)
                 trioMealSection(meal, needsNewerTrio: controlActive && !actionsAvailable)
+                if let occurrence = sentMealOccurrence {
+                    mealDetailsSection(occurrence)
+                }
                 if actionsAvailable {
                     trioRemoteActionsSection(meal)
                 }
@@ -610,6 +622,13 @@ struct TreatmentDetailView: View {
                 LoopCarbEditSheet(carb: carb)
             }
         }
+        .background(
+            Color.clear.sheet(isPresented: $showNamingSheet) {
+                if let occurrence = sentMealOccurrence {
+                    MealNamingSheet(occurrenceID: occurrence.id)
+                }
+            }
+        )
         .confirmationDialog(deleteDialogTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button(treatment.trioMeal != nil ? "Delete meal" : "Delete carbs", role: .destructive, action: sendDelete)
         } message: {
@@ -705,6 +724,43 @@ struct TreatmentDetailView: View {
             }
             if meal.isFPUChild, let rootMeal {
                 NavigationLink("Show original meal", destination: TreatmentDetailView(treatment: rootMeal))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func mealDetailsSection(_ occurrence: MealOccurrence) -> some View {
+        Section(
+            header: Text("Meal details"),
+            footer: Text("Sent from LoopFollow. Name the meal and add its pre-bolus to build its history.")
+        ) {
+            Button { showNamingSheet = true } label: {
+                HStack {
+                    Text("Meal name")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    if let name = occurrence.mealName, !name.isEmpty {
+                        Text(name)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Label("Name this meal", systemImage: "tag")
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
+            Button { showNamingSheet = true } label: {
+                HStack {
+                    Text("Pre-bolus")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    if let minutes = occurrence.prebolusMinutes {
+                        Text(NamedMealFormat.prebolus(minutes))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Label("Add", systemImage: "timer")
+                            .foregroundColor(.orange)
+                    }
+                }
             }
         }
     }
@@ -1015,6 +1071,16 @@ class TreatmentDetailViewModel: ObservableObject {
 struct TreatmentRow: View {
     let treatment: Treatment
     var rootMeal: Treatment? = nil
+    @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
+
+    /// A LoopFollow-sent meal still missing its name or pre-bolus.
+    private var sentMealNeedingDetails: MealOccurrence? {
+        guard let meal = treatment.trioMeal, !meal.isFPUChild,
+              let occurrence = NamedMealStore.shared.occurrence(for: meal),
+              occurrence.needsDetails
+        else { return nil }
+        return occurrence
+    }
 
     var body: some View {
         NavigationLink(destination: TreatmentDetailView(treatment: treatment, rootMeal: rootMeal)) {
@@ -1040,6 +1106,21 @@ struct TreatmentRow: View {
                 }
 
                 Spacer()
+
+                if let occurrence = sentMealNeedingDetails {
+                    HStack(spacing: 6) {
+                        if occurrence.isMissingName {
+                            Image(systemName: "tag")
+                                .accessibilityLabel("Needs a meal name")
+                        }
+                        if occurrence.isMissingPrebolus {
+                            Image(systemName: "timer")
+                                .accessibilityLabel("Needs a pre-bolus time")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.orange)
+                }
             }
             .padding(.vertical, 4)
         }
