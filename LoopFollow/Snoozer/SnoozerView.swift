@@ -48,7 +48,10 @@ struct SnoozerView: View {
                         }
                     } else {
                         GeometryReader { content in
+                            // Spare height is shared evenly above and below the
+                            // block, so the rows stay evenly spaced.
                             VStack(spacing: 0) {
+                                Spacer(minLength: 0)
                                 leftColumn(
                                     isLandscape: false,
                                     barShowing: barShowing,
@@ -56,6 +59,7 @@ struct SnoozerView: View {
                                 )
                                 .layoutPriority(1)
                                 rightColumn(isLandscape: false)
+                                Spacer(minLength: 0)
                             }
                         }
                     }
@@ -163,14 +167,18 @@ struct SnoozerView: View {
 
     // MARK: - Columns
 
-    private let portraitEmojiMinHeight: CGFloat = 70
+    private let portraitEmojiHeight: CGFloat = 100
     private let clockHeight: CGFloat = 115
     private let portraitClockBottomSpace: CGFloat = 16
     private let displayNameHeight: CGFloat = 60
+    /// Room kept for the CGM state line (up to two lines) when it shows.
+    private let cgmLineHeight: CGFloat = 72
+    /// How far the portrait rows may grow past their base sizes into spare height.
+    private let portraitMaxGrowth: CGFloat = 1.25
 
     /// Height the emoji and clock need below the left column in portrait.
     private var portraitRightColumnMinHeight: CGFloat {
-        let emoji = snoozerEmoji.value ? portraitEmojiMinHeight + 4 : 0
+        let emoji = snoozerEmoji.value ? portraitEmojiHeight + 4 : 0
         return emoji + clockHeight + portraitClockBottomSpace + 8
     }
 
@@ -180,14 +188,17 @@ struct SnoozerView: View {
     private func leftColumn(isLandscape: Bool, barShowing: Bool, availableHeight: CGFloat? = nil) -> some View {
         let topPad: CGFloat = barShowing ? 0 : 16
         let nameH: CGFloat = (!isLandscape && showDisplayName.value) ? displayNameHeight : 0
+        let cgmH: CGFloat = cgmSensorState.value == nil ? 0 : cgmLineHeight
         let maxHeights: [CGFloat] = [
             barShowing ? 210 : 250,
             barShowing ? (isLandscape ? 72 : 85) : (isLandscape ? 80 : 100),
             barShowing ? (isLandscape ? 60 : 105) : (isLandscape ? 68 : 120),
             barShowing ? (isLandscape ? 36 : 105) : (isLandscape ? 40 : 120),
         ]
+        // Portrait rows scale together: down to fit a short screen, or up (to a
+        // limit) into spare height, so the emoji and clock always stay on screen.
         let fit: CGFloat = availableHeight.map {
-            min(1, max(0, $0 - topPad - nameH) / maxHeights.reduce(0, +))
+            min(portraitMaxGrowth, max(0, $0 - topPad - nameH - cgmH) / maxHeights.reduce(0, +))
         } ?? 1
         let bigMaxH = maxHeights[0] * fit
         let dirMaxH = maxHeights[1] * fit
@@ -227,7 +238,7 @@ struct SnoozerView: View {
             } else {
                 Text(directionText.value)
                     .font(.system(size: 200, weight: .black))
-                    .minimumScaleFactor(minScale)
+                    .minimumScaleFactor(0.5)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity, maxHeight: dirMaxH)
 
@@ -260,7 +271,11 @@ struct SnoozerView: View {
 
     private func rightColumn(isLandscape: Bool) -> some View {
         VStack(spacing: 0) {
-            Spacer()
+            if isLandscape {
+                Spacer()
+            } else {
+                Spacer().frame(height: 8)
+            }
             if showDisplayName.value && isLandscape {
                 Text(Bundle.main.displayName)
                     .font(.system(size: 50, weight: .bold))
@@ -274,7 +289,7 @@ struct SnoozerView: View {
                         Text(bgEmoji)
                             .font(.system(size: 128))
                             .minimumScaleFactor(0.5)
-                            .frame(minHeight: isLandscape ? nil : portraitEmojiMinHeight)
+                            .frame(height: isLandscape ? nil : portraitEmojiHeight)
                     }
 
                     Text(context.date, format: Date.FormatStyle(date: .omitted, time: .shortened))
@@ -284,7 +299,11 @@ struct SnoozerView: View {
                         .frame(height: clockHeight)
                 }
             }
-            Spacer(minLength: isLandscape ? nil : portraitClockBottomSpace)
+            if isLandscape {
+                Spacer()
+            } else {
+                Spacer().frame(height: portraitClockBottomSpace)
+            }
         }
     }
 

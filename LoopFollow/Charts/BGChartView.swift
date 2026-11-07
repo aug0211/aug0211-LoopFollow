@@ -75,6 +75,12 @@ private func chartYDomainUpperBound(_ maxBG: Double) -> Double {
     return clampedMax + topPadding
 }
 
+/// Bottom of an override band, extended downward from its top edge so the
+/// band is at least `minSpan` (in mg/dL) tall on screen.
+private func overrideBandBottom(_ band: BGChartModel.BandRect, minSpan: Double) -> Double {
+    min(band.yBottom, band.yTop - minSpan)
+}
+
 struct BGChartView: View {
     enum Config {
         case small
@@ -168,6 +174,9 @@ private struct MainBGChart: View {
 
     /// Measured size of the visible selection pill (see PillSizePreferenceKey).
     @State private var pillSize: CGSize = .zero
+
+    /// Override bands are drawn at least this tall.
+    @ScaledMetric(relativeTo: .caption2) private var overrideBandMinHeight: CGFloat = 22
 
     /// Fixed pill size, scaled with Dynamic Type.
     @ScaledMetric(relativeTo: .caption) private var scaledPillWidth: CGFloat = 152
@@ -401,7 +410,8 @@ private struct MainBGChart: View {
                         canvasWidth: canvasWidth,
                         height: mainHeight,
                         visibleSeconds: interaction.visibleSeconds,
-                        timeZone: timeZoneForAxis
+                        timeZone: timeZoneForAxis,
+                        overrideMinSpan: overrideBandMinSpan
                     )
                     .equatable()
                     .offset(x: -canvasOffsetX)
@@ -992,8 +1002,9 @@ private struct MainBGChart: View {
     /// Band (override / temp target) under the given date+value, if any.
     private func bandAnchor(at date: Date, value: Double) -> SelectionAnchor? {
         for band in model.overrides where date >= band.start && date <= band.end {
-            if value >= band.yBottom, value <= band.yTop {
-                let midY = (band.yTop + band.yBottom) / 2
+            let bottom = overrideBandBottom(band, minSpan: overrideBandMinSpan)
+            if value >= bottom, value <= band.yTop {
+                let midY = (band.yTop + bottom) / 2
                 return SelectionAnchor(date: date, value: midY, texts: [band.pillText], detail: band.detail)
             }
         }
@@ -1143,6 +1154,12 @@ private struct MainBGChart: View {
         ) * viewportWidth
     }
 
+    /// `overrideBandMinHeight` in mg/dL at the current scale.
+    private var overrideBandMinSpan: Double {
+        guard plotFrame.height > 0 else { return 0 }
+        return Double(overrideBandMinHeight) * chartYDomainUpperBound(model.maxBG) / Double(plotFrame.height)
+    }
+
     private func yPosition(forValue value: Double) -> CGFloat {
         let yMax = chartYDomainUpperBound(model.maxBG)
         let clamped = min(max(value, 0), yMax)
@@ -1168,7 +1185,7 @@ private struct MainBGChart: View {
                 let xStart = xPosition(for: visibleBandStart, viewportWidth: viewportWidth)
                 let xEnd = xPosition(for: visibleBandEnd, viewportWidth: viewportWidth)
                 let bandWidth = max(0, xEnd - xStart)
-                let y = yPosition(forValue: (band.yBottom + band.yTop) / 2)
+                let y = yPosition(forValue: (overrideBandBottom(band, minSpan: overrideBandMinSpan) + band.yTop) / 2)
 
                 if bandWidth > 24 {
                     Text(band.label)
@@ -1383,6 +1400,8 @@ private struct BGChartCanvas: View, Equatable {
     let height: CGFloat
     let visibleSeconds: TimeInterval
     let timeZone: TimeZone
+    /// Minimum override band height in mg/dL (main chart only).
+    var overrideMinSpan: Double = 0
 
     static func == (lhs: BGChartCanvas, rhs: BGChartCanvas) -> Bool {
         lhs.generation == rhs.generation &&
@@ -1392,7 +1411,8 @@ private struct BGChartCanvas: View, Equatable {
             lhs.canvasWidth == rhs.canvasWidth &&
             lhs.height == rhs.height &&
             lhs.visibleSeconds == rhs.visibleSeconds &&
-            lhs.timeZone == rhs.timeZone
+            lhs.timeZone == rhs.timeZone &&
+            lhs.overrideMinSpan == rhs.overrideMinSpan
     }
 
     private var basalScale: Double {
@@ -1528,7 +1548,7 @@ private struct BGChartCanvas: View, Equatable {
             RectangleMark(
                 xStart: .value("start", band.start),
                 xEnd: .value("end", band.end),
-                yStart: .value("yBottom", band.yBottom),
+                yStart: .value("yBottom", overrideBandBottom(band, minSpan: overrideMinSpan)),
                 yEnd: .value("yTop", band.yTop)
             )
             .foregroundStyle(model.overrideColor.opacity(0.6))
