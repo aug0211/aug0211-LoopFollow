@@ -164,14 +164,14 @@ struct SnoozerView: View {
     // MARK: - Columns
 
     private let portraitEmojiMinHeight: CGFloat = 70
-    private let portraitClockMinHeight: CGFloat = 80
+    private let clockHeight: CGFloat = 115
     private let portraitClockBottomSpace: CGFloat = 16
     private let displayNameHeight: CGFloat = 60
 
     /// Height the emoji and clock need below the left column in portrait.
     private var portraitRightColumnMinHeight: CGFloat {
         let emoji = snoozerEmoji.value ? portraitEmojiMinHeight + 4 : 0
-        return emoji + portraitClockMinHeight + portraitClockBottomSpace + 8
+        return emoji + clockHeight + portraitClockBottomSpace + 8
     }
 
     /// The left column's heights are scaled down together when `availableHeight`
@@ -181,10 +181,10 @@ struct SnoozerView: View {
         let topPad: CGFloat = barShowing ? 0 : 16
         let nameH: CGFloat = (!isLandscape && showDisplayName.value) ? displayNameHeight : 0
         let maxHeights: [CGFloat] = [
-            barShowing ? (isLandscape ? 210 : 200) : 240,
-            barShowing ? (isLandscape ? 72 : 90) : (isLandscape ? 80 : 110),
-            barShowing ? (isLandscape ? 60 : 80) : (isLandscape ? 68 : 100),
-            barShowing ? (isLandscape ? 36 : 60) : (isLandscape ? 40 : 80),
+            barShowing ? 210 : 250,
+            barShowing ? (isLandscape ? 72 : 85) : (isLandscape ? 80 : 100),
+            barShowing ? (isLandscape ? 60 : 105) : (isLandscape ? 68 : 120),
+            barShowing ? (isLandscape ? 36 : 105) : (isLandscape ? 40 : 120),
         ]
         let fit: CGFloat = availableHeight.map {
             min(1, max(0, $0 - topPad - nameH) / maxHeights.reduce(0, +))
@@ -226,20 +226,20 @@ struct SnoozerView: View {
                 .frame(maxWidth: .infinity, maxHeight: dirMaxH)
             } else {
                 Text(directionText.value)
-                    .font(.system(size: 160, weight: .black))
+                    .font(.system(size: 200, weight: .black))
                     .minimumScaleFactor(minScale)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity, maxHeight: dirMaxH)
 
                 Text(deltaText.value)
-                    .font(.system(size: 140).monospacedDigit())
+                    .font(.system(size: 160).monospacedDigit())
                     .minimumScaleFactor(minScale)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity, maxHeight: deltaMaxH)
             }
 
             Text(minAgoText.value)
-                .font(.system(size: isLandscape ? 60 : 80).monospacedDigit())
+                .font(.system(size: 160).monospacedDigit())
                 .minimumScaleFactor(minScale)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, maxHeight: ageMaxH)
@@ -278,10 +278,10 @@ struct SnoozerView: View {
                     }
 
                     Text(context.date, format: Date.FormatStyle(date: .omitted, time: .shortened))
-                        .font(.system(size: isLandscape ? 70 : 100).monospacedDigit())
+                        .font(.system(size: 160).monospacedDigit())
                         .minimumScaleFactor(0.5)
                         .foregroundColor(.white)
-                        .frame(minHeight: isLandscape ? 78 : portraitClockMinHeight, maxHeight: isLandscape ? 78 : 100)
+                        .frame(height: clockHeight)
                 }
             }
             Spacer(minLength: isLandscape ? nil : portraitClockBottomSpace)
