@@ -40,14 +40,80 @@ final class QuickPickMealsManager: ObservableObject {
     }
 
     func refresh(now: Date = Date(), carbStep: Double = 1.0, maxCarbs: Double, includeFatProtein: Bool) {
-        let history = Storage.shared.remoteMealHistory.value
-        quickPickMeals = Self.computeQuickPickMeals(
+        let history = Self.combinedHistory(
+            local: Storage.shared.remoteMealHistory.value,
+            shared: Storage.shared.mealOccurrences.value
+        )
+        let picks = Self.computeQuickPickMeals(
             from: history,
             now: now,
             carbStep: carbStep,
             maxCarbs: maxCarbs,
             includeFatProtein: includeFatProtein
         )
+        quickPickMeals = Self.filledWithSavedMeals(
+            picks,
+            savedMeals: Storage.shared.namedMeals.value,
+            usage: NamedMealSearch.usage(from: Storage.shared.mealOccurrences.value),
+            maxCarbs: maxCarbs,
+            includeFatProtein: includeFatProtein
+        )
+    }
+
+    // MARK: - Sharing across devices
+
+    /// This device's own sends plus named meals synced from Nightscout, which
+    /// include meals sent from other devices. A synced meal this device also sent
+    /// (same carbs within 15 minutes) counts once, keeping the local entry and its bolus.
+    static func combinedHistory(local: [RemoteMealHistoryEntry], shared: [MealOccurrence]) -> [RemoteMealHistoryEntry] {
+        let window: TimeInterval = 15 * 60
+        let extra = shared
+            .filter { $0.mealID != nil && $0.carbs > 0 }
+            .filter { occurrence in
+                !local.contains { entry in
+                    Int(entry.carbs.rounded()) == occurrence.carbs
+                        && (abs(entry.date.timeIntervalSince(occurrence.sentAt)) <= window
+                            || abs(entry.date.timeIntervalSince(occurrence.mealTime)) <= window)
+                }
+            }
+            .map {
+                RemoteMealHistoryEntry(
+                    carbs: Double($0.carbs),
+                    fat: Double($0.fat),
+                    protein: Double($0.protein),
+                    date: $0.mealTime
+                )
+            }
+        return local + extra
+    }
+
+    /// Tops up a short list (a new device, or one rarely used) with the most eaten
+    /// saved meals, so every device offers the same meals from the start.
+    static func filledWithSavedMeals(
+        _ picks: [QuickPickMeal],
+        savedMeals: [NamedMeal],
+        usage: [String: NamedMealSearch.Usage],
+        maxCarbs: Double,
+        includeFatProtein: Bool
+    ) -> [QuickPickMeal] {
+        guard picks.count < maxResults else { return picks }
+        var result = picks
+        let ranked = savedMeals.sorted {
+            let lhs = usage[$0.id], rhs = usage[$1.id]
+            if (lhs?.count ?? 0) != (rhs?.count ?? 0) { return (lhs?.count ?? 0) > (rhs?.count ?? 0) }
+            return (lhs?.lastEaten ?? $0.createdAt) > (rhs?.lastEaten ?? $1.createdAt)
+        }
+        for meal in ranked where result.count < maxResults {
+            let carbs = Double(meal.carbs)
+            guard carbs > 0, carbs <= maxCarbs, !result.contains(where: { $0.carbs == carbs }) else { continue }
+            result.append(QuickPickMeal(
+                carbs: carbs,
+                fat: includeFatProtein ? Double(meal.fat) : 0,
+                protein: includeFatProtein ? Double(meal.protein) : 0,
+                bolus: 0
+            ))
+        }
+        return result
     }
 
     // MARK: - Scoring (static for testability)

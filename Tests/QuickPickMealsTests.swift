@@ -46,3 +46,38 @@ struct QuickPickMealsTests {
         #expect(decoded == meal)
     }
 }
+
+struct SharedQuickPickTests {
+    private func occurrence(_ carbs: Int, at date: Date, named: Bool = true) -> MealOccurrence {
+        var o = MealOccurrence(id: UUID().uuidString, sentAt: date, mealTime: date, carbs: carbs, fat: 10, protein: 5)
+        if named { o.mealID = "m\(carbs)" }
+        return o
+    }
+
+    @Test("Named meals from other devices join this device's history; duplicates count once")
+    func combinedHistory() {
+        let now = Date()
+        let local = [RemoteMealHistoryEntry(carbs: 40, bolus: 2, date: now)]
+        let shared = [
+            occurrence(40, at: now.addingTimeInterval(120)), // same meal, sent here
+            occurrence(60, at: now.addingTimeInterval(-3600)), // from another device
+            occurrence(30, at: now, named: false), // unnamed: stays local to its device
+        ]
+        let history = QuickPickMealsManager.combinedHistory(local: local, shared: shared)
+        #expect(history.map(\.carbs).sorted() == [40, 60])
+        #expect(history.first { $0.carbs == 40 }?.bolus == 2)
+    }
+
+    @Test("A short list is topped up with the most eaten saved meals")
+    func topUp() {
+        let saved = [
+            NamedMeal(id: "a", name: "A", carbs: 20, fat: 0, protein: 0, createdAt: Date(), nightscoutID: nil),
+            NamedMeal(id: "b", name: "B", carbs: 50, fat: 5, protein: 5, createdAt: Date(), nightscoutID: nil),
+        ]
+        let usage = ["b": NamedMealSearch.Usage(count: 3, lastEaten: Date())]
+        let existing = [QuickPickMeal(carbs: 20, fat: 0, protein: 0, bolus: 1)]
+        let result = QuickPickMealsManager.filledWithSavedMeals(existing, savedMeals: saved, usage: usage, maxCarbs: 200, includeFatProtein: true)
+        #expect(result.map(\.carbs) == [20, 50])
+        #expect(result[1].bolus == 0)
+    }
+}

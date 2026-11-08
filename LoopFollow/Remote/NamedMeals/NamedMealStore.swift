@@ -245,7 +245,6 @@ final class NamedMealStore {
     /// Merges meals and named meals saved by any caregiver's LoopFollow.
     func syncFromNightscout() {
         guard !Storage.shared.url.value.isEmpty else { return }
-        NightscoutUtils.refreshAccess()
         Task {
             do {
                 let foods = try await self.fetchArray(path: "/api/v1/food.json", query: [:])

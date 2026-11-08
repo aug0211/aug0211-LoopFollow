@@ -199,22 +199,16 @@ class NightscoutUtils {
         return components?.url
     }
 
-    private static var lastAccessRefresh: Date?
-
-    /// Re-checks what the token may do (write, admin) and stores it, at most every
-    /// 5 minutes. Before this, access was only checked from the Nightscout settings
-    /// screen, so a device that never opened it (for example the Mac app with
-    /// imported settings) stayed read-only. A failed check changes nothing.
-    static func refreshAccess(force: Bool = false) {
-        DispatchQueue.main.async {
-            if !force, let last = lastAccessRefresh, Date().timeIntervalSince(last) < 300 { return }
-            lastAccessRefresh = Date()
-            verifyURLAndToken { error, _, nsWriteAuth, nsAdminAuth in
-                guard error == nil else { return }
-                DispatchQueue.main.async {
-                    if Storage.shared.nsWriteAuth.value != nsWriteAuth { Storage.shared.nsWriteAuth.value = nsWriteAuth }
-                    if Storage.shared.nsAdminAuth.value != nsAdminAuth { Storage.shared.nsAdminAuth.value = nsAdminAuth }
-                }
+    /// Re-checks what the token may do (write, admin) and stores it. Called when the
+    /// meal entry screen or a meal's detail screen opens, besides the Nightscout
+    /// settings screen, so a device that never opened settings (for example the Mac
+    /// app) isn't stuck read-only. A failed check changes nothing.
+    static func refreshAccess() {
+        verifyURLAndToken { error, _, nsWriteAuth, nsAdminAuth in
+            guard error == nil else { return }
+            DispatchQueue.main.async {
+                if Storage.shared.nsWriteAuth.value != nsWriteAuth { Storage.shared.nsWriteAuth.value = nsWriteAuth }
+                if Storage.shared.nsAdminAuth.value != nsAdminAuth { Storage.shared.nsAdminAuth.value = nsAdminAuth }
             }
         }
     }

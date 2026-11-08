@@ -241,6 +241,7 @@ struct MealView: View {
                 }
                 calculator.setCarbs(carbs.doubleValue(for: .gram()))
                 if mealWithBolus.value { calculator.start() }
+                NightscoutUtils.refreshAccess()
                 NamedMealStore.shared.syncFromNightscout()
 
                 quickPickMeals.refresh(
@@ -251,6 +252,13 @@ struct MealView: View {
                 if !Storage.shared.hasSeenFatProteinOrderChange.value && Storage.shared.mealWithFatProtein.value {
                     showFatProteinOrderBanner = true
                 }
+            }
+            // Synced meals arrive after the screen opens; refresh the chips with them.
+            .onChange(of: namedMeals.value) { _ in
+                quickPickMeals.refresh(maxCarbs: maxCarbs.value.doubleValue(for: .gram()), includeFatProtein: mealWithFatProtein.value)
+            }
+            .onChange(of: mealOccurrences.value) { _ in
+                quickPickMeals.refresh(maxCarbs: maxCarbs.value.doubleValue(for: .gram()), includeFatProtein: mealWithFatProtein.value)
             }
             .onDisappear {
                 // A calculation sheet can cover this view in compact layouts.

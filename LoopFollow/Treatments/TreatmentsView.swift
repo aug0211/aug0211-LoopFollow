@@ -620,6 +620,7 @@ struct TreatmentDetailView: View {
         .preferredColorScheme(Storage.shared.appearanceMode.value.colorScheme)
         .onAppear {
             viewModel.loadDetails(for: treatment)
+            if treatment.trioMeal != nil { NightscoutUtils.refreshAccess() }
         }
         .sheet(isPresented: $showEditSheet) {
             if let meal = commandMeal {
