@@ -361,6 +361,7 @@ struct RemoteSettingsView: View {
             otpTimeRemaining = nil
             // Update view model from storage to ensure UI is current
             viewModel.updateViewModelFromStorage()
+            NightscoutUtils.refreshAccess()
         }
         .onReceive(otpTimer) { _ in
             let now = Date().timeIntervalSince1970
