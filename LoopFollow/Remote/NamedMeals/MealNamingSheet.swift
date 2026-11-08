@@ -92,7 +92,7 @@ struct MealNamingSheet: View {
                     }
 
                     Section(
-                        header: Text("Pre-bolus"),
+                        header: Text(NamedMealFormat.bolusTimingLabel(negative: prebolusNegative)),
                         footer: Text(prebolusFooter)
                     ) {
                         HStack {

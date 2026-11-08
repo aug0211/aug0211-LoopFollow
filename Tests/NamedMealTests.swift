@@ -173,6 +173,6 @@ struct NamedMealTests {
     func prebolusWording() {
         #expect(NamedMealFormat.prebolus(13) == "Pre-bolus 13 min")
         #expect(NamedMealFormat.prebolus(0) == "Bolused at meal start")
-        #expect(NamedMealFormat.prebolus(-5) == "Bolused 5 min after starting")
+        #expect(NamedMealFormat.prebolus(-5) == "Post-bolus 5 min")
     }
 }

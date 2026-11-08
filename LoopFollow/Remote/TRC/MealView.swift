@@ -626,7 +626,7 @@ struct MealView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(meal.name)
                                 .foregroundColor(.primary)
-                            Text(meal.macroSummary + " · " + NamedMealStore.shared.insights(forMeal: meal.id).shortSummary)
+                            Text(NamedMealFormat.macros(carbs: meal.carbs, fat: meal.fat, protein: meal.protein, includeFatProtein: mealWithFatProtein.value) + " · " + NamedMealStore.shared.insights(forMeal: meal.id).shortSummary)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -656,7 +656,7 @@ struct MealView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 160)
-                TextField("Pre-bolus", text: $optionalPrebolusText)
+                TextField(NamedMealFormat.bolusTimingLabel(negative: optionalPrebolusNegative), text: $optionalPrebolusText)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                 Text("min")
@@ -684,33 +684,40 @@ struct MealView: View {
         }
     }
 
-    /// A named chip is a fixed-width card: the name on up to two lines, then one
-    /// line of macros (no bolus). An unnamed chip stays compact, carbs first.
+    /// A named chip is a narrow card: the name on up to three lines, then its
+    /// macros (no bolus). An unnamed chip shows its macros, then its bolus.
     private func quickPickLabel(_ meal: QuickPickMeal, name: String?) -> some View {
-        var details: [String] = []
-        if name != nil { details.append("\(Int(meal.carbs))g") }
-        if mealWithFatProtein.value, meal.fat > 0 || meal.protein > 0 {
-            details.append("F\(Int(meal.fat)) P\(Int(meal.protein))")
-        }
-        if name == nil, mealWithBolus.value, !isScheduling, meal.bolus > 0 {
-            details.append("\(InsulinFormatter.shared.string(meal.bolus))U")
+        let macros = NamedMealFormat.macros(
+            carbs: Int(meal.carbs.rounded()),
+            fat: Int(meal.fat.rounded()),
+            protein: Int(meal.protein.rounded()),
+            includeFatProtein: mealWithFatProtein.value
+        )
+        let detail: String?
+        if name != nil {
+            detail = macros
+        } else if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
+            detail = "\(InsulinFormatter.shared.string(meal.bolus))U"
+        } else {
+            detail = nil
         }
 
         return VStack(alignment: .leading, spacing: 3) {
-            Text(name ?? "\(Int(meal.carbs))g")
-                .font(.subheadline.weight(.semibold))
+            Text(name ?? macros)
+                .font(name == nil ? .subheadline.weight(.semibold) : .footnote.weight(.semibold))
                 .foregroundColor(.accentColor)
-                .lineLimit(2)
+                .lineLimit(3)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
-            if !details.isEmpty {
-                Text(details.joined(separator: " · "))
-                    .font(.caption)
+            if let detail {
+                Text(detail)
+                    .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
         }
-        .frame(width: name == nil ? nil : 168, alignment: .leading)
+        .frame(width: name == nil ? nil : 116, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.accentColor.opacity(0.15))

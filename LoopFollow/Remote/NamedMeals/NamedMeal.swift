@@ -102,15 +102,21 @@ enum NamedMealFormat {
     static let prebolusRange = -60 ... 90
     static let toleranceRange = 0 ... 15
 
-    static func macros(carbs: Int, fat: Int, protein: Int) -> String {
-        "\(carbs)g carbs · \(fat)g fat · \(protein)g protein"
+    /// "C57 • F24 • P25", or "C57" when meals are carbs only.
+    static func macros(carbs: Int, fat: Int, protein: Int, includeFatProtein: Bool = true) -> String {
+        includeFatProtein ? "C\(carbs) • F\(fat) • P\(protein)" : "C\(carbs)"
     }
 
-    /// "Pre-bolus 13 min", "Bolused at meal start" or "Bolused 5 min after starting".
+    /// "Pre-bolus" for a bolus before eating, "Post-bolus" for one after.
+    static func bolusTimingLabel(negative: Bool) -> String {
+        negative ? "Post-bolus" : "Pre-bolus"
+    }
+
+    /// "Pre-bolus 13 min", "Bolused at meal start" or "Post-bolus 5 min".
     static func prebolus(_ minutes: Int) -> String {
         if minutes > 0 { return "Pre-bolus \(minutes) min" }
         if minutes == 0 { return "Bolused at meal start" }
-        return "Bolused \(-minutes) min after starting"
+        return "Post-bolus \(-minutes) min"
     }
 
     /// Parses a typed pre-bolus. Empty means unknown (nil); out of range or not a number is invalid.

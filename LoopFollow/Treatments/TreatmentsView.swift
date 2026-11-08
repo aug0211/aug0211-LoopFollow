@@ -756,7 +756,7 @@ struct TreatmentDetailView: View {
                 }
                 Button { openNaming(for: meal) } label: {
                     HStack {
-                        Text("Pre-bolus")
+                        Text(NamedMealFormat.bolusTimingLabel(negative: (occurrence?.prebolusMinutes ?? 0) < 0))
                             .foregroundColor(.primary)
                         Spacer()
                         if let minutes = occurrence?.prebolusMinutes {
@@ -779,7 +779,7 @@ struct TreatmentDetailView: View {
                     LabeledValueRow(label: "Meal name", value: name)
                 }
                 if let minutes = occurrence.prebolusMinutes {
-                    LabeledValueRow(label: "Pre-bolus", value: NamedMealFormat.prebolus(minutes))
+                    LabeledValueRow(label: NamedMealFormat.bolusTimingLabel(negative: minutes < 0), value: NamedMealFormat.prebolus(minutes))
                 }
                 if let mealID = occurrence.mealID {
                     NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))

@@ -263,8 +263,8 @@ struct WatchMealView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .lineLimit(2)
                     Text(config.mealWithFatProtein
-                        ? "\(Int(meal.carbs))g · F\(Int(meal.fat)) P\(Int(meal.protein))"
-                        : "\(Int(meal.carbs))g carbs")
+                        ? "C\(Int(meal.carbs)) • F\(Int(meal.fat)) • P\(Int(meal.protein))"
+                        : "C\(Int(meal.carbs))")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
