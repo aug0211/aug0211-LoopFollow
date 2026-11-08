@@ -702,12 +702,12 @@ struct MealView: View {
             detail = nil
         }
 
-        return VStack(alignment: .leading, spacing: 3) {
+        return VStack(alignment: .center, spacing: 3) {
             Text(name ?? macros)
                 .font(name == nil ? .subheadline.weight(.semibold) : .footnote.weight(.semibold))
                 .foregroundColor(.accentColor)
                 .lineLimit(3)
-                .multilineTextAlignment(.leading)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let detail {
                 Text(detail)
@@ -717,7 +717,7 @@ struct MealView: View {
                     .minimumScaleFactor(0.8)
             }
         }
-        .frame(width: name.map { Self.namedChipWidth(name: $0, detail: detail) }, alignment: .leading)
+        .frame(width: name.map { Self.namedChipWidth(name: $0, detail: detail) }, alignment: .center)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.accentColor.opacity(0.15))
