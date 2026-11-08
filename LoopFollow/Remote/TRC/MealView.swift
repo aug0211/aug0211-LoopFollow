@@ -717,7 +717,7 @@ struct MealView: View {
                     .minimumScaleFactor(0.8)
             }
         }
-        .frame(width: name == nil ? nil : 116, alignment: .leading)
+        .frame(width: name == nil ? nil : 104, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.accentColor.opacity(0.15))
