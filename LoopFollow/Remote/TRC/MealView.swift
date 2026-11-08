@@ -669,13 +669,11 @@ struct MealView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 10) {
                 ForEach(quickPickMeals.quickPickMeals) { meal in
-                    let named = namedMeal(matching: meal)
+                    let named = nsWriteAuth.value ? namedMeal(matching: meal) : nil
                     Button {
-                        applyQuickPickMeal(meal)
-                        if let named, nsWriteAuth.value {
-                            optionalMealName = named.name
-                            selectedNamedMealID = named.id
-                        }
+                        // A saved meal fills in its name and macros only, like picking it
+                        // from search; its old bolus is neither shown nor used.
+                        if let named { pickNamedMeal(named) } else { applyQuickPickMeal(meal) }
                     } label: {
                         quickPickLabel(meal, name: named?.name)
                     }
@@ -687,14 +685,14 @@ struct MealView: View {
     }
 
     /// A named chip is a fixed-width card: the name on up to two lines, then one
-    /// line of macros and bolus. An unnamed chip stays compact, carbs first.
+    /// line of macros (no bolus). An unnamed chip stays compact, carbs first.
     private func quickPickLabel(_ meal: QuickPickMeal, name: String?) -> some View {
         var details: [String] = []
         if name != nil { details.append("\(Int(meal.carbs))g") }
         if mealWithFatProtein.value, meal.fat > 0 || meal.protein > 0 {
             details.append("F\(Int(meal.fat)) P\(Int(meal.protein))")
         }
-        if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
+        if name == nil, mealWithBolus.value, !isScheduling, meal.bolus > 0 {
             details.append("\(InsulinFormatter.shared.string(meal.bolus))U")
         }
 
