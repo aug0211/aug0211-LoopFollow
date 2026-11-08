@@ -337,12 +337,13 @@ struct MealView: View {
                         message += String(format: "\nCarbs: %.0f g", carbsAmount)
                     }
 
-                    if proteinAmount > 0 {
-                        message += String(format: "\nProtein: %.0f g", proteinAmount)
-                    }
-
+                    // Same order as the inputs: carbs, fat, protein.
                     if fatAmount > 0 {
                         message += String(format: "\nFat: %.0f g", fatAmount)
+                    }
+
+                    if proteinAmount > 0 {
+                        message += String(format: "\nProtein: %.0f g", proteinAmount)
                     }
 
                     if bolusAmount > 0 {
@@ -561,7 +562,7 @@ struct MealView: View {
                     statusMessage = RemoteCommandMessage.sent
                     LogManager.shared.log(
                         category: .apns,
-                        message: "sendMealPushNotification succeeded - Carbs: \(submittedCarbs.doubleValue(for: .gram())) g, Protein: \(submittedProtein.doubleValue(for: .gram())) g, Fat: \(submittedFat.doubleValue(for: .gram())) g, Bolus: \(submittedBolus) U, Scheduled: \(scheduledDate != nil ? formatDate(scheduledDate!) : "now")"
+                        message: "sendMealPushNotification succeeded - Carbs: \(submittedCarbs.doubleValue(for: .gram())) g, Fat: \(submittedFat.doubleValue(for: .gram())) g, Protein: \(submittedProtein.doubleValue(for: .gram())) g, Bolus: \(submittedBolus) U, Scheduled: \(scheduledDate != nil ? formatDate(scheduledDate!) : "now")"
                     )
 
                     // Reset meal values and scheduled data after success
