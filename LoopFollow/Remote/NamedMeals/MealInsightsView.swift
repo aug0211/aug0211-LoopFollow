@@ -36,7 +36,7 @@ struct MealInsightsView: View {
                 }
             } else {
                 Section {
-                    Text("Insights appear once \(MealInsights.minimumMeals) meals have 4 hours of BG data (\(insights.measured) so far).")
+                    Text("Insights appear once \(MealInsights.minimumMeals) meals have 4 hours of BG data with no other meal in that time (\(insights.measured) so far).")
                         .foregroundColor(.secondary)
                 }
             }
@@ -77,7 +77,7 @@ struct MealInsightsView: View {
                 valueRow("Time above range", duration(minutes))
             }
             if let insulin = insights.medianInsulin {
-                valueRow("Insulin", InsulinFormatter.shared.string(insulin) + " U")
+                valueRow("Insulin (total in 4h)", InsulinFormatter.shared.string(insulin) + " U")
             }
             if let trend = insights.trend {
                 valueRow("Trend", trendText(trend))
@@ -125,7 +125,11 @@ struct MealInsightsView: View {
             Group {
                 if let outcome = occurrence.outcome {
                     if outcome.hasEnoughData {
-                        Text("\(bg(outcome.startBG)) → peak \(bg(outcome.peakBG)) at \(duration(outcome.minutesToPeak)) · lowest \(bg(outcome.lowestBG))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U")
+                        Text("\(bg(outcome.startBG)) → peak \(bg(outcome.peakBG)) at \(duration(outcome.minutesToPeak)) · lowest \(bg(outcome.lowestBG))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U total in 4h")
+                        if outcome.overlappedMeal == true {
+                            Label("Overlapped with another meal, not in insights", systemImage: "square.on.square")
+                                .foregroundColor(.orange)
+                        }
                     } else {
                         Text("Not enough BG data")
                     }

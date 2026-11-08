@@ -780,15 +780,16 @@ struct MealView: View {
         }
     }
 
-    /// "Last time: 4.5U insulin, peak 210 at 1h 10m" for the picked meal.
+    /// "Last time: 4.5U total in 4h, peak 210 at 1h 10m" for the picked meal, from
+    /// the latest time it was eaten without another meal mixed in.
     private var lastTimeHint: String? {
         guard let meal = selectedNamedMeal else { return nil }
         let history = NamedMealStore.shared.occurrences(ofMeal: meal.id)
-        if let outcome = history.compactMap(\.outcome).first(where: \.hasEnoughData) {
+        if let outcome = history.compactMap(\.outcome).first(where: \.isUsable) {
             let peak = Localizer.toDisplayUnits(String(outcome.peakBG))
             let minutes = outcome.minutesToPeak
             let time = minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
-            return "Last time: \(InsulinFormatter.shared.string(outcome.insulin))U insulin, peak \(peak) at \(time)"
+            return "Last time: \(InsulinFormatter.shared.string(outcome.insulin))U total in 4h, peak \(peak) at \(time)"
         }
         if let last = history.first {
             return "Last eaten " + last.mealTime.formatted(.dateTime.month(.abbreviated).day().hour().minute())

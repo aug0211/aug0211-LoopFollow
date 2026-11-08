@@ -16,12 +16,19 @@ struct MealOutcome: Codable, Equatable {
     let hadLow: Bool
     /// Minutes above the high line.
     let minutesAboveRange: Int
-    /// Insulin delivered from 30 minutes before the meal to 4 hours after eating started (boluses and SMBs).
+    /// All insulin delivered from 30 minutes before the meal to 4 hours after eating
+    /// started (boluses and SMBs), including any for other food in that time.
     let insulin: Double
     /// False when there were too few readings; such meals are left out of insights.
     let hasEnoughData: Bool
+    /// True when another meal was entered in the same window, so the BG and insulin
+    /// aren't this meal's alone. Nil on outcomes worked out before this was checked.
+    var overlappedMeal: Bool? = nil
 
     var rise: Int { peakBG - startBG }
+
+    /// Counts toward insights: enough readings and no other meal mixed in.
+    var isUsable: Bool { hasEnoughData && overlappedMeal != true }
 
     /// Works out an outcome from the readings around a meal.
     /// `readings` may be in any order; only those from 10 minutes before eating to 4 hours after are used.
@@ -30,7 +37,8 @@ struct MealOutcome: Codable, Equatable {
         insulin: Double,
         eatingStart: Date,
         lowLine: Double,
-        highLine: Double
+        highLine: Double,
+        overlappedMeal: Bool = false
     ) -> MealOutcome {
         let start = eatingStart
         let end = eatingStart.addingTimeInterval(window)
@@ -44,7 +52,8 @@ struct MealOutcome: Codable, Equatable {
               let lowest = after.min(by: { $0.sgv < $1.sgv })
         else {
             return MealOutcome(startBG: 0, peakBG: 0, minutesToPeak: 0, lowestBG: 0, hadLow: false,
-                               minutesAboveRange: 0, insulin: insulin, hasEnoughData: false)
+                               minutesAboveRange: 0, insulin: insulin, hasEnoughData: false,
+                               overlappedMeal: overlappedMeal)
         }
 
         // Each reading stands for the time until the next one (at most 10 minutes).
@@ -62,8 +71,40 @@ struct MealOutcome: Codable, Equatable {
             hadLow: Double(lowest.sgv) < lowLine,
             minutesAboveRange: Int(minutesAbove.rounded()),
             insulin: insulin,
-            hasEnoughData: after.count >= minimumReadings
+            hasEnoughData: after.count >= minimumReadings,
+            overlappedMeal: overlappedMeal
         )
+    }
+
+    /// Whether Nightscout `treatments` include a carb entry for another meal between
+    /// `from` and `to`. Skips this meal's own entry (by Trio meal ID, else carbs within
+    /// 10 minutes of its time) and Trio's fat/protein follow-on entries.
+    static func hasOtherMeal(
+        in treatments: [[String: Any]],
+        trioMealID: String?,
+        mealTime: Date,
+        carbs: Int,
+        from: Date,
+        to: Date
+    ) -> Bool {
+        treatments.contains { treatment in
+            guard let amount = (treatment["carbs"] as? NSNumber)?.doubleValue, amount > 0,
+                  let date = parseDate(treatment["created_at"] as? String),
+                  date >= from, date <= to
+            else { return false }
+            let id = treatment["id"] as? String
+            if let id, let fpuID = treatment["fpuID"] as? String, id == fpuID { return false }
+            if let trioMealID, id == trioMealID { return false }
+            if abs(date.timeIntervalSince(mealTime)) <= 600, Int(amount.rounded()) == carbs { return false }
+            return true
+        }
+    }
+
+    private static func parseDate(_ text: String?) -> Date? {
+        guard let text else { return nil }
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return withFraction.date(from: text) ?? ISO8601DateFormatter().date(from: text)
     }
 }
 
@@ -81,7 +122,7 @@ struct MealInsights: Equatable {
 
     /// Meals eaten under this name.
     let timesEaten: Int
-    /// Meals with a usable outcome.
+    /// Meals with a usable outcome (enough readings, no other meal mixed in).
     let measured: Int
     let medianPeak: Int?
     let peakRange: ClosedRange<Int>?
@@ -107,7 +148,7 @@ struct MealInsights: Equatable {
 
     static func summarize(_ occurrences: [MealOccurrence]) -> MealInsights {
         let measuredMeals = occurrences
-            .filter { $0.outcome?.hasEnoughData == true }
+            .filter { $0.outcome?.isUsable == true }
             .sorted { $0.mealTime < $1.mealTime }
         let outcomes = measuredMeals.compactMap(\.outcome)
         let peaks = outcomes.map(\.peakBG)

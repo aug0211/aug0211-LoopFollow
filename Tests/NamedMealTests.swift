@@ -114,6 +114,43 @@ struct NamedMealTests {
         return item
     }
 
+    @Test("A meal overlapped by another meal is left out of insights")
+    func overlappedMealsExcluded() {
+        var overlapped = measured("c", daysAgo: 1, prebolus: 5, peak: 300)
+        overlapped.outcome?.overlappedMeal = true
+        let insights = MealInsights.summarize([
+            measured("a", daysAgo: 3, prebolus: 5, peak: 200),
+            measured("b", daysAgo: 2, prebolus: 5, peak: 210),
+            overlapped,
+        ])
+        #expect(insights.timesEaten == 3)
+        #expect(insights.measured == 2)
+        #expect(!insights.hasSummary)
+    }
+
+    @Test("Another carb entry in the window counts as an overlapping meal; this meal and FPU entries don't")
+    func overlapDetection() {
+        let mealTime = Date(timeIntervalSince1970: 1_800_000_000)
+        let iso = ISO8601DateFormatter()
+        func carbs(_ grams: Double, minutes: Double, id: String? = nil, fpuID: String? = nil) -> [String: Any] {
+            var entry: [String: Any] = ["carbs": NSNumber(value: grams), "created_at": iso.string(from: mealTime.addingTimeInterval(minutes * 60))]
+            if let id { entry["id"] = id }
+            if let fpuID { entry["fpuID"] = fpuID }
+            return entry
+        }
+        let window = (from: mealTime.addingTimeInterval(-1800), to: mealTime.addingTimeInterval(4 * 3600))
+        func check(_ treatments: [[String: Any]], trioID: String? = nil) -> Bool {
+            MealOutcome.hasOtherMeal(in: treatments, trioMealID: trioID, mealTime: mealTime, carbs: 6, from: window.from, to: window.to)
+        }
+
+        #expect(!check([carbs(6, minutes: 1)])) // this meal, matched by carbs and time
+        #expect(!check([carbs(6, minutes: 0, id: "T1")], trioID: "T1")) // this meal, by Trio ID
+        #expect(!check([carbs(12, minutes: 90, id: "F", fpuID: "F")])) // fat/protein follow-on
+        #expect(!check([["insulin": NSNumber(value: 2), "created_at": iso.string(from: mealTime)]])) // bolus only
+        #expect(check([carbs(6, minutes: 1), carbs(45, minutes: 60)])) // lunch an hour later
+        #expect(!check([carbs(45, minutes: 5 * 60)])) // after the window
+    }
+
     @Test("Insights need 3 measured meals and group pre-bolus times")
     func insightsSummary() {
         let two = MealInsights.summarize([measured("a", daysAgo: 2, prebolus: 5, peak: 250), measured("b", daysAgo: 1, prebolus: 6, peak: 230)])

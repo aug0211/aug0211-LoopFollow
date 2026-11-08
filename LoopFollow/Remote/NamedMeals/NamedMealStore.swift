@@ -348,7 +348,8 @@ final class NamedMealStore {
         guard !isRefreshingOutcomes, !Storage.shared.url.value.isEmpty else { return }
         let now = Date()
         let pending = occurrences
-            .filter { $0.mealID != nil && $0.outcome == nil }
+            // Also re-checks outcomes from before overlap detection.
+            .filter { $0.mealID != nil && ($0.outcome == nil || $0.outcome?.overlappedMeal == nil) }
             .filter { $0.eatingStart.addingTimeInterval(MealOutcome.window + 600) < now }
             .sorted { $0.mealTime > $1.mealTime }
             .prefix(20)
@@ -402,13 +403,22 @@ final class NamedMealStore {
         let insulin = treatments.reduce(0.0) { total, treatment in
             total + ((treatment["insulin"] as? NSNumber)?.doubleValue ?? 0)
         }
+        let overlapped = MealOutcome.hasOtherMeal(
+            in: treatments,
+            trioMealID: occurrence.trioMealID,
+            mealTime: occurrence.mealTime,
+            carbs: occurrence.carbs,
+            from: insulinFrom,
+            to: end
+        )
 
         return MealOutcome.compute(
             readings: readings,
             insulin: insulin,
             eatingStart: start,
             lowLine: lowLine,
-            highLine: highLine
+            highLine: highLine,
+            overlappedMeal: overlapped
         )
     }
 
