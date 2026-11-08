@@ -64,6 +64,7 @@ final class NamedMealStore {
     /// The recorded meal for a Trio meal entry, created when the meal came from
     /// the Watch or Trio, and linked to Trio's meal ID.
     func ensureOccurrence(for meal: TrioMealTreatment) -> MealOccurrence {
+        // Only called from editing, which requires Nightscout write access.
         let trioMealID = meal.mealID.uuidString
         if var existing = occurrence(for: meal) {
             if existing.trioMealID != trioMealID {
@@ -98,7 +99,8 @@ final class NamedMealStore {
 
     /// Names a sent meal (an existing saved meal, or a new one) and sets its pre-bolus.
     func save(occurrenceID: String, existingMealID: String?, newName: String?, prebolusMinutes: Int?) {
-        guard var occurrence = occurrence(id: occurrenceID) else { return }
+        // Editing is only offered with Nightscout write access; nothing is kept on the device alone.
+        guard canWrite, var occurrence = occurrence(id: occurrenceID) else { return }
 
         var meal: NamedMeal?
         if let existingMealID {

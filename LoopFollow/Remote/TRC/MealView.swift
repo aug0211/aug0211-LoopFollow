@@ -533,7 +533,8 @@ struct MealView: View {
                     let sentCarbs = submittedCarbs.doubleValue(for: .gram())
                     let sentFat = submittedFat.doubleValue(for: .gram())
                     let sentProtein = submittedProtein.doubleValue(for: .gram())
-                    if sentCarbs > 0 || sentFat > 0 || sentProtein > 0 {
+                    // Naming needs Nightscout write access; read-only users can't edit meals.
+                    if Storage.shared.nsWriteAuth.value, sentCarbs > 0 || sentFat > 0 || sentProtein > 0 {
                         namingOccurrenceID = NamedMealStore.shared.recordSentMeal(
                             carbs: sentCarbs,
                             fat: sentFat,

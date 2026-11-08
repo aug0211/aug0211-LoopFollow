@@ -739,42 +739,55 @@ struct TreatmentDetailView: View {
     @ViewBuilder
     private func mealDetailsSection(_ meal: TrioMealTreatment) -> some View {
         let occurrence = mealOccurrence
-        Section(
-            header: Text("Meal details"),
-            footer: Text(nsWriteAuth.value
-                ? "Name the meal and add its pre-bolus to build its history. Saved to Nightscout for everyone."
-                : "Name the meal and add its pre-bolus to build its history. Your Nightscout token is read-only, so changes stay on this iPhone.")
-        ) {
-            Button { openNaming(for: meal) } label: {
-                HStack {
-                    Text("Meal name")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if let name = occurrence?.mealName, !name.isEmpty {
-                        Text(name)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Label("Name this meal", systemImage: "tag")
-                            .foregroundColor(.orange)
+        if nsWriteAuth.value {
+            Section(
+                header: Text("Meal details"),
+                footer: Text("Name the meal and add its pre-bolus to build its history. Saved to Nightscout for everyone.")
+            ) {
+                Button { openNaming(for: meal) } label: {
+                    HStack {
+                        Text("Meal name")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if let name = occurrence?.mealName, !name.isEmpty {
+                            Text(name)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Label("Name this meal", systemImage: "tag")
+                                .foregroundColor(.orange)
+                        }
                     }
                 }
-            }
-            Button { openNaming(for: meal) } label: {
-                HStack {
-                    Text("Pre-bolus")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if let minutes = occurrence?.prebolusMinutes {
-                        Text(NamedMealFormat.prebolus(minutes))
-                            .foregroundColor(.secondary)
-                    } else {
-                        Label("Add", systemImage: "timer")
-                            .foregroundColor(.orange)
+                Button { openNaming(for: meal) } label: {
+                    HStack {
+                        Text("Pre-bolus")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if let minutes = occurrence?.prebolusMinutes {
+                            Text(NamedMealFormat.prebolus(minutes))
+                                .foregroundColor(.secondary)
+                        } else {
+                            Label("Add", systemImage: "timer")
+                                .foregroundColor(.orange)
+                        }
                     }
                 }
+                if let mealID = occurrence?.mealID {
+                    NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))
+                }
             }
-            if let mealID = occurrence?.mealID {
-                NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))
+        } else if let occurrence, occurrence.mealName != nil || occurrence.prebolusMinutes != nil {
+            // Read-only Nightscout access: show what others saved, no editing.
+            Section(header: Text("Meal details")) {
+                if let name = occurrence.mealName, !name.isEmpty {
+                    LabeledValueRow(label: "Meal name", value: name)
+                }
+                if let minutes = occurrence.prebolusMinutes {
+                    LabeledValueRow(label: "Pre-bolus", value: NamedMealFormat.prebolus(minutes))
+                }
+                if let mealID = occurrence.mealID {
+                    NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))
+                }
             }
         }
     }
@@ -1086,10 +1099,11 @@ struct TreatmentRow: View {
     let treatment: Treatment
     var rootMeal: Treatment? = nil
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
+    @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
 
     /// What a Trio meal (from LoopFollow, the Watch or Trio) is still missing.
     private var missingMealDetails: (name: Bool, prebolus: Bool)? {
-        guard let meal = treatment.trioMeal, !meal.isFPUChild else { return nil }
+        guard nsWriteAuth.value, let meal = treatment.trioMeal, !meal.isFPUChild else { return nil }
         guard let occurrence = NamedMealStore.shared.occurrence(for: meal) else { return (true, true) }
         guard occurrence.needsDetails else { return nil }
         return (occurrence.isMissingName, occurrence.isMissingPrebolus)
