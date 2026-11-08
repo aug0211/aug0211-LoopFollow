@@ -94,6 +94,7 @@ struct RemoteSettingsView: View {
                     header: Text("Named Meals"),
                     footer: Text("A sent meal matches a saved meal when its carbs, fat and protein are each within this many grams. 0 matches only identical meals.")
                 ) {
+                    NavigationLink("Saved meals", destination: NamedMealsListView())
                     Stepper(
                         "Meal match tolerance: \(mealMatchTolerance.value) g",
                         value: $mealMatchTolerance.value,

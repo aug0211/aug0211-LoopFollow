@@ -61,6 +61,9 @@ struct MealNamingSheet: View {
                                             Text(meal.macroSummary)
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
+                                            Text(store.insights(forMeal: meal.id).shortSummary)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
                                         }
                                         Spacer()
                                         if selectedMealID == meal.id {

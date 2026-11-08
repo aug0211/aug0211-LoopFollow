@@ -20,11 +20,12 @@ struct NamedMeal: Codable, Equatable, Identifiable {
     }
 }
 
-/// One meal sent from LoopFollow, with the name and pre-bolus time added afterwards.
+/// One meal eaten (sent from LoopFollow, the Watch or entered in Trio), with the
+/// name and pre-bolus time added afterwards.
 struct MealOccurrence: Codable, Equatable, Identifiable {
     let id: String
     let sentAt: Date
-    /// The meal time sent to the loop (the scheduled time, or when it was sent).
+    /// The meal time in the loop (when it was entered, or its scheduled time).
     let mealTime: Date
     let carbs: Int
     let fat: Int
@@ -35,6 +36,15 @@ struct MealOccurrence: Codable, Equatable, Identifiable {
     var prebolusMinutes: Int?
     /// Nightscout `_id` of the note recording this meal, once uploaded.
     var nightscoutID: String?
+    /// Trio's meal ID, linking this to the loop's carb entry.
+    var trioMealID: String?
+    /// How BG went after the meal, worked out once 4 hours have passed.
+    var outcome: MealOutcome?
+
+    /// When eating started: the meal time plus the pre-bolus.
+    var eatingStart: Date {
+        mealTime.addingTimeInterval(Double(prebolusMinutes ?? 0) * 60)
+    }
 
     var isMissingName: Bool { mealName?.isEmpty ?? true }
     var isMissingPrebolus: Bool { prebolusMinutes == nil }
@@ -62,15 +72,20 @@ enum NamedMealMatcher {
         abs(meal.carbs - carbs) + abs(meal.fat - fat) + abs(meal.protein - protein)
     }
 
-    /// The sent meal recorded for a loop meal entry: entries within 10 minutes,
-    /// preferring identical macros (a later edit can change them), then the closest time.
+    /// The recorded meal for a loop meal entry: the one linked to Trio's meal ID,
+    /// else (just after a send, or after an edit gave the meal a new ID) one within
+    /// 10 minutes, preferring identical macros, then the closest time.
     static func occurrence(
+        trioMealID: String? = nil,
         for mealDate: Date,
         carbs: Int,
         fat: Int,
         protein: Int,
         in occurrences: [MealOccurrence]
     ) -> MealOccurrence? {
+        if let trioMealID, let linked = occurrences.first(where: { $0.trioMealID == trioMealID }) {
+            return linked
+        }
         let window: TimeInterval = 10 * 60
         let candidates = occurrences.filter { abs($0.mealTime.timeIntervalSince(mealDate)) <= window }
         if let exact = candidates

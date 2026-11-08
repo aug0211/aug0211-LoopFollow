@@ -409,11 +409,19 @@ struct TreatmentDetailView: View {
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
     @State private var showNamingSheet = false
+    @State private var namingOccurrenceID: String?
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
+    @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
 
-    /// The LoopFollow-sent meal behind this entry, for naming and pre-bolus.
-    private var sentMealOccurrence: MealOccurrence? {
+    /// The recorded meal behind this entry (name, pre-bolus), if it has one yet.
+    private var mealOccurrence: MealOccurrence? {
         commandMeal.flatMap { NamedMealStore.shared.occurrence(for: $0) }
+    }
+
+    /// Opens naming for this meal, recording it first when it came from the Watch or Trio.
+    private func openNaming(for meal: TrioMealTreatment) {
+        namingOccurrenceID = NamedMealStore.shared.ensureOccurrence(for: meal).id
+        showNamingSheet = true
     }
 
     /// The Trio meal remote commands act on: the root meal for an FPU child whose root is loaded.
@@ -455,8 +463,8 @@ struct TreatmentDetailView: View {
                 let controlActive = TrioMealTreatment.remoteControlActive(remoteType: remoteType.value, device: device.value)
                 let actionsAvailable = TrioMealTreatment.remoteActionsAvailable(remoteType: remoteType.value, device: device.value, remoteCommands: remoteCommands.value)
                 trioMealSection(meal, needsNewerTrio: controlActive && !actionsAvailable)
-                if let occurrence = sentMealOccurrence {
-                    mealDetailsSection(occurrence)
+                if let target = commandMeal, !target.isFPUChild || rootMeal != nil {
+                    mealDetailsSection(target)
                 }
                 if actionsAvailable {
                     trioRemoteActionsSection(meal)
@@ -624,8 +632,8 @@ struct TreatmentDetailView: View {
         }
         .background(
             Color.clear.sheet(isPresented: $showNamingSheet) {
-                if let occurrence = sentMealOccurrence {
-                    MealNamingSheet(occurrenceID: occurrence.id)
+                if let namingOccurrenceID {
+                    MealNamingSheet(occurrenceID: namingOccurrenceID)
                 }
             }
         )
@@ -729,17 +737,20 @@ struct TreatmentDetailView: View {
     }
 
     @ViewBuilder
-    private func mealDetailsSection(_ occurrence: MealOccurrence) -> some View {
+    private func mealDetailsSection(_ meal: TrioMealTreatment) -> some View {
+        let occurrence = mealOccurrence
         Section(
             header: Text("Meal details"),
-            footer: Text("Sent from LoopFollow. Name the meal and add its pre-bolus to build its history.")
+            footer: Text(nsWriteAuth.value
+                ? "Name the meal and add its pre-bolus to build its history. Saved to Nightscout for everyone."
+                : "Name the meal and add its pre-bolus to build its history. Your Nightscout token is read-only, so changes stay on this iPhone.")
         ) {
-            Button { showNamingSheet = true } label: {
+            Button { openNaming(for: meal) } label: {
                 HStack {
                     Text("Meal name")
                         .foregroundColor(.primary)
                     Spacer()
-                    if let name = occurrence.mealName, !name.isEmpty {
+                    if let name = occurrence?.mealName, !name.isEmpty {
                         Text(name)
                             .foregroundColor(.secondary)
                     } else {
@@ -748,12 +759,12 @@ struct TreatmentDetailView: View {
                     }
                 }
             }
-            Button { showNamingSheet = true } label: {
+            Button { openNaming(for: meal) } label: {
                 HStack {
                     Text("Pre-bolus")
                         .foregroundColor(.primary)
                     Spacer()
-                    if let minutes = occurrence.prebolusMinutes {
+                    if let minutes = occurrence?.prebolusMinutes {
                         Text(NamedMealFormat.prebolus(minutes))
                             .foregroundColor(.secondary)
                     } else {
@@ -761,6 +772,9 @@ struct TreatmentDetailView: View {
                             .foregroundColor(.orange)
                     }
                 }
+            }
+            if let mealID = occurrence?.mealID {
+                NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))
             }
         }
     }
@@ -1073,13 +1087,12 @@ struct TreatmentRow: View {
     var rootMeal: Treatment? = nil
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
 
-    /// A LoopFollow-sent meal still missing its name or pre-bolus.
-    private var sentMealNeedingDetails: MealOccurrence? {
-        guard let meal = treatment.trioMeal, !meal.isFPUChild,
-              let occurrence = NamedMealStore.shared.occurrence(for: meal),
-              occurrence.needsDetails
-        else { return nil }
-        return occurrence
+    /// What a Trio meal (from LoopFollow, the Watch or Trio) is still missing.
+    private var missingMealDetails: (name: Bool, prebolus: Bool)? {
+        guard let meal = treatment.trioMeal, !meal.isFPUChild else { return nil }
+        guard let occurrence = NamedMealStore.shared.occurrence(for: meal) else { return (true, true) }
+        guard occurrence.needsDetails else { return nil }
+        return (occurrence.isMissingName, occurrence.isMissingPrebolus)
     }
 
     var body: some View {
@@ -1107,13 +1120,13 @@ struct TreatmentRow: View {
 
                 Spacer()
 
-                if let occurrence = sentMealNeedingDetails {
+                if let missing = missingMealDetails {
                     HStack(spacing: 6) {
-                        if occurrence.isMissingName {
+                        if missing.name {
                             Image(systemName: "tag")
                                 .accessibilityLabel("Needs a meal name")
                         }
-                        if occurrence.isMissingPrebolus {
+                        if missing.prebolus {
                             Image(systemName: "timer")
                                 .accessibilityLabel("Needs a pre-bolus time")
                         }

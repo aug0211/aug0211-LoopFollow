@@ -49,15 +49,41 @@ final class NamedMealStore {
         occurrences.first { $0.id == id }
     }
 
-    /// The sent meal behind a Trio meal entry, if it was sent from LoopFollow.
+    /// The recorded meal behind a Trio meal entry, if it has one yet.
     func occurrence(for meal: TrioMealTreatment) -> MealOccurrence? {
         NamedMealMatcher.occurrence(
+            trioMealID: meal.mealID.uuidString,
             for: Date(timeIntervalSince1970: meal.date),
             carbs: meal.carbsForEdit,
             fat: meal.fat,
             protein: meal.protein,
             in: occurrences
         )
+    }
+
+    /// The recorded meal for a Trio meal entry, created when the meal came from
+    /// the Watch or Trio, and linked to Trio's meal ID.
+    func ensureOccurrence(for meal: TrioMealTreatment) -> MealOccurrence {
+        let trioMealID = meal.mealID.uuidString
+        if var existing = occurrence(for: meal) {
+            if existing.trioMealID != trioMealID {
+                existing.trioMealID = trioMealID
+                replace(existing)
+            }
+            return existing
+        }
+        let mealTime = Date(timeIntervalSince1970: meal.date)
+        let occurrence = MealOccurrence(
+            id: UUID().uuidString,
+            sentAt: mealTime,
+            mealTime: mealTime,
+            carbs: meal.carbsForEdit,
+            fat: meal.fat,
+            protein: meal.protein,
+            trioMealID: trioMealID
+        )
+        occurrences = occurrences + [occurrence]
+        return occurrence
     }
 
     func matches(for occurrence: MealOccurrence) -> [NamedMeal] {
@@ -84,6 +110,10 @@ final class NamedMealStore {
         if let meal {
             occurrence.mealID = meal.id
             occurrence.mealName = meal.name
+        }
+        if occurrence.prebolusMinutes != prebolusMinutes {
+            // The eating start moved, so work out the outcome again.
+            occurrence.outcome = nil
         }
         occurrence.prebolusMinutes = prebolusMinutes
         replace(occurrence)
@@ -195,6 +225,7 @@ final class NamedMealStore {
             "lfFat": occurrence.fat,
             "lfProtein": occurrence.protein,
             "lfSentAt": Self.isoFormatter.string(from: occurrence.sentAt),
+            "lfTrioMealId": occurrence.trioMealID ?? "",
         ]
         body["lfPrebolusMinutes"] = occurrence.prebolusMinutes.map { $0 as Any } ?? NSNull()
 
@@ -267,12 +298,15 @@ final class NamedMealStore {
             let mealName = (note["lfMealName"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let prebolus = (note["lfPrebolusMinutes"] as? NSNumber)?.intValue
             let nightscoutID = note["_id"] as? String
+            let trioMealID = (note["lfTrioMealId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
 
             if let index = all.firstIndex(where: { $0.id == id }) {
+                if all[index].prebolusMinutes != prebolus { all[index].outcome = nil }
                 all[index].mealID = mealID
                 all[index].mealName = mealName
                 all[index].prebolusMinutes = prebolus
                 all[index].nightscoutID = nightscoutID ?? all[index].nightscoutID
+                all[index].trioMealID = trioMealID ?? all[index].trioMealID
             } else {
                 let sentAt = (note["lfSentAt"] as? String).flatMap(NightscoutUtils.parseDate) ?? createdAt
                 all.append(MealOccurrence(
@@ -285,11 +319,95 @@ final class NamedMealStore {
                     mealID: mealID,
                     mealName: mealName,
                     prebolusMinutes: prebolus,
-                    nightscoutID: nightscoutID
+                    nightscoutID: nightscoutID,
+                    trioMealID: trioMealID
                 ))
             }
         }
         if all != occurrences { occurrences = all }
+    }
+
+    // MARK: - Insights
+
+    /// Named meals eaten under `mealID`, newest first.
+    func occurrences(ofMeal mealID: String) -> [MealOccurrence] {
+        occurrences.filter { $0.mealID == mealID }.sorted { $0.mealTime > $1.mealTime }
+    }
+
+    func insights(forMeal mealID: String) -> MealInsights {
+        MealInsights.summarize(occurrences(ofMeal: mealID))
+    }
+
+    private var isRefreshingOutcomes = false
+
+    /// Works out how BG went after each named meal once 4 hours have passed,
+    /// from Nightscout readings and insulin. Each outcome is fetched once.
+    func refreshOutcomes() {
+        guard !isRefreshingOutcomes, !Storage.shared.url.value.isEmpty else { return }
+        let now = Date()
+        let pending = occurrences
+            .filter { $0.mealID != nil && $0.outcome == nil }
+            .filter { $0.eatingStart.addingTimeInterval(MealOutcome.window + 600) < now }
+            .sorted { $0.mealTime > $1.mealTime }
+            .prefix(20)
+        guard !pending.isEmpty else { return }
+        isRefreshingOutcomes = true
+
+        let thresholds = UnitSettingsStore.shared.effectiveThresholds()
+        Task {
+            var results: [String: MealOutcome] = [:]
+            for occurrence in pending {
+                do {
+                    results[occurrence.id] = try await self.fetchOutcome(occurrence, lowLine: thresholds.low, highLine: thresholds.high)
+                } catch {
+                    LogManager.shared.log(category: .nightscout, message: "Meal outcome fetch failed: \(error.localizedDescription)")
+                }
+            }
+            await MainActor.run {
+                var all = self.occurrences
+                for index in all.indices {
+                    if let outcome = results[all[index].id] { all[index].outcome = outcome }
+                }
+                if all != self.occurrences { self.occurrences = all }
+                self.isRefreshingOutcomes = false
+            }
+        }
+    }
+
+    private func fetchOutcome(_ occurrence: MealOccurrence, lowLine: Double, highLine: Double) async throws -> MealOutcome {
+        let start = occurrence.eatingStart
+        let end = start.addingTimeInterval(MealOutcome.window)
+        let readingsFrom = start.addingTimeInterval(-15 * 60)
+        let insulinFrom = min(occurrence.mealTime, start).addingTimeInterval(-30 * 60)
+
+        let entries = try await fetchArray(path: "/api/v1/entries/sgv.json", query: [
+            "find[date][$gte]": String(Int64(readingsFrom.timeIntervalSince1970 * 1000)),
+            "find[date][$lte]": String(Int64(end.timeIntervalSince1970 * 1000)),
+            "count": "200",
+        ])
+        let readings: [(date: Date, sgv: Int)] = entries.compactMap { entry in
+            guard let millis = (entry["date"] as? NSNumber)?.doubleValue,
+                  let sgv = (entry["sgv"] as? NSNumber)?.intValue
+            else { return nil }
+            return (Date(timeIntervalSince1970: millis / 1000), sgv)
+        }
+
+        let treatments = try await fetchArray(path: "/api/v1/treatments.json", query: [
+            "find[created_at][$gte]": Self.isoFormatter.string(from: insulinFrom),
+            "find[created_at][$lte]": Self.isoFormatter.string(from: end),
+            "count": "300",
+        ])
+        let insulin = treatments.reduce(0.0) { total, treatment in
+            total + ((treatment["insulin"] as? NSNumber)?.doubleValue ?? 0)
+        }
+
+        return MealOutcome.compute(
+            readings: readings,
+            insulin: insulin,
+            eatingStart: start,
+            lowLine: lowLine,
+            highLine: highLine
+        )
     }
 
     // MARK: - HTTP
