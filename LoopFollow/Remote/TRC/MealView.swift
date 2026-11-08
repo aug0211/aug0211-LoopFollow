@@ -667,7 +667,7 @@ struct MealView: View {
 
     private var quickPickChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
                 ForEach(quickPickMeals.quickPickMeals) { meal in
                     let named = namedMeal(matching: meal)
                     Button {
@@ -677,37 +677,46 @@ struct MealView: View {
                             selectedNamedMealID = named.id
                         }
                     } label: {
-                        VStack(spacing: 2) {
-                            if let named {
-                                Text(named.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .lineLimit(1)
-                                Text("\(Int(meal.carbs))g")
-                                    .font(.caption2)
-                            } else {
-                                Text("\(Int(meal.carbs))g")
-                                    .font(.subheadline.weight(.medium))
-                            }
-                            if mealWithFatProtein.value, meal.fat > 0 || meal.protein > 0 {
-                                Text("F\(Int(meal.fat)) P\(Int(meal.protein))")
-                                    .font(.caption2)
-                            }
-                            if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
-                                Text("\(InsulinFormatter.shared.string(meal.bolus))U")
-                                    .font(.caption2)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.accentColor.opacity(0.15))
-                        .foregroundColor(.accentColor)
-                        .cornerRadius(8)
+                        quickPickLabel(meal, name: named?.name)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.vertical, 4)
         }
+    }
+
+    /// A named chip is a fixed-width card: the name on up to two lines, then one
+    /// line of macros and bolus. An unnamed chip stays compact, carbs first.
+    private func quickPickLabel(_ meal: QuickPickMeal, name: String?) -> some View {
+        var details: [String] = []
+        if name != nil { details.append("\(Int(meal.carbs))g") }
+        if mealWithFatProtein.value, meal.fat > 0 || meal.protein > 0 {
+            details.append("F\(Int(meal.fat)) P\(Int(meal.protein))")
+        }
+        if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
+            details.append("\(InsulinFormatter.shared.string(meal.bolus))U")
+        }
+
+        return VStack(alignment: .leading, spacing: 3) {
+            Text(name ?? "\(Int(meal.carbs))g")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.accentColor)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if !details.isEmpty {
+                Text(details.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: name == nil ? nil : 168, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.15))
+        .cornerRadius(10)
     }
 
     /// The saved meal with exactly a Quick-Pick's carbs, fat and protein, most eaten first.
