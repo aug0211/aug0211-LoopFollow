@@ -68,16 +68,17 @@ struct SharedQuickPickTests {
         #expect(history.first { $0.carbs == 40 }?.bolus == 2)
     }
 
-    @Test("A short list is topped up with the most eaten saved meals")
-    func topUp() {
-        let saved = [
-            NamedMeal(id: "a", name: "A", carbs: 20, fat: 0, protein: 0, createdAt: Date(), nightscoutID: nil),
-            NamedMeal(id: "b", name: "B", carbs: 50, fat: 5, protein: 5, createdAt: Date(), nightscoutID: nil),
+    @Test("A meal from another device shows only around the time it's usually eaten")
+    func sharedMealsFollowTimeOfDay() {
+        let now = Date()
+        let shared = [
+            occurrence(45, at: now.addingTimeInterval(-7 * 86400)), // same time last week
+            occurrence(80, at: now.addingTimeInterval(-7 * 86400 + 12 * 3600)), // 12 hours off
         ]
-        let usage = ["b": NamedMealSearch.Usage(count: 3, lastEaten: Date())]
-        let existing = [QuickPickMeal(carbs: 20, fat: 0, protein: 0, bolus: 1)]
-        let result = QuickPickMealsManager.filledWithSavedMeals(existing, savedMeals: saved, usage: usage, maxCarbs: 200, includeFatProtein: true)
-        #expect(result.map(\.carbs) == [20, 50])
-        #expect(result[1].bolus == 0)
+        let history = QuickPickMealsManager.combinedHistory(local: [], shared: shared)
+        let picks = QuickPickMealsManager.computeQuickPickMeals(
+            from: history, now: now, carbStep: 1, maxCarbs: 200, includeFatProtein: true
+        )
+        #expect(picks.map(\.carbs) == [45])
     }
 }

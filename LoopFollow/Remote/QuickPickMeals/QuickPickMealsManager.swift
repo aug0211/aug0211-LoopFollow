@@ -44,17 +44,12 @@ final class QuickPickMealsManager: ObservableObject {
             local: Storage.shared.remoteMealHistory.value,
             shared: Storage.shared.mealOccurrences.value
         )
-        let picks = Self.computeQuickPickMeals(
+        // Scored exactly as before (time of day, weekday/weekend, recency), so only
+        // meals usually eaten around now show; there's no untimed filler.
+        quickPickMeals = Self.computeQuickPickMeals(
             from: history,
             now: now,
             carbStep: carbStep,
-            maxCarbs: maxCarbs,
-            includeFatProtein: includeFatProtein
-        )
-        quickPickMeals = Self.filledWithSavedMeals(
-            picks,
-            savedMeals: Storage.shared.namedMeals.value,
-            usage: NamedMealSearch.usage(from: Storage.shared.mealOccurrences.value),
             maxCarbs: maxCarbs,
             includeFatProtein: includeFatProtein
         )
@@ -77,43 +72,15 @@ final class QuickPickMealsManager: ObservableObject {
                 }
             }
             .map {
+                // Entry time, like this device's own history.
                 RemoteMealHistoryEntry(
                     carbs: Double($0.carbs),
                     fat: Double($0.fat),
                     protein: Double($0.protein),
-                    date: $0.mealTime
+                    date: $0.sentAt
                 )
             }
         return local + extra
-    }
-
-    /// Tops up a short list (a new device, or one rarely used) with the most eaten
-    /// saved meals, so every device offers the same meals from the start.
-    static func filledWithSavedMeals(
-        _ picks: [QuickPickMeal],
-        savedMeals: [NamedMeal],
-        usage: [String: NamedMealSearch.Usage],
-        maxCarbs: Double,
-        includeFatProtein: Bool
-    ) -> [QuickPickMeal] {
-        guard picks.count < maxResults else { return picks }
-        var result = picks
-        let ranked = savedMeals.sorted {
-            let lhs = usage[$0.id], rhs = usage[$1.id]
-            if (lhs?.count ?? 0) != (rhs?.count ?? 0) { return (lhs?.count ?? 0) > (rhs?.count ?? 0) }
-            return (lhs?.lastEaten ?? $0.createdAt) > (rhs?.lastEaten ?? $1.createdAt)
-        }
-        for meal in ranked where result.count < maxResults {
-            let carbs = Double(meal.carbs)
-            guard carbs > 0, carbs <= maxCarbs, !result.contains(where: { $0.carbs == carbs }) else { continue }
-            result.append(QuickPickMeal(
-                carbs: carbs,
-                fat: includeFatProtein ? Double(meal.fat) : 0,
-                protein: includeFatProtein ? Double(meal.protein) : 0,
-                bolus: 0
-            ))
-        }
-        return result
     }
 
     // MARK: - Scoring (static for testability)
