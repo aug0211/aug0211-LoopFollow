@@ -1586,7 +1586,12 @@ class TreatmentsViewModel: ObservableObject {
     private var rootMealsByFPUID: [UUID: Treatment] = [:]
     private var processedNightscoutIds = Set<String>() // Track which NS entries we've already processed
     private var oldestFetchedDate: Date? // Track the oldest treatment date we've fetched
-    private let pageSize = 100
+    /// The first load covers the last 24 hours (a busy Trio day is a few hundred
+    /// records: SMBs and temp basals every 5 minutes), capped for safety.
+    private let initialWindow: TimeInterval = 24 * 3600
+    private let initialLimit = 1000
+    /// Each Load More fetches this many Nightscout records.
+    private let pageSize = 300
     private var isFetching = false
 
     func loadInitialTreatments() {
@@ -1603,21 +1608,22 @@ class TreatmentsViewModel: ObservableObject {
         hasSMBEntries = false
         hasAutomaticEntries = false
 
-        // Start from now and go backwards
-        fetchTreatments(endDate: Date()) { [weak self] treatments, rawCount in
+        // Start with the last 24 hours, then Load More goes further back.
+        let now = Date()
+        fetchTreatments(endDate: now, startDate: now.addingTimeInterval(-initialWindow), limit: initialLimit) { [weak self] treatments, _ in
             guard let self = self else { return }
 
             DispatchQueue.main.async {
                 self.allTreatments = treatments
                 self.regroupTreatments()
 
-                // Update oldest date from the last (oldest) treatment
-                if let oldest = treatments.last {
-                    self.oldestFetchedDate = Date(timeIntervalSince1970: oldest.date)
-                }
+                // Load More continues from the oldest treatment, or from the start
+                // of the 24 hours when there were none.
+                self.oldestFetchedDate = treatments.last.map { Date(timeIntervalSince1970: $0.date) }
+                    ?? now.addingTimeInterval(-self.initialWindow)
 
-                // Has more data if we got a full page from Nightscout
-                self.hasMoreData = rawCount >= self.pageSize
+                // Older treatments may exist before the first 24 hours.
+                self.hasMoreData = true
                 self.isInitialLoading = false
                 self.isFetching = false
             }
@@ -1647,7 +1653,7 @@ class TreatmentsViewModel: ObservableObject {
         isFetching = true
 
         // Fetch treatments older than the oldest we have
-        fetchTreatments(endDate: oldestDate) { [weak self] treatments, rawCount in
+        fetchTreatments(endDate: oldestDate, limit: pageSize) { [weak self] treatments, rawCount in
             guard let self = self else { return }
 
             DispatchQueue.main.async {
@@ -1667,7 +1673,7 @@ class TreatmentsViewModel: ObservableObject {
         }
     }
 
-    private func fetchTreatments(endDate: Date, completion: @escaping ([Treatment], Int) -> Void) {
+    private func fetchTreatments(endDate: Date, startDate: Date? = nil, limit: Int, completion: @escaping ([Treatment], Int) -> Void) {
         guard IsNightscoutEnabled() else {
             completion([], 0)
             return
@@ -1688,7 +1694,7 @@ class TreatmentsViewModel: ObservableObject {
 
         // For pagination: fetch treatments with created_at < endDate
         // Go back up to 365 days from endDate to ensure we get enough data
-        let startDate = Calendar.current.date(byAdding: .day, value: -365, to: endDate)!
+        let startDate = startDate ?? Calendar.current.date(byAdding: .day, value: -365, to: endDate)!
         let endDateString = formatter.string(from: endDate)
         let startDateString = formatter.string(from: startDate)
 
@@ -1696,7 +1702,7 @@ class TreatmentsViewModel: ObservableObject {
         let parameters: [String: String] = [
             "find[created_at][$gte]": startDateString,
             "find[created_at][$lt]": endDateString,
-            "count": "\(pageSize)",
+            "count": "\(limit)",
         ]
 
         // Construct URL
