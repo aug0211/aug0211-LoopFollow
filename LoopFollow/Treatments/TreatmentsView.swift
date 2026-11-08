@@ -408,8 +408,7 @@ struct TreatmentDetailView: View {
     @ObservedObject private var loopRemoteCommands = Storage.shared.loopRemoteCommands
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
-    @State private var showNamingSheet = false
-    @State private var namingOccurrenceID: String?
+    @State private var namingTarget: MealNamingTarget?
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
     @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
 
@@ -420,8 +419,7 @@ struct TreatmentDetailView: View {
 
     /// Opens naming for this meal, recording it first when it came from the Watch or Trio.
     private func openNaming(for meal: TrioMealTreatment) {
-        namingOccurrenceID = NamedMealStore.shared.ensureOccurrence(for: meal).id
-        showNamingSheet = true
+        namingTarget = MealNamingTarget(id: NamedMealStore.shared.ensureOccurrence(for: meal).id)
     }
 
     /// The Trio meal remote commands act on: the root meal for an FPU child whose root is loaded.
@@ -631,10 +629,8 @@ struct TreatmentDetailView: View {
             }
         }
         .background(
-            Color.clear.sheet(isPresented: $showNamingSheet) {
-                if let namingOccurrenceID {
-                    MealNamingSheet(occurrenceID: namingOccurrenceID)
-                }
+            Color.clear.sheet(item: $namingTarget) { target in
+                MealNamingSheet(occurrenceID: target.id)
             }
         )
         .confirmationDialog(deleteDialogTitle, isPresented: $showDeleteConfirmation, titleVisibility: .visible) {

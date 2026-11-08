@@ -3,6 +3,12 @@
 
 import SwiftUI
 
+/// Which recorded meal the naming sheet opens for. Driving the sheet with this
+/// (`sheet(item:)`) means it can never open without a meal and render blank.
+struct MealNamingTarget: Identifiable, Equatable {
+    let id: String
+}
+
 /// Names a meal sent from LoopFollow and records its pre-bolus time. Shown to the
 /// sender after a meal is sent, and to anyone from the meal's detail screen.
 struct MealNamingSheet: View {

@@ -28,7 +28,7 @@ struct MealView: View {
     @State private var didInitialize = false
     /// The sent meal offered for naming after the success alert.
     @State private var namingOccurrenceID: String?
-    @State private var showNamingSheet = false
+    @State private var namingTarget: MealNamingTarget?
 
     @FocusState private var carbsFieldIsFocused: Bool
     @FocusState private var proteinFieldIsFocused: Bool
@@ -309,13 +309,11 @@ struct MealView: View {
             }
             .background(
                 // Offered after the success alert; closing it closes the meal screen.
-                Color.clear.sheet(isPresented: $showNamingSheet, onDismiss: {
+                Color.clear.sheet(item: $namingTarget, onDismiss: {
                     namingOccurrenceID = nil
                     presentationMode.wrappedValue.dismiss()
-                }) {
-                    if let namingOccurrenceID {
-                        MealNamingSheet(occurrenceID: namingOccurrenceID)
-                    }
+                }) { target in
+                    MealNamingSheet(occurrenceID: target.id)
                 }
             )
             .alert(isPresented: $showAlert) {
@@ -394,10 +392,10 @@ struct MealView: View {
                         title: Text("Command Sent"),
                         message: Text(statusMessage ?? ""),
                         dismissButton: .default(Text("OK"), action: {
-                            if namingOccurrenceID != nil {
+                            if let namingOccurrenceID {
                                 // Let the alert finish closing before presenting the sheet.
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                    showNamingSheet = true
+                                    namingTarget = MealNamingTarget(id: namingOccurrenceID)
                                 }
                             } else {
                                 presentationMode.wrappedValue.dismiss()
