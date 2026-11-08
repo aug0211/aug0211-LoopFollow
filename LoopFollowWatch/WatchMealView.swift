@@ -15,6 +15,7 @@ struct WatchMealView: View {
     @State private var editingField: EditField? = .carbs
     @State private var lastHapticValue: Int = 0
     @State private var showBolusStep = false
+    @State private var showSavedMeals = false
     @FocusState private var crownFocused: Bool
 
     enum EditField {
@@ -125,6 +126,9 @@ struct WatchMealView: View {
         .onChange(of: protein) { _ in playHaptic(Int(protein.rounded())) }
         .onChange(of: fat) { _ in playHaptic(Int(fat.rounded())) }
         .onChange(of: entryTimeOffset) { _ in playHaptic(Int(entryTimeOffset)) }
+        .sheet(isPresented: $showSavedMeals) {
+            savedMealsList
+        }
         .navigationDestination(isPresented: $showBolusStep) {
             WatchBolusView(config: config, bgFetcher: bgFetcher, pendingMeal: pendingMealData, popToRoot: popToRoot)
         }
@@ -168,6 +172,20 @@ struct WatchMealView: View {
 
     @ViewBuilder
     private var entryView: some View {
+        if !config.namedMeals.isEmpty {
+            Button {
+                editingField = nil
+                showSavedMeals = true
+            } label: {
+                Label("Saved meals", systemImage: "list.bullet")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.yellow)
+            .controlSize(.small)
+        }
+
         HStack {
             Button {
                 adjustActiveField(by: -stepSize)
@@ -225,6 +243,33 @@ struct WatchMealView: View {
         .disabled(carbs <= 0 && protein <= 0 && fat <= 0)
         .opacity(editingField == nil ? 1 : 0)
         .allowsHitTesting(editingField == nil)
+    }
+
+    /// Saved meals from the iPhone, most eaten first. Picking one fills in its
+    /// carbs, fat and protein (within the guardrails); the name is added on the iPhone.
+    private var savedMealsList: some View {
+        List(config.namedMeals, id: \.self) { meal in
+            Button {
+                carbs = min(meal.carbs, config.maxCarbs)
+                if config.mealWithFatProtein {
+                    fat = min(meal.fat, config.maxFat)
+                    protein = min(meal.protein, config.maxProtein)
+                }
+                editingField = nil
+                showSavedMeals = false
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(meal.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(2)
+                    Text(config.mealWithFatProtein
+                        ? "\(Int(meal.carbs))g · F\(Int(meal.fat)) P\(Int(meal.protein))"
+                        : "\(Int(meal.carbs))g carbs")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
 
     @ViewBuilder

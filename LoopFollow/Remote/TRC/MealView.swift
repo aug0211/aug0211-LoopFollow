@@ -30,7 +30,15 @@ struct MealView: View {
     @State private var namingOccurrenceID: String?
     @State private var namingTarget: MealNamingTarget?
     /// Optional, entered with the meal: saved with it, so the after-send naming prompt is skipped.
+    /// The name field also searches saved meals as you type.
     @State private var optionalMealName = ""
+    /// The saved meal picked from search or a Quick-Pick chip.
+    @State private var selectedNamedMealID: String?
+    @FocusState private var mealNameFocused: Bool
+    @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
+    @ObservedObject private var namedMeals = Storage.shared.namedMeals
+    @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
+    @ObservedObject private var mealMatchTolerance = Storage.shared.mealMatchTolerance
     @State private var optionalPrebolusText = ""
     @State private var optionalPrebolusNegative = false
 
@@ -59,58 +67,11 @@ struct MealView: View {
         NavigationView {
             VStack {
                 Form {
-                    if !quickPickMeals.quickPickMeals.isEmpty {
+                    if nsWriteAuth.value {
+                        mealNameSection
+                    } else if !quickPickMeals.quickPickMeals.isEmpty {
                         Section(header: QuickPickSectionHeader(title: "Quick-Pick Meals", infoText: QuickPickSectionHeader.mealInfoText)) {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(quickPickMeals.quickPickMeals) { meal in
-                                        Button {
-                                            applyQuickPickMeal(meal)
-                                        } label: {
-                                            VStack(spacing: 2) {
-                                                Text("\(Int(meal.carbs))g")
-                                                    .font(.subheadline.weight(.medium))
-                                                if mealWithFatProtein.value, meal.fat > 0 || meal.protein > 0 {
-                                                    Text("F\(Int(meal.fat)) P\(Int(meal.protein))")
-                                                        .font(.caption2)
-                                                }
-                                                if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
-                                                    Text("\(InsulinFormatter.shared.string(meal.bolus))U")
-                                                        .font(.caption2)
-                                                }
-                                            }
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(Color.accentColor.opacity(0.15))
-                                            .foregroundColor(.accentColor)
-                                            .cornerRadius(8)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-
-                    Section(
-                        header: Text("Name & Pre-bolus (optional)"),
-                        footer: Text("Leave blank to name the meal later. Pre-bolus is minutes between the bolus and starting to eat; choose After if insulin went in after eating started.")
-                    ) {
-                        TextField("Meal name", text: $optionalMealName)
-                            .textInputAutocapitalization(.words)
-                        HStack {
-                            Picker("", selection: $optionalPrebolusNegative) {
-                                Text("Before").tag(false)
-                                Text("After").tag(true)
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(maxWidth: 160)
-                            TextField("Minutes", text: $optionalPrebolusText)
-                                .keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing)
-                            Text("min")
-                                .foregroundColor(.secondary)
+                            quickPickChips
                         }
                     }
 
@@ -564,16 +525,16 @@ struct MealView: View {
                             protein: sentProtein,
                             mealTime: scheduledDate ?? Date()
                         )
-                        let typedName = optionalMealName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let name = resolvedMealName(carbs: occurrence.carbs, fat: occurrence.fat, protein: occurrence.protein)
                         let typedPrebolus = NamedMealFormat.parsePrebolus(optionalPrebolusText, negative: optionalPrebolusNegative)
-                        if !typedName.isEmpty || typedPrebolus != .empty {
+                        if name.existingID != nil || name.newName != nil || typedPrebolus != .empty {
                             // Entered up front: save it now and skip the after-send prompt.
                             var minutes: Int?
                             if case let .minutes(value) = typedPrebolus { minutes = value }
                             NamedMealStore.shared.save(
                                 occurrenceID: occurrence.id,
-                                existingMealID: nil,
-                                newName: typedName.isEmpty ? nil : typedName,
+                                existingMealID: name.existingID,
+                                newName: name.newName,
                                 prebolusMinutes: minutes
                             )
                         } else {
@@ -601,6 +562,7 @@ struct MealView: View {
                     fat = HKQuantity(unit: .gram(), doubleValue: 0.0)
                     bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: 0)
                     optionalMealName = ""
+                    selectedNamedMealID = nil
                     optionalPrebolusText = ""
                     optionalPrebolusNegative = false
                     selectedTime = nil
@@ -623,6 +585,191 @@ struct MealView: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    // MARK: - Meal name, saved-meal search and Quick-Pick
+
+    private var trimmedMealName: String {
+        optionalMealName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var selectedNamedMeal: NamedMeal? {
+        selectedNamedMealID.flatMap { id in namedMeals.value.first { $0.id == id } }
+    }
+
+    @ViewBuilder
+    private var mealNameSection: some View {
+        Section(
+            header: QuickPickSectionHeader(title: "Meal", infoText: QuickPickSectionHeader.mealInfoText),
+            footer: Text("Type to find a saved meal, or a new name to save this meal under it. All optional. Pre-bolus is minutes between the bolus and starting to eat; choose After if insulin went in after eating started.")
+        ) {
+            TextField("Meal name (optional)", text: $optionalMealName)
+                .focused($mealNameFocused)
+                .textInputAutocapitalization(.words)
+                .disableAutocorrection(true)
+                .onChange(of: optionalMealName) { _ in
+                    if let selected = selectedNamedMeal,
+                       NamedMealFormat.nameKey(selected.name) != NamedMealFormat.nameKey(optionalMealName)
+                    {
+                        selectedNamedMealID = nil
+                    }
+                }
+
+            if mealNameFocused, !trimmedMealName.isEmpty {
+                let results = Array(NamedMealSearch.search(
+                    trimmedMealName,
+                    in: namedMeals.value,
+                    usage: NamedMealSearch.usage(from: mealOccurrences.value)
+                ).prefix(6))
+                ForEach(results) { meal in
+                    Button { pickNamedMeal(meal) } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(meal.name)
+                                .foregroundColor(.primary)
+                            Text(meal.macroSummary + " · " + NamedMealStore.shared.insights(forMeal: meal.id).shortSummary)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                if !results.contains(where: { NamedMealFormat.nameKey($0.name) == NamedMealFormat.nameKey(trimmedMealName) }) {
+                    Button {
+                        mealNameFocused = false
+                    } label: {
+                        Label("Save as new meal “\(trimmedMealName)”", systemImage: "plus.circle")
+                    }
+                }
+            } else if trimmedMealName.isEmpty, !quickPickMeals.quickPickMeals.isEmpty {
+                quickPickChips
+            }
+
+            if let hint = lastTimeHint {
+                Text(hint)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Picker("", selection: $optionalPrebolusNegative) {
+                    Text("Before").tag(false)
+                    Text("After").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 160)
+                TextField("Pre-bolus", text: $optionalPrebolusText)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                Text("min")
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private var quickPickChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(quickPickMeals.quickPickMeals) { meal in
+                    let named = namedMeal(matching: meal)
+                    Button {
+                        applyQuickPickMeal(meal)
+                        if let named, nsWriteAuth.value {
+                            optionalMealName = named.name
+                            selectedNamedMealID = named.id
+                        }
+                    } label: {
+                        VStack(spacing: 2) {
+                            if let named {
+                                Text(named.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                Text("\(Int(meal.carbs))g")
+                                    .font(.caption2)
+                            } else {
+                                Text("\(Int(meal.carbs))g")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            if mealWithFatProtein.value, meal.fat > 0 || meal.protein > 0 {
+                                Text("F\(Int(meal.fat)) P\(Int(meal.protein))")
+                                    .font(.caption2)
+                            }
+                            if mealWithBolus.value, !isScheduling, meal.bolus > 0 {
+                                Text("\(InsulinFormatter.shared.string(meal.bolus))U")
+                                    .font(.caption2)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor.opacity(0.15))
+                        .foregroundColor(.accentColor)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    /// The saved meal with exactly a Quick-Pick's carbs, fat and protein, most eaten first.
+    private func namedMeal(matching quickPick: QuickPickMeal) -> NamedMeal? {
+        let carbs = Int(quickPick.carbs.rounded())
+        let fat = Int(quickPick.fat.rounded())
+        let protein = Int(quickPick.protein.rounded())
+        let usage = NamedMealSearch.usage(from: mealOccurrences.value)
+        return namedMeals.value
+            .filter { $0.carbs == carbs && $0.fat == fat && $0.protein == protein }
+            .max { (usage[$0.id]?.count ?? 0) < (usage[$1.id]?.count ?? 0) }
+    }
+
+    /// Fills in a saved meal's carbs, fat and protein (within the guardrails) and its name.
+    /// The bolus is left to the calculator; see `lastTimeHint`.
+    private func pickNamedMeal(_ meal: NamedMeal) {
+        UIApplication.shared.endEditing()
+        mealNameFocused = false
+        optionalMealName = meal.name
+        selectedNamedMealID = meal.id
+        DispatchQueue.main.async {
+            carbs = HKQuantity(unit: .gram(), doubleValue: min(Double(meal.carbs), maxCarbs.value.doubleValue(for: .gram())))
+            if mealWithFatProtein.value {
+                fat = HKQuantity(unit: .gram(), doubleValue: min(Double(meal.fat), maxFat.value.doubleValue(for: .gram())))
+                protein = HKQuantity(unit: .gram(), doubleValue: min(Double(meal.protein), maxProtein.value.doubleValue(for: .gram())))
+            }
+        }
+    }
+
+    /// "Last time: 4.5U insulin, peak 210 at 1h 10m" for the picked meal.
+    private var lastTimeHint: String? {
+        guard let meal = selectedNamedMeal else { return nil }
+        let history = NamedMealStore.shared.occurrences(ofMeal: meal.id)
+        if let outcome = history.compactMap(\.outcome).first(where: \.hasEnoughData) {
+            let peak = Localizer.toDisplayUnits(String(outcome.peakBG))
+            let minutes = outcome.minutesToPeak
+            let time = minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+            return "Last time: \(InsulinFormatter.shared.string(outcome.insulin))U insulin, peak \(peak) at \(time)"
+        }
+        if let last = history.first {
+            return "Last eaten " + last.mealTime.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+        }
+        return nil
+    }
+
+    /// Name to save at send: a saved meal is kept only while its macros stay within
+    /// the match tolerance (otherwise the name is dropped); an unknown name is new.
+    private func resolvedMealName(carbs: Int, fat: Int, protein: Int) -> (existingID: String?, newName: String?) {
+        let typed = trimmedMealName
+        guard !typed.isEmpty else { return (nil, nil) }
+        let key = NamedMealFormat.nameKey(typed)
+        let candidates = namedMeals.value.filter { NamedMealFormat.nameKey($0.name) == key }
+        guard !candidates.isEmpty else { return (nil, typed) }
+        let tolerance = mealMatchTolerance.value
+        let includeFatProtein = mealWithFatProtein.value
+        let keep = (selectedNamedMeal.map { [$0] } ?? []) + candidates
+        if let match = keep.first(where: {
+            $0.stillMatches(carbs: carbs, fat: fat, protein: protein, tolerance: tolerance, includeFatProtein: includeFatProtein)
+        }) {
+            return (match.id, nil)
+        }
+        return (nil, nil)
     }
 
     private func applyQuickPickMeal(_ meal: QuickPickMeal) {

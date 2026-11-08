@@ -133,3 +133,114 @@ enum NamedMealFormat {
         name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
+
+/// Finds saved meals by name as you type, forgiving case, accents, missing
+/// letters and small typos.
+enum NamedMealSearch {
+    struct Usage {
+        let count: Int
+        let lastEaten: Date
+    }
+
+    /// How well `query` matches `name`, higher is better; nil when it doesn't match.
+    /// 5: name starts with it · 4: a word starts with it · 3: contains it ·
+    /// 2: its letters appear in order · 1: one typo per word of 4+ letters.
+    static func score(_ query: String, name: String) -> Int? {
+        let q = normalize(query)
+        let n = normalize(name)
+        guard !q.isEmpty, !n.isEmpty else { return nil }
+        let words = n.split(separator: " ").map(String.init)
+
+        if n.hasPrefix(q) { return 5 }
+        if words.contains(where: { $0.hasPrefix(q) }) { return 4 }
+        if n.contains(q) { return 3 }
+        if isSubsequence(q.replacingOccurrences(of: " ", with: ""), of: n.replacingOccurrences(of: " ", with: "")) { return 2 }
+
+        let queryWords = q.split(separator: " ").map(String.init)
+        let typoMatch = queryWords.allSatisfy { queryWord in
+            words.contains { word in
+                if word.hasPrefix(queryWord) { return true }
+                guard queryWord.count >= 4 else { return false }
+                let prefix = String(word.prefix(queryWord.count))
+                return editDistance(queryWord, prefix) <= 1 || editDistance(queryWord, word) <= 1
+            }
+        }
+        return typoMatch ? 1 : nil
+    }
+
+    /// Matching meals, best match first, then most eaten, then most recent, then by name.
+    static func search(_ query: String, in meals: [NamedMeal], usage: [String: Usage]) -> [NamedMeal] {
+        meals
+            .compactMap { meal in score(query, name: meal.name).map { (meal, $0) } }
+            .sorted { lhs, rhs in
+                if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+                let lhsUsage = usage[lhs.0.id]
+                let rhsUsage = usage[rhs.0.id]
+                if (lhsUsage?.count ?? 0) != (rhsUsage?.count ?? 0) { return (lhsUsage?.count ?? 0) > (rhsUsage?.count ?? 0) }
+                if lhsUsage?.lastEaten != rhsUsage?.lastEaten {
+                    return (lhsUsage?.lastEaten ?? .distantPast) > (rhsUsage?.lastEaten ?? .distantPast)
+                }
+                return lhs.0.name.localizedCaseInsensitiveCompare(rhs.0.name) == .orderedAscending
+            }
+            .map { $0.0 }
+    }
+
+    static func usage(from occurrences: [MealOccurrence]) -> [String: Usage] {
+        var result: [String: Usage] = [:]
+        for occurrence in occurrences {
+            guard let mealID = occurrence.mealID else { continue }
+            let current = result[mealID]
+            result[mealID] = Usage(
+                count: (current?.count ?? 0) + 1,
+                lastEaten: max(current?.lastEaten ?? .distantPast, occurrence.mealTime)
+            )
+        }
+        return result
+    }
+
+    static func normalize(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .lowercased()
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+    }
+
+    private static func isSubsequence(_ needle: String, of haystack: String) -> Bool {
+        var index = haystack.startIndex
+        for character in needle {
+            guard let found = haystack[index...].firstIndex(of: character) else { return false }
+            index = haystack.index(after: found)
+        }
+        return true
+    }
+
+    /// Levenshtein distance.
+    static func editDistance(_ a: String, _ b: String) -> Int {
+        let a = Array(a), b = Array(b)
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+        var previous = Array(0 ... b.count)
+        for i in 1 ... a.count {
+            var current = [i] + Array(repeating: 0, count: b.count)
+            for j in 1 ... b.count {
+                current[j] = min(
+                    previous[j] + 1,
+                    current[j - 1] + 1,
+                    previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)
+                )
+            }
+            previous = current
+        }
+        return previous[b.count]
+    }
+}
+
+extension NamedMeal {
+    /// Rule for keeping a meal's name at send time: every macro still within the
+    /// match tolerance (fat and protein ignored when meals are carbs only).
+    func stillMatches(carbs: Int, fat: Int, protein: Int, tolerance: Int, includeFatProtein: Bool) -> Bool {
+        guard abs(self.carbs - carbs) <= tolerance else { return false }
+        guard includeFatProtein else { return true }
+        return abs(self.fat - fat) <= tolerance && abs(self.protein - protein) <= tolerance
+    }
+}

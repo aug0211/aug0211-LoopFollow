@@ -3,6 +3,14 @@
 
 import Foundation
 
+/// A saved meal from the iPhone, for the Watch meal picker.
+struct WatchNamedMeal: Equatable, Hashable {
+    let name: String
+    let carbs: Double
+    let fat: Double
+    let protein: Double
+}
+
 struct WatchConfig: Equatable {
     var nsURL: String
     var nsToken: String
@@ -54,6 +62,8 @@ struct WatchConfig: Equatable {
     var mealWithFatProtein: Bool
     var maxProtein: Double
     var maxFat: Double
+    /// Saved meals, most eaten first (synced from iPhone).
+    var namedMeals: [WatchNamedMeal]
 
     var hasDexcomCredentials: Bool {
         !dexUsername.isEmpty && !dexPassword.isEmpty
@@ -113,6 +123,7 @@ struct WatchConfig: Equatable {
             "mealWithFatProtein": mealWithFatProtein,
             "maxProtein": maxProtein,
             "maxFat": maxFat,
+            "namedMeals": namedMeals.map { meal -> [String: Any] in ["name": meal.name, "carbs": meal.carbs, "fat": meal.fat, "protein": meal.protein] },
         ]
     }
 
@@ -151,6 +162,11 @@ struct WatchConfig: Equatable {
         mealWithFatProtein = dict["mealWithFatProtein"] as? Bool ?? false
         maxProtein = dict["maxProtein"] as? Double ?? 30.0
         maxFat = dict["maxFat"] as? Double ?? 30.0
+        namedMeals = (dict["namedMeals"] as? [[String: Any]] ?? []).compactMap { entry in
+            guard let name = entry["name"] as? String else { return nil }
+            func number(_ key: String) -> Double { (entry[key] as? NSNumber)?.doubleValue ?? 0 }
+            return WatchNamedMeal(name: name, carbs: number("carbs"), fat: number("fat"), protein: number("protein"))
+        }
     }
 
     func saveToDefaults() {

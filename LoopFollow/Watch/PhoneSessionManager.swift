@@ -58,6 +58,7 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             s.dynamicBGColor.$value.map { _ in () }.eraseToAnyPublisher(),
             s.bolusCalculatorSettings.$value.map { _ in () }.eraseToAnyPublisher(),
             s.mealWithFatProtein.$value.map { _ in () }.eraseToAnyPublisher(),
+            s.namedMeals.$value.map { _ in () }.eraseToAnyPublisher(),
             Observable.shared.loopFollowDeviceToken.$value.map { _ in () }.eraseToAnyPublisher(),
         ]
         Publishers.MergeMany(changes.map { $0.dropFirst() })
@@ -115,7 +116,21 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             "mealWithFatProtein": Storage.shared.mealWithFatProtein.value,
             "maxProtein": Storage.shared.maxProtein.value.doubleValue(for: .gram()),
             "maxFat": Storage.shared.maxFat.value.doubleValue(for: .gram()),
+            "namedMeals": Self.watchNamedMeals(),
         ]
+    }
+
+    /// Saved meals for the Watch's meal picker, most eaten first.
+    private static func watchNamedMeals() -> [[String: Any]] {
+        let usage = NamedMealSearch.usage(from: Storage.shared.mealOccurrences.value)
+        return Storage.shared.namedMeals.value
+            .sorted {
+                let lhs = usage[$0.id]?.count ?? 0
+                let rhs = usage[$1.id]?.count ?? 0
+                return lhs == rhs ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending : lhs > rhs
+            }
+            .prefix(40)
+            .map { meal -> [String: Any] in ["name": meal.name, "carbs": meal.carbs, "fat": meal.fat, "protein": meal.protein] }
     }
 
     func sendConfig() {

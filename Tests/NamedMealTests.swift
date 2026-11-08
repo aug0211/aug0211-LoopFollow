@@ -139,6 +139,36 @@ struct NamedMealTests {
         #expect(insights.trend?.later == 200)
     }
 
+    @Test("Search ranks name start, word start, contains, letters in order, then typos")
+    func searchRanking() {
+        #expect(NamedMealSearch.score("piz", name: "Pizza") == 5)
+        #expect(NamedMealSearch.score("pro", name: "Vanilla Protein") == 4)
+        #expect(NamedMealSearch.score("nill", name: "Vanilla Protein") == 3)
+        #expect(NamedMealSearch.score("vprot", name: "Vanilla Protein") == 2)
+        #expect(NamedMealSearch.score("vanulla prot", name: "Vanilla Protein") == 1)
+        #expect(NamedMealSearch.score("PIZZA", name: "pizza") == 5)
+        #expect(NamedMealSearch.score("creme", name: "Crème brûlée") == 5)
+        #expect(NamedMealSearch.score("taco", name: "Pizza") == nil)
+    }
+
+    @Test("Search ties go to the most eaten meal")
+    func searchUsageOrder() {
+        let meals = [meal("Pasta salad", 40, 10, 8), meal("Pasta", 60, 12, 14)]
+        let usage = ["Pasta salad": NamedMealSearch.Usage(count: 5, lastEaten: Date())]
+        #expect(NamedMealSearch.search("pas", in: meals, usage: usage).map(\.name) == ["Pasta salad", "Pasta"])
+        #expect(NamedMealSearch.search("pasta s", in: meals, usage: [:]).map(\.name) == ["Pasta salad"])
+    }
+
+    @Test("A picked meal keeps its name only within the tolerance")
+    func stillMatchesRule() {
+        let pizza = meal("Pizza", 60, 20, 18)
+        #expect(pizza.stillMatches(carbs: 64, fat: 20, protein: 18, tolerance: 5, includeFatProtein: true))
+        #expect(!pizza.stillMatches(carbs: 90, fat: 20, protein: 18, tolerance: 5, includeFatProtein: true))
+        #expect(!pizza.stillMatches(carbs: 60, fat: 30, protein: 18, tolerance: 5, includeFatProtein: true))
+        // Carbs-only meals ignore fat and protein.
+        #expect(pizza.stillMatches(carbs: 62, fat: 0, protein: 0, tolerance: 5, includeFatProtein: false))
+    }
+
     @Test("Pre-bolus wording")
     func prebolusWording() {
         #expect(NamedMealFormat.prebolus(13) == "Pre-bolus 13 min")
