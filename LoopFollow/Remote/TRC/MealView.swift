@@ -729,13 +729,15 @@ struct MealView: View {
     }
 
     /// Fills in a saved meal's carbs, fat and protein (within the guardrails) and its name.
-    /// The bolus is left to the calculator; see `lastTimeHint`.
+    /// The bolus is cleared to 0 so an earlier pick's insulin never carries over; the
+    /// amount is left to the calculator (see `lastTimeHint`).
     private func pickNamedMeal(_ meal: NamedMeal) {
         UIApplication.shared.endEditing()
         mealNameFocused = false
         optionalMealName = meal.name
         selectedNamedMealID = meal.id
         DispatchQueue.main.async {
+            bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: 0)
             carbs = HKQuantity(unit: .gram(), doubleValue: min(Double(meal.carbs), maxCarbs.value.doubleValue(for: .gram())))
             if mealWithFatProtein.value {
                 fat = HKQuantity(unit: .gram(), doubleValue: min(Double(meal.fat), maxFat.value.doubleValue(for: .gram())))
