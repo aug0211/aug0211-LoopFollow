@@ -348,8 +348,8 @@ final class NamedMealStore {
         guard !isRefreshingOutcomes, !Storage.shared.url.value.isEmpty else { return }
         let now = Date()
         let pending = occurrences
-            // Also re-checks outcomes from before overlap detection.
-            .filter { $0.mealID != nil && ($0.outcome == nil || $0.outcome?.overlappedMeal == nil) }
+            // Also redoes outcomes from before overlap detection and BG curves.
+            .filter { $0.mealID != nil && ($0.outcome == nil || $0.outcome?.overlappedMeal == nil || $0.outcome?.curve == nil) }
             .filter { $0.eatingStart.addingTimeInterval(MealOutcome.window + 600) < now }
             .sorted { $0.mealTime > $1.mealTime }
             .prefix(20)

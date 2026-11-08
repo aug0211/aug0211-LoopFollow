@@ -24,6 +24,11 @@ struct MealOutcome: Codable, Equatable {
     /// True when another meal was entered in the same window, so the BG and insulin
     /// aren't this meal's alone. Nil on outcomes worked out before this was checked.
     var overlappedMeal: Bool? = nil
+    /// BG every 5 minutes from 10 minutes before eating to 4 hours after
+    /// (`curveMinutes`), 0 where there was no reading. Nil on older outcomes.
+    var curve: [Int]? = nil
+
+    static let curveMinutes = Array(stride(from: -10, through: 240, by: 5))
 
     var rise: Int { peakBG - startBG }
 
@@ -46,6 +51,13 @@ struct MealOutcome: Codable, Equatable {
             .filter { $0.sgv > 0 && $0.date >= start.addingTimeInterval(-600) && $0.date <= end }
             .sorted { $0.date < $1.date }
         let after = sorted.filter { $0.date >= start }
+        let curve = curveMinutes.map { minute -> Int in
+            let time = start.addingTimeInterval(Double(minute) * 60)
+            guard let nearest = sorted.min(by: { abs($0.date.timeIntervalSince(time)) < abs($1.date.timeIntervalSince(time)) }),
+                  abs(nearest.date.timeIntervalSince(time)) <= 240
+            else { return 0 }
+            return nearest.sgv
+        }
 
         guard let startReading = sorted.min(by: { abs($0.date.timeIntervalSince(start)) < abs($1.date.timeIntervalSince(start)) }),
               let peak = after.max(by: { $0.sgv < $1.sgv }),
@@ -53,7 +65,7 @@ struct MealOutcome: Codable, Equatable {
         else {
             return MealOutcome(startBG: 0, peakBG: 0, minutesToPeak: 0, lowestBG: 0, hadLow: false,
                                minutesAboveRange: 0, insulin: insulin, hasEnoughData: false,
-                               overlappedMeal: overlappedMeal)
+                               overlappedMeal: overlappedMeal, curve: curve)
         }
 
         // Each reading stands for the time until the next one (at most 10 minutes).
@@ -72,7 +84,8 @@ struct MealOutcome: Codable, Equatable {
             minutesAboveRange: Int(minutesAbove.rounded()),
             insulin: insulin,
             hasEnoughData: after.count >= minimumReadings,
-            overlappedMeal: overlappedMeal
+            overlappedMeal: overlappedMeal,
+            curve: curve
         )
     }
 
@@ -134,6 +147,12 @@ struct MealInsights: Equatable {
     let prebolusGroups: [PrebolusGroup]
     /// Median peak of the earlier and the later half, once there are 6 or more meals.
     let trend: (earlier: Int, later: Int)?
+    /// Median BG at each point of `MealOutcome.curveMinutes`, 0 where unknown.
+    var typicalCurve: [Int]? = nil
+    /// Things that keep happening with this meal, once there are enough meals.
+    var patterns: [MealPattern] = []
+
+    var hasWarning: Bool { patterns.contains { $0.isWarning } }
 
     var hasSummary: Bool { measured >= Self.minimumMeals }
 
@@ -144,6 +163,7 @@ struct MealInsights: Equatable {
             && lhs.medianMinutesAboveRange == rhs.medianMinutesAboveRange && lhs.medianInsulin == rhs.medianInsulin
             && lhs.prebolusGroups == rhs.prebolusGroups
             && lhs.trend?.earlier == rhs.trend?.earlier && lhs.trend?.later == rhs.trend?.later
+            && lhs.typicalCurve == rhs.typicalCurve && lhs.patterns == rhs.patterns
     }
 
     static func summarize(_ occurrences: [MealOccurrence]) -> MealInsights {
@@ -180,7 +200,7 @@ struct MealInsights: Equatable {
             }
         }
 
-        return MealInsights(
+        var insights = MealInsights(
             timesEaten: occurrences.count,
             measured: outcomes.count,
             medianPeak: median(peaks),
@@ -193,6 +213,18 @@ struct MealInsights: Equatable {
             prebolusGroups: groups,
             trend: trend
         )
+        insights.typicalCurve = medianCurve(outcomes.compactMap(\.curve))
+        insights.patterns = MealPattern.find(in: insights, outcomes: outcomes)
+        return insights
+    }
+
+    /// Point-by-point median of the curves, ignoring gaps (0).
+    static func medianCurve(_ curves: [[Int]]) -> [Int]? {
+        guard !curves.isEmpty else { return nil }
+        let length = curves.map(\.count).max() ?? 0
+        return (0 ..< length).map { index in
+            median(curves.compactMap { index < $0.count && $0[index] > 0 ? $0[index] : nil }) ?? 0
+        }
     }
 
     static func median(_ values: [Int]) -> Int? {
@@ -218,5 +250,81 @@ struct MealInsights: Equatable {
             parts.append(mealsWithLow == 1 ? "1 low" : "\(mealsWithLow) lows")
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Something that keeps happening with a meal, worth a look.
+struct MealPattern: Equatable {
+    enum Kind: String {
+        case lows, highs, latePeak, prebolusHelps, rising, falling, variable
+    }
+
+    let kind: Kind
+    let text: String
+
+    var isWarning: Bool { [.lows, .highs, .rising].contains(kind) }
+
+    var symbol: String {
+        switch kind {
+        case .lows: return "arrow.down.circle.fill"
+        case .highs: return "arrow.up.circle.fill"
+        case .latePeak: return "clock.fill"
+        case .prebolusHelps: return "timer"
+        case .rising: return "chart.line.uptrend.xyaxis"
+        case .falling: return "chart.line.downtrend.xyaxis"
+        case .variable: return "waveform.path"
+        }
+    }
+
+    /// Patterns over meals with a usable outcome; needs `MealInsights.minimumMeals`.
+    static func find(in insights: MealInsights, outcomes: [MealOutcome]) -> [MealPattern] {
+        let count = outcomes.count
+        guard count >= MealInsights.minimumMeals else { return [] }
+        var patterns: [MealPattern] = []
+        func bg(_ value: Int) -> String { Localizer.toDisplayUnits(String(value)) }
+        func duration(_ minutes: Int) -> String { minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m" }
+
+        // At least 2 meals and a third of them.
+        let lows = outcomes.filter(\.hadLow).count
+        if lows >= 2, lows * 3 >= count {
+            patterns.append(MealPattern(kind: .lows, text: "Went low after \(lows) of \(count) times"))
+        }
+
+        // Two thirds of meals spent 30+ minutes above range.
+        let highs = outcomes.filter { $0.minutesAboveRange >= 30 }.count
+        if highs * 3 >= count * 2 {
+            let typical = insights.medianMinutesAboveRange.map { ", typically \(duration($0)) above" } ?? ""
+            patterns.append(MealPattern(kind: .highs, text: "Went above range after \(highs) of \(count) times\(typical)"))
+        }
+
+        if let minutes = insights.medianMinutesToPeak, minutes >= 120 {
+            patterns.append(MealPattern(kind: .latePeak, text: "Peaks late, typically \(duration(minutes)) after eating"))
+        }
+
+        // Best pre-bolus group peaks at least 30 lower than the worst.
+        if insights.prebolusGroups.count >= 2,
+           let best = insights.prebolusGroups.min(by: { $0.medianPeak < $1.medianPeak }),
+           let worst = insights.prebolusGroups.max(by: { $0.medianPeak < $1.medianPeak }),
+           worst.medianPeak - best.medianPeak >= 30
+        {
+            patterns.append(MealPattern(
+                kind: .prebolusHelps,
+                text: "\(best.label): peak ~\(bg(best.medianPeak)), \(bg(worst.medianPeak - best.medianPeak)) lower than \(worst.label.lowercased())"
+            ))
+        }
+
+        if let trend = insights.trend {
+            let change = trend.later - trend.earlier
+            if change >= 30 {
+                patterns.append(MealPattern(kind: .rising, text: "Peaks are rising lately (~\(bg(trend.earlier)) → ~\(bg(trend.later)))"))
+            } else if change <= -30 {
+                patterns.append(MealPattern(kind: .falling, text: "Peaks are falling lately (~\(bg(trend.earlier)) → ~\(bg(trend.later)))"))
+            }
+        }
+
+        if let range = insights.peakRange, range.upperBound - range.lowerBound >= 100 {
+            patterns.append(MealPattern(kind: .variable, text: "Varies a lot: peaks from \(bg(range.lowerBound)) to \(bg(range.upperBound))"))
+        }
+        return patterns
     }
 }

@@ -21,6 +21,9 @@ struct TreatmentsView: View {
 
     @StateObject private var viewModel = TreatmentsViewModel()
     @State private var selectedFilter: TreatmentFilter = .all
+    /// Meal name typed while the Carbs filter is on.
+    @State private var mealNameFilter = ""
+    @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
     @ObservedObject private var device = Storage.shared.device
     @ObservedObject private var graphTimeZoneEnabled = Storage.shared.graphTimeZoneEnabled
     @ObservedObject private var graphTimeZoneIdentifier = Storage.shared.graphTimeZoneIdentifier
@@ -77,6 +80,28 @@ struct TreatmentsView: View {
                         }
                     }
                     .pickerStyle(SegmentedPickerStyle())
+
+                    if selectedFilter == .carb {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            TextField("Filter by meal name", text: $mealNameFilter)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                            if !mealNameFilter.isEmpty {
+                                Button { mealNameFilter = "" } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Clear meal filter")
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(10)
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.top, 1)
@@ -104,9 +129,17 @@ struct TreatmentsView: View {
                             Spacer()
                         }
                     } else if filteredGroupedTreatments.isEmpty {
-                        Text("No recent treatments")
-                            .foregroundColor(.secondary)
-                            .padding()
+                        if isFilteringByMeal {
+                            Text("No loaded meals match “\(mealNameFilter.trimmingCharacters(in: .whitespaces))”.")
+                                .foregroundColor(.secondary)
+                                .padding()
+                            Button("Load older treatments") { viewModel.loadMoreIfNeeded() }
+                                .disabled(viewModel.isLoadingMore)
+                        } else {
+                            Text("No recent treatments")
+                                .foregroundColor(.secondary)
+                                .padding()
+                        }
                     } else {
                         ForEach(sortedDayKeys, id: \.self) { dayKey in
                             Section {
@@ -214,7 +247,12 @@ struct TreatmentsView: View {
         case .all:
             return viewModel.groupedTreatments
         case .carb:
-            return groupedTreatments(matching: [.carb])
+            let carbs = groupedTreatments(matching: [.carb])
+            guard isFilteringByMeal else { return carbs }
+            return carbs.compactMapValues { treatments in
+                let matching = treatments.filter(matchesMealFilter)
+                return matching.isEmpty ? nil : matching
+            }
         case .basal:
             return groupedTreatments(matching: [.tempBasal])
         case .bolusAll:
@@ -229,6 +267,19 @@ struct TreatmentsView: View {
         case .bolusManual:
             return groupedTreatments(matching: [.bolusManual])
         }
+    }
+
+    private var isFilteringByMeal: Bool {
+        selectedFilter == .carb && !mealNameFilter.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// A carb entry whose meal name matches the filter (forgiving case, accents and
+    /// small typos). Fat/protein entries match through their original meal.
+    private func matchesMealFilter(_ treatment: Treatment) -> Bool {
+        guard var meal = treatment.trioMeal else { return false }
+        if meal.isFPUChild, let root = viewModel.rootMeal(forFPUChild: treatment)?.trioMeal { meal = root }
+        guard let name = NamedMealStore.shared.occurrence(for: meal)?.mealName, !name.isEmpty else { return false }
+        return NamedMealSearch.score(mealNameFilter, name: name) != nil
     }
 
     private func groupedTreatments(matching types: Set<TreatmentType>) -> [String: [Treatment]] {
@@ -620,7 +671,10 @@ struct TreatmentDetailView: View {
         .preferredColorScheme(Storage.shared.appearanceMode.value.colorScheme)
         .onAppear {
             viewModel.loadDetails(for: treatment)
-            if treatment.trioMeal != nil { NightscoutUtils.refreshAccess() }
+            if treatment.trioMeal != nil {
+                NightscoutUtils.refreshAccess()
+                NamedMealStore.shared.refreshOutcomes()
+            }
         }
         .sheet(isPresented: $showEditSheet) {
             if let meal = commandMeal {
@@ -769,6 +823,7 @@ struct TreatmentDetailView: View {
                         }
                     }
                 }
+                if let occurrence { mealOutcomeRow(occurrence) }
                 if let mealID = occurrence?.mealID {
                     NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))
                 }
@@ -782,10 +837,31 @@ struct TreatmentDetailView: View {
                 if let minutes = occurrence.prebolusMinutes {
                     LabeledValueRow(label: NamedMealFormat.bolusTimingLabel(negative: minutes < 0), value: NamedMealFormat.prebolus(minutes))
                 }
+                mealOutcomeRow(occurrence)
                 if let mealID = occurrence.mealID {
                     NavigationLink("History & insights", destination: MealInsightsView(mealID: mealID))
                 }
             }
+        }
+    }
+
+    /// BG in the 4 hours after this meal, once worked out (named meals only).
+    @ViewBuilder
+    private func mealOutcomeRow(_ occurrence: MealOccurrence) -> some View {
+        if let outcome = occurrence.outcome, outcome.hasEnoughData, let curve = outcome.curve {
+            VStack(alignment: .leading, spacing: 6) {
+                MealSparkline(curves: [curve], color: outcome.sparklineColor)
+                    .frame(height: 70)
+                Text("\(Localizer.toDisplayUnits(String(outcome.startBG))) → peak \(Localizer.toDisplayUnits(String(outcome.peakBG))) · lowest \(Localizer.toDisplayUnits(String(outcome.lowestBG)))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U total in 4h")
+                    .font(.caption)
+                    .foregroundColor(outcome.hadLow ? .red : .secondary)
+                if outcome.overlappedMeal == true {
+                    Label("Overlapped with another meal", systemImage: "square.on.square")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+            .padding(.vertical, 4)
         }
     }
 

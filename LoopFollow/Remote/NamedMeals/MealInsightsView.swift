@@ -29,6 +29,10 @@ struct MealInsightsView: View {
                 }
             }
 
+            if !insights.patterns.isEmpty {
+                patternsSection(insights)
+            }
+
             if insights.hasSummary {
                 summarySection(insights)
                 if !insights.prebolusGroups.isEmpty {
@@ -41,7 +45,7 @@ struct MealInsightsView: View {
                 }
             }
 
-            Section(header: Text("History")) {
+            Section(header: Text("Recent history")) {
                 ForEach(history) { occurrence in
                     historyRow(occurrence)
                 }
@@ -58,11 +62,34 @@ struct MealInsightsView: View {
     // MARK: - Sections
 
     @ViewBuilder
+    private func patternsSection(_ insights: MealInsights) -> some View {
+        Section(
+            header: Text("Patterns"),
+            footer: Text("From the \(insights.measured) meals with 4 hours of BG data and no other meal in that time. For information only.")
+        ) {
+            ForEach(insights.patterns, id: \.kind) { pattern in
+                Label {
+                    Text(pattern.text)
+                } icon: {
+                    Image(systemName: pattern.symbol)
+                        .foregroundColor(pattern.isWarning ? .orange : .accentColor)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private func summarySection(_ insights: MealInsights) -> some View {
         Section(
             header: Text("Typical result"),
-            footer: Text("Medians over \(insights.measured) meals, from when eating started to 4 hours later. Insulin includes boluses and SMBs from 30 minutes before the meal. For information only.")
+            footer: Text("Medians over \(insights.measured) meals, from when eating started to 4 hours later. In the graph, each meal is a faint line and the bold line is the typical one; the dashed line is when eating started and the band is the target range. Insulin includes boluses and SMBs from 30 minutes before the meal. For information only.")
         ) {
+            let curves = store.occurrences(ofMeal: mealID).compactMap { $0.outcome?.isUsable == true ? $0.outcome?.curve : nil }
+            if !curves.isEmpty {
+                MealSparkline(curves: curves, emphasized: insights.typicalCurve, color: insights.hasWarning ? .orange : .accentColor)
+                    .frame(height: 120)
+                    .padding(.vertical, 6)
+            }
             if let peak = insights.medianPeak {
                 valueRow("Peak", bg(peak) + (insights.peakRange.map { " (\(bg($0.lowerBound))–\(bg($0.upperBound)))" } ?? ""))
             }
@@ -141,6 +168,12 @@ struct MealInsightsView: View {
             }
             .font(.caption)
             .foregroundColor(occurrence.outcome?.hadLow == true ? .red : .secondary)
+
+            if let outcome = occurrence.outcome, outcome.hasEnoughData, let curve = outcome.curve {
+                MealSparkline(curves: [curve], color: outcome.sparklineColor)
+                    .frame(height: 40)
+                    .opacity(outcome.overlappedMeal == true ? 0.5 : 1)
+            }
         }
     }
 
@@ -186,12 +219,28 @@ struct NamedMealsListView: View {
                     .foregroundColor(.secondary)
             }
             ForEach(namedMeals.value.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) { meal in
+                let insights = store.insights(forMeal: meal.id)
                 NavigationLink(destination: MealInsightsView(mealID: meal.id)) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(meal.name)
-                        Text(meal.macroSummary + " · " + store.insights(forMeal: meal.id).shortSummary)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Text(meal.name)
+                                if insights.hasWarning {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                        .accessibilityLabel("Has a pattern to review")
+                                }
+                            }
+                            Text(meal.macroSummary + " · " + insights.shortSummary)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if insights.hasSummary, let typical = insights.typicalCurve {
+                            MealSparkline(curves: [typical], color: insights.hasWarning ? .orange : .accentColor)
+                                .frame(width: 70, height: 30)
+                        }
                     }
                 }
             }

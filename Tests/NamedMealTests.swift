@@ -151,6 +151,60 @@ struct NamedMealTests {
         #expect(!check([carbs(45, minutes: 5 * 60)])) // after the window
     }
 
+    @Test("Outcome keeps a 5-minute BG curve with gaps where readings are missing")
+    func outcomeCurve() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let values = (0 ..< 49).map { 100 + $0 }
+        let outcome = MealOutcome.compute(readings: readings(from: start, values: values), insulin: 1, eatingStart: start, lowLine: 70, highLine: 180)
+        let curve = try #require(outcome.curve)
+        #expect(curve.count == MealOutcome.curveMinutes.count)
+        #expect(curve[0] == 0) // 10 minutes before eating: no reading
+        #expect(curve[MealOutcome.curveMinutes.firstIndex(of: 0)!] == 100)
+        #expect(curve.last == 148)
+    }
+
+    @Test("Typical curve is the point-by-point median, ignoring gaps")
+    func typicalCurve() {
+        #expect(MealInsights.medianCurve([[100, 0, 200], [120, 150, 0], [110, 0, 220]]) == [110, 150, 210])
+        #expect(MealInsights.medianCurve([]) == nil)
+    }
+
+    private func outcome(peak: Int, low: Bool = false, above: Int = 0, toPeak: Int = 60) -> MealOutcome {
+        MealOutcome(startBG: 100, peakBG: peak, minutesToPeak: toPeak, lowestBG: low ? 55 : 90, hadLow: low,
+                    minutesAboveRange: above, insulin: 3, hasEnoughData: true, overlappedMeal: false)
+    }
+
+    private func patterns(_ outcomes: [MealOutcome], prebolus: [Int?]? = nil) -> Set<MealPattern.Kind> {
+        let meals = outcomes.enumerated().map { index, outcome -> MealOccurrence in
+            var item = occurrence("p\(index)", at: Date().addingTimeInterval(Double(index - outcomes.count) * 86400), 45, 10, 12)
+            item.mealID = "meal"
+            item.prebolusMinutes = prebolus?[index]
+            item.outcome = outcome
+            return item
+        }
+        return Set(MealInsights.summarize(meals).patterns.map(\.kind))
+    }
+
+    @Test("Patterns: repeated lows, repeated highs, late peaks")
+    func patternBasics() {
+        #expect(patterns([outcome(peak: 150), outcome(peak: 160)]).isEmpty) // too few meals
+        #expect(patterns([outcome(peak: 150, low: true), outcome(peak: 160, low: true), outcome(peak: 150)]) == [.lows])
+        #expect(patterns([outcome(peak: 230, above: 60), outcome(peak: 240, above: 45), outcome(peak: 170)]) == [.highs])
+        #expect(patterns([outcome(peak: 170, toPeak: 150), outcome(peak: 170, toPeak: 130), outcome(peak: 170, toPeak: 140)]) == [.latePeak])
+    }
+
+    @Test("Patterns: pre-bolus difference and rising peaks")
+    func patternComparisons() {
+        let prebolus = patterns(
+            [outcome(peak: 220), outcome(peak: 230), outcome(peak: 170), outcome(peak: 180)],
+            prebolus: [2, 4, 15, 18]
+        )
+        #expect(prebolus.contains(.prebolusHelps))
+
+        let rising = patterns([150, 150, 150, 200, 210, 200].map { outcome(peak: $0) })
+        #expect(rising.contains(.rising))
+    }
+
     @Test("Insights need 3 measured meals and group pre-bolus times")
     func insightsSummary() {
         let two = MealInsights.summarize([measured("a", daysAgo: 2, prebolus: 5, peak: 250), measured("b", daysAgo: 1, prebolus: 6, peak: 230)])
