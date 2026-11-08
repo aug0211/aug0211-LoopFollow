@@ -394,6 +394,23 @@ final class BGChartModel: ObservableObject {
         }
     }
 
+    /// "Carbs, 45g, time", with the meal's saved name in place of "Carbs" and its
+    /// pre-bolus on a last line when they've been recorded.
+    private static func carbPillText(grams: Int, time: String, detail: Treatment?) -> String {
+        var lines = ["Carbs", "\(grams)g", time]
+        if let meal = detail?.trioMeal, !meal.isFPUChild,
+           let occurrence = NamedMealStore.shared.occurrence(for: meal)
+        {
+            if let name = occurrence.mealName, !name.isEmpty {
+                lines[0] = name
+            }
+            if let minutes = occurrence.prebolusMinutes {
+                lines.append(NamedMealFormat.prebolus(minutes))
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
     /// Schedules a rebuild, coalescing bursts: a refresh cycle calls a dozen
     /// update*Graph() entry points back-to-back, and rebuilding once per
     /// runloop turn is enough.
@@ -491,7 +508,7 @@ final class BGChartModel: ObservableObject {
                 value: $0.value,
                 sgv: Double($0.sgv),
                 label: label,
-                pillText: "Carbs\n\(grams)g\n\(pillTimeString(for: Date(timeIntervalSince1970: $0.date)))",
+                pillText: Self.carbPillText(grams: grams, time: pillTimeString(for: Date(timeIntervalSince1970: $0.date)), detail: $0.detail),
                 detail: $0.detail
             )
         }, minGap: Spread.carbGap, maxShift: Spread.carbShift)

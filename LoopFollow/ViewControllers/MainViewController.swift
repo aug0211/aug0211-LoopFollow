@@ -244,6 +244,13 @@ class MainViewController: UIViewController, UNUserNotificationCenterDelegate {
         }
         DeviceStatusHistory.shared.start()
 
+        // A meal's saved name or pre-bolus shows in its chart popup.
+        Storage.shared.mealOccurrences.$value
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.chartModel.rebuild() }
+            .store(in: &cancellables)
+
         scheduleAllTasks()
         setupNightscoutSocket()
 
