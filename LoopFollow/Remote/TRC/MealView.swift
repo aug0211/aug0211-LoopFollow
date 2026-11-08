@@ -29,6 +29,10 @@ struct MealView: View {
     /// The sent meal offered for naming after the success alert.
     @State private var namingOccurrenceID: String?
     @State private var namingTarget: MealNamingTarget?
+    /// Optional, entered with the meal: saved with it, so the after-send naming prompt is skipped.
+    @State private var optionalMealName = ""
+    @State private var optionalPrebolusText = ""
+    @State private var optionalPrebolusNegative = false
 
     @FocusState private var carbsFieldIsFocused: Bool
     @FocusState private var proteinFieldIsFocused: Bool
@@ -86,6 +90,27 @@ struct MealView: View {
                                 }
                                 .padding(.vertical, 4)
                             }
+                        }
+                    }
+
+                    Section(
+                        header: Text("Name & Pre-bolus (optional)"),
+                        footer: Text("Leave blank to name the meal later. Pre-bolus is minutes between the bolus and starting to eat; choose After if insulin went in after eating started.")
+                    ) {
+                        TextField("Meal name", text: $optionalMealName)
+                            .textInputAutocapitalization(.words)
+                        HStack {
+                            Picker("", selection: $optionalPrebolusNegative) {
+                                Text("Before").tag(false)
+                                Text("After").tag(true)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 160)
+                            TextField("Minutes", text: $optionalPrebolusText)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                            Text("min")
+                                .foregroundColor(.secondary)
                         }
                     }
 
@@ -533,12 +558,27 @@ struct MealView: View {
                     let sentProtein = submittedProtein.doubleValue(for: .gram())
                     // Naming needs Nightscout write access; read-only users can't edit meals.
                     if Storage.shared.nsWriteAuth.value, sentCarbs > 0 || sentFat > 0 || sentProtein > 0 {
-                        namingOccurrenceID = NamedMealStore.shared.recordSentMeal(
+                        let occurrence = NamedMealStore.shared.recordSentMeal(
                             carbs: sentCarbs,
                             fat: sentFat,
                             protein: sentProtein,
                             mealTime: scheduledDate ?? Date()
-                        ).id
+                        )
+                        let typedName = optionalMealName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let typedPrebolus = NamedMealFormat.parsePrebolus(optionalPrebolusText, negative: optionalPrebolusNegative)
+                        if !typedName.isEmpty || typedPrebolus != .empty {
+                            // Entered up front: save it now and skip the after-send prompt.
+                            var minutes: Int?
+                            if case let .minutes(value) = typedPrebolus { minutes = value }
+                            NamedMealStore.shared.save(
+                                occurrenceID: occurrence.id,
+                                existingMealID: nil,
+                                newName: typedName.isEmpty ? nil : typedName,
+                                prebolusMinutes: minutes
+                            )
+                        } else {
+                            namingOccurrenceID = occurrence.id
+                        }
                     }
                     if submittedBolus > 0 { calculator.recordBolus(submittedBolus) }
                     if sentCarbs > 0 {
@@ -560,6 +600,9 @@ struct MealView: View {
                     protein = HKQuantity(unit: .gram(), doubleValue: 0.0)
                     fat = HKQuantity(unit: .gram(), doubleValue: 0.0)
                     bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: 0)
+                    optionalMealName = ""
+                    optionalPrebolusText = ""
+                    optionalPrebolusNegative = false
                     selectedTime = nil
                     isScheduling = false
                     alertType = .statusSuccess
