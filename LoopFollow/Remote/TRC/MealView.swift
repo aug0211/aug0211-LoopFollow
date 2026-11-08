@@ -717,11 +717,30 @@ struct MealView: View {
                     .minimumScaleFactor(0.8)
             }
         }
-        .frame(width: name == nil ? nil : 104, alignment: .leading)
+        .frame(width: name.map { Self.namedChipWidth(name: $0, detail: detail) }, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(Color.accentColor.opacity(0.15))
         .cornerRadius(10)
+    }
+
+    /// Width of a named chip's text: its longest wrapped line, up to 104 points, so
+    /// the card hugs the text as closely on the right as on the left. A fixed width
+    /// leaves blue space when the wrapped lines come out shorter.
+    private static func namedChipWidth(name: String, detail: String?) -> CGFloat {
+        let maxWidth: CGFloat = 104
+        let nameFont = UIFont.systemFont(ofSize: UIFont.preferredFont(forTextStyle: .footnote).pointSize, weight: .semibold)
+        var width = (name as NSString).boundingRect(
+            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: nameFont],
+            context: nil
+        ).width
+        if let detail {
+            let detailWidth = (detail as NSString).size(withAttributes: [.font: UIFont.preferredFont(forTextStyle: .caption2)]).width
+            width = max(width, detailWidth)
+        }
+        return min(maxWidth, ceil(width) + 1)
     }
 
     /// The saved meal with exactly a Quick-Pick's carbs, fat and protein, most eaten first.
