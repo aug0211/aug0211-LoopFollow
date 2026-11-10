@@ -3,7 +3,7 @@
 
 import SwiftUI
 
-/// A small BG graph of the 4 hours after a meal: the target range as a band, a
+/// A small BG graph of up to 3 hours after a meal: the target range as a band, a
 /// tick where eating started, and one line per meal. With several curves, each
 /// meal is a faint line and `emphasized` (the typical curve) is drawn on top.
 struct MealSparkline: View {

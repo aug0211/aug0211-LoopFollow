@@ -77,9 +77,9 @@ struct NamedMealTests {
     @Test("Outcome: start, peak, time to peak, lows and time above range")
     func outcomeCompute() {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
-        // 49 readings over 4 hours: rises to 250 at 30 min, then falls to 65.
+        // 37 readings over 3 hours: rises to 250 at 30 min, then falls to 65.
         var values = [100, 120, 150, 180, 200, 230, 250, 240, 220, 200, 190, 185, 170]
-        values += Array(repeating: 150, count: 30) + [120, 100, 90, 80, 70, 65]
+        values += Array(repeating: 150, count: 18) + [120, 100, 90, 80, 70, 65]
         let outcome = MealOutcome.compute(
             readings: readings(from: start, values: values),
             insulin: 4.5,
@@ -96,6 +96,30 @@ struct NamedMealTests {
         #expect(outcome.hadLow)
         #expect(outcome.minutesAboveRange == 40) // 8 readings above 180 (200 … 185), 5 minutes each
         #expect(outcome.insulin == 4.5)
+        #expect(outcome.measuredMinutes == 180)
+        #expect(outcome.overlappedMeal == false)
+    }
+
+    @Test("The next meal ends the stretch; under 90 minutes is too soon to count")
+    func outcomeCutShort() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let values = (0 ..< 37).map { 100 + $0 * 2 }
+        func compute(nextMealAfter minutes: Double) -> MealOutcome {
+            MealOutcome.compute(readings: readings(from: start, values: values), insulin: 2, eatingStart: start,
+                                lowLine: 70, highLine: 180, nextMeal: start.addingTimeInterval(minutes * 60))
+        }
+
+        let tooSoon = compute(nextMealAfter: 60)
+        #expect(tooSoon.overlappedMeal == true)
+        #expect(tooSoon.measuredMinutes == 60)
+        #expect(!tooSoon.isUsable)
+
+        let cut = compute(nextMealAfter: 100)
+        #expect(cut.isUsable)
+        #expect(cut.measuredMinutes == 100)
+        #expect(cut.peakBG == 140) // the reading at 100 min; later ones belong to the next meal
+        let curve = try #require(cut.curve)
+        #expect(curve.last == 0)
     }
 
     @Test("Outcome needs about 2 hours of readings")
@@ -114,10 +138,12 @@ struct NamedMealTests {
         return item
     }
 
-    @Test("A meal overlapped by another meal is left out of insights")
+    @Test("A meal whose next meal came too soon is left out of insights")
     func overlappedMealsExcluded() {
         var overlapped = measured("c", daysAgo: 1, prebolus: 5, peak: 300)
-        overlapped.outcome?.overlappedMeal = true
+        overlapped.outcome = MealOutcome(startBG: 100, peakBG: 300, minutesToPeak: 40, lowestBG: 90, hadLow: false,
+                                         minutesAboveRange: 20, insulin: 4, hasEnoughData: false,
+                                         overlappedMeal: true, measuredMinutes: 50)
         let insights = MealInsights.summarize([
             measured("a", daysAgo: 3, prebolus: 5, peak: 200),
             measured("b", daysAgo: 2, prebolus: 5, peak: 210),
@@ -128,8 +154,8 @@ struct NamedMealTests {
         #expect(!insights.hasSummary)
     }
 
-    @Test("Another carb entry in the window counts as an overlapping meal; this meal and FPU entries don't")
-    func overlapDetection() {
+    @Test("The next meal is the first real carb entry; this meal, FPU entries and low treatments don't count")
+    func nextMealDetection() {
         let mealTime = Date(timeIntervalSince1970: 1_800_000_000)
         let iso = ISO8601DateFormatter()
         func carbs(_ grams: Double, minutes: Double, id: String? = nil, fpuID: String? = nil) -> [String: Any] {
@@ -138,29 +164,44 @@ struct NamedMealTests {
             if let fpuID { entry["fpuID"] = fpuID }
             return entry
         }
-        let window = (from: mealTime.addingTimeInterval(-1800), to: mealTime.addingTimeInterval(4 * 3600))
-        func check(_ treatments: [[String: Any]], trioID: String? = nil) -> Bool {
-            MealOutcome.hasOtherMeal(in: treatments, trioMealID: trioID, mealTime: mealTime, carbs: 6, from: window.from, to: window.to)
+        func next(_ treatments: [[String: Any]], trioID: String? = nil) -> Double? {
+            MealOutcome.nextMealStart(in: treatments, trioMealID: trioID, mealTime: mealTime, carbs: 30,
+                                      eatingStart: mealTime, to: mealTime.addingTimeInterval(3 * 3600))
+                .map { $0.timeIntervalSince(mealTime) / 60 }
         }
 
-        #expect(!check([carbs(6, minutes: 1)])) // this meal, matched by carbs and time
-        #expect(!check([carbs(6, minutes: 0, id: "T1")], trioID: "T1")) // this meal, by Trio ID
-        #expect(!check([carbs(12, minutes: 90, id: "F", fpuID: "F")])) // fat/protein follow-on
-        #expect(!check([["insulin": NSNumber(value: 2), "created_at": iso.string(from: mealTime)]])) // bolus only
-        #expect(check([carbs(6, minutes: 1), carbs(45, minutes: 60)])) // lunch an hour later
-        #expect(!check([carbs(45, minutes: 5 * 60)])) // after the window
+        #expect(next([carbs(30, minutes: 1)]) == nil) // this meal, matched by carbs and time
+        #expect(next([carbs(30, minutes: 0, id: "T1")], trioID: "T1") == nil) // this meal, by Trio ID
+        #expect(next([carbs(21, minutes: 90, id: "F", fpuID: "F")]) == nil) // fat/protein follow-on
+        #expect(next([carbs(4, minutes: 70)]) == nil) // low treatment
+        #expect(next([["insulin": NSNumber(value: 2), "created_at": iso.string(from: mealTime)]]) == nil) // bolus only
+        #expect(next([carbs(45, minutes: 120), carbs(60, minutes: 75)]) == 75) // the first one
+        #expect(next([carbs(45, minutes: -20)]) == nil) // before this meal
+        #expect(next([carbs(45, minutes: 4 * 60)]) == nil) // after the stretch
+    }
+
+    @Test("Insulin counts only up to the end of the stretch")
+    func insulinWindow() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let iso = ISO8601DateFormatter()
+        let treatments: [[String: Any]] = [
+            ["insulin": NSNumber(value: 3), "created_at": iso.string(from: start)],
+            ["insulin": NSNumber(value: 0.5), "created_at": iso.string(from: start.addingTimeInterval(3600))],
+            ["insulin": NSNumber(value: 5), "created_at": iso.string(from: start.addingTimeInterval(2 * 3600))],
+        ]
+        #expect(MealOutcome.insulin(in: treatments, from: start.addingTimeInterval(-1800), to: start.addingTimeInterval(90 * 60)) == 3.5)
     }
 
     @Test("Outcome keeps a 5-minute BG curve with gaps where readings are missing")
     func outcomeCurve() throws {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
-        let values = (0 ..< 49).map { 100 + $0 }
+        let values = (0 ..< 37).map { 100 + $0 }
         let outcome = MealOutcome.compute(readings: readings(from: start, values: values), insulin: 1, eatingStart: start, lowLine: 70, highLine: 180)
         let curve = try #require(outcome.curve)
         #expect(curve.count == MealOutcome.curveMinutes.count)
         #expect(curve[0] == 0) // 10 minutes before eating: no reading
         #expect(curve[MealOutcome.curveMinutes.firstIndex(of: 0)!] == 100)
-        #expect(curve.last == 148)
+        #expect(curve.last == 136) // 3 hours after eating
     }
 
     @Test("Typical curve is the point-by-point median, ignoring gaps")

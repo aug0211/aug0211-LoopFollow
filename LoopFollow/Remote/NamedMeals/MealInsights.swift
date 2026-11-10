@@ -3,11 +3,16 @@
 
 import Foundation
 
-/// How BG went in the 4 hours after eating started.
+/// How BG went after eating started: up to 3 hours, or until the next meal if that
+/// came sooner. Meals measured for at least 90 minutes count toward insights.
 struct MealOutcome: Codable, Equatable {
-    static let window: TimeInterval = 4 * 3600
-    /// Readings needed (about 2 of the 4 hours) for an outcome to count.
-    static let minimumReadings = 24
+    /// Longest stretch measured after eating started.
+    static let window: TimeInterval = 3 * 3600
+    /// Shortest stretch (before the next meal) that still counts toward insights.
+    static let minimumMinutes = 90
+    /// Carb entries this size or smaller (for example low treatments) don't end the
+    /// stretch; they're part of how the meal went.
+    static let smallCarbs = 10.0
 
     let startBG: Int
     let peakBG: Int
@@ -16,48 +21,58 @@ struct MealOutcome: Codable, Equatable {
     let hadLow: Bool
     /// Minutes above the high line.
     let minutesAboveRange: Int
-    /// All insulin delivered from 30 minutes before the meal to 4 hours after eating
-    /// started (boluses and SMBs), including any for other food in that time.
+    /// All insulin delivered from 30 minutes before the meal to the end of the
+    /// measured stretch (boluses and SMBs).
     let insulin: Double
-    /// False when there were too few readings; such meals are left out of insights.
+    /// True when the stretch was long enough with enough readings; others are left out of insights.
     let hasEnoughData: Bool
-    /// True when another meal was entered in the same window, so the BG and insulin
-    /// aren't this meal's alone. Nil on outcomes worked out before this was checked.
+    /// True when the next meal ended the stretch before 3 hours.
     var overlappedMeal: Bool? = nil
-    /// BG every 5 minutes from 10 minutes before eating to 4 hours after
-    /// (`curveMinutes`), 0 where there was no reading. Nil on older outcomes.
+    /// BG every 5 minutes from 10 minutes before eating to 3 hours after
+    /// (`curveMinutes`), 0 where there was no reading or after the next meal.
     var curve: [Int]? = nil
+    /// Minutes measured after eating started. Nil on outcomes from before the
+    /// 3-hour stretch, which are worked out again.
+    var measuredMinutes: Int? = nil
 
-    static let curveMinutes = Array(stride(from: -10, through: 240, by: 5))
+    static let curveMinutes = Array(stride(from: -10, through: 180, by: 5))
 
     var rise: Int { peakBG - startBG }
 
-    /// Counts toward insights: enough readings and no other meal mixed in.
-    var isUsable: Bool { hasEnoughData && overlappedMeal != true }
+    /// Counts toward insights.
+    var isUsable: Bool { hasEnoughData }
 
-    /// Works out an outcome from the readings around a meal.
-    /// `readings` may be in any order; only those from 10 minutes before eating to 4 hours after are used.
+    /// Works out an outcome from the readings around a meal, from eating start to
+    /// 3 hours later or `nextMeal`, whichever comes first.
+    /// `readings` may be in any order; others are ignored.
     static func compute(
         readings: [(date: Date, sgv: Int)],
         insulin: Double,
         eatingStart: Date,
         lowLine: Double,
         highLine: Double,
-        overlappedMeal: Bool = false
+        nextMeal: Date? = nil
     ) -> MealOutcome {
         let start = eatingStart
-        let end = eatingStart.addingTimeInterval(window)
+        let fullEnd = eatingStart.addingTimeInterval(window)
+        let end = min(fullEnd, max(start, nextMeal ?? fullEnd))
+        let cutShort = end < fullEnd
+        let measured = Int((end.timeIntervalSince(start) / 60).rounded())
+
         let sorted = readings
             .filter { $0.sgv > 0 && $0.date >= start.addingTimeInterval(-600) && $0.date <= end }
             .sorted { $0.date < $1.date }
         let after = sorted.filter { $0.date >= start }
         let curve = curveMinutes.map { minute -> Int in
             let time = start.addingTimeInterval(Double(minute) * 60)
-            guard let nearest = sorted.min(by: { abs($0.date.timeIntervalSince(time)) < abs($1.date.timeIntervalSince(time)) }),
+            guard time <= end,
+                  let nearest = sorted.min(by: { abs($0.date.timeIntervalSince(time)) < abs($1.date.timeIntervalSince(time)) }),
                   abs(nearest.date.timeIntervalSince(time)) <= 240
             else { return 0 }
             return nearest.sgv
         }
+        // About 70% of the 5-minute readings expected in the stretch.
+        let enough = measured >= minimumMinutes && Double(after.count) >= Double(measured) / 5 * 0.7
 
         guard let startReading = sorted.min(by: { abs($0.date.timeIntervalSince(start)) < abs($1.date.timeIntervalSince(start)) }),
               let peak = after.max(by: { $0.sgv < $1.sgv }),
@@ -65,14 +80,14 @@ struct MealOutcome: Codable, Equatable {
         else {
             return MealOutcome(startBG: 0, peakBG: 0, minutesToPeak: 0, lowestBG: 0, hadLow: false,
                                minutesAboveRange: 0, insulin: insulin, hasEnoughData: false,
-                               overlappedMeal: overlappedMeal, curve: curve)
+                               overlappedMeal: cutShort, curve: curve, measuredMinutes: measured)
         }
 
         // Each reading stands for the time until the next one (at most 10 minutes).
         var minutesAbove = 0.0
         for (index, reading) in after.enumerated() where Double(reading.sgv) > highLine {
-            let next = index + 1 < after.count ? after[index + 1].date : reading.date.addingTimeInterval(300)
-            minutesAbove += min(next.timeIntervalSince(reading.date), 600) / 60
+            let next = index + 1 < after.count ? after[index + 1].date : min(reading.date.addingTimeInterval(300), end)
+            minutesAbove += min(max(next.timeIntervalSince(reading.date), 0), 600) / 60
         }
 
         return MealOutcome(
@@ -83,33 +98,48 @@ struct MealOutcome: Codable, Equatable {
             hadLow: Double(lowest.sgv) < lowLine,
             minutesAboveRange: Int(minutesAbove.rounded()),
             insulin: insulin,
-            hasEnoughData: after.count >= minimumReadings,
-            overlappedMeal: overlappedMeal,
-            curve: curve
+            hasEnoughData: enough,
+            overlappedMeal: cutShort,
+            curve: curve,
+            measuredMinutes: measured
         )
     }
 
-    /// Whether Nightscout `treatments` include a carb entry for another meal between
-    /// `from` and `to`. Skips this meal's own entry (by Trio meal ID, else carbs within
-    /// 10 minutes of its time) and Trio's fat/protein follow-on entries.
-    static func hasOtherMeal(
+    /// When the next meal was entered after this one, from Nightscout `treatments`:
+    /// the first carb entry from 15 minutes before eating started up to `to`. Skips
+    /// this meal's own entry (by Trio meal ID, else the same carbs within 10 minutes
+    /// of its time), Trio's fat/protein follow-on entries, and small entries such as
+    /// low treatments (`smallCarbs`).
+    static func nextMealStart(
         in treatments: [[String: Any]],
         trioMealID: String?,
         mealTime: Date,
         carbs: Int,
-        from: Date,
+        eatingStart: Date,
         to: Date
-    ) -> Bool {
-        treatments.contains { treatment in
-            guard let amount = (treatment["carbs"] as? NSNumber)?.doubleValue, amount > 0,
+    ) -> Date? {
+        let from = eatingStart.addingTimeInterval(-15 * 60)
+        return treatments.compactMap { treatment -> Date? in
+            guard let amount = (treatment["carbs"] as? NSNumber)?.doubleValue, amount > smallCarbs,
                   let date = parseDate(treatment["created_at"] as? String),
                   date >= from, date <= to
-            else { return false }
+            else { return nil }
             let id = treatment["id"] as? String
-            if let id, let fpuID = treatment["fpuID"] as? String, id == fpuID { return false }
-            if let trioMealID, id == trioMealID { return false }
-            if abs(date.timeIntervalSince(mealTime)) <= 600, Int(amount.rounded()) == carbs { return false }
-            return true
+            if let id, let fpuID = treatment["fpuID"] as? String, id == fpuID { return nil }
+            if let trioMealID, id == trioMealID { return nil }
+            if abs(date.timeIntervalSince(mealTime)) <= 600, Int(amount.rounded()) == carbs { return nil }
+            return date
+        }.min()
+    }
+
+    /// Insulin (boluses and SMBs) in Nightscout `treatments` between `from` and `to`.
+    static func insulin(in treatments: [[String: Any]], from: Date, to: Date) -> Double {
+        treatments.reduce(0.0) { total, treatment in
+            guard let amount = (treatment["insulin"] as? NSNumber)?.doubleValue,
+                  let date = parseDate(treatment["created_at"] as? String),
+                  date >= from, date <= to
+            else { return total }
+            return total + amount
         }
     }
 

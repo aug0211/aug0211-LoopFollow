@@ -38,7 +38,7 @@ struct MealOccurrence: Codable, Equatable, Identifiable {
     var nightscoutID: String?
     /// Trio's meal ID, linking this to the loop's carb entry.
     var trioMealID: String?
-    /// How BG went after the meal, worked out once 4 hours have passed.
+    /// How BG went after the meal, worked out once 3 hours have passed.
     var outcome: MealOutcome?
 
     /// When eating started: the meal time plus the pre-bolus.

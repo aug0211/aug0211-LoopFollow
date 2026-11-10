@@ -845,24 +845,28 @@ struct TreatmentDetailView: View {
         }
     }
 
-    /// BG in the 4 hours after this meal, once worked out (named meals only).
+    /// BG for up to 3 hours after this meal (or to the next meal), once worked out (named meals only).
     @ViewBuilder
     private func mealOutcomeRow(_ occurrence: MealOccurrence) -> some View {
         if let outcome = occurrence.outcome, outcome.hasEnoughData, let curve = outcome.curve {
             VStack(alignment: .leading, spacing: 6) {
                 MealSparkline(curves: [curve], color: outcome.sparklineColor)
                     .frame(height: 70)
-                Text("\(Localizer.toDisplayUnits(String(outcome.startBG))) → peak \(Localizer.toDisplayUnits(String(outcome.peakBG))) · lowest \(Localizer.toDisplayUnits(String(outcome.lowestBG)))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U total in 4h")
+                Text("\(Localizer.toDisplayUnits(String(outcome.startBG))) → peak \(Localizer.toDisplayUnits(String(outcome.peakBG))) · lowest \(Localizer.toDisplayUnits(String(outcome.lowestBG)))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U over \(Self.duration(outcome.measuredMinutes ?? Int(MealOutcome.window / 60)))")
                     .font(.caption)
                     .foregroundColor(outcome.hadLow ? .red : .secondary)
                 if outcome.overlappedMeal == true {
-                    Label("Overlapped with another meal", systemImage: "square.on.square")
+                    Label("Measured to the next meal", systemImage: "fork.knife")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(.secondary)
                 }
             }
             .padding(.vertical, 4)
         }
+    }
+
+    private static func duration(_ minutes: Int) -> String {
+        minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
     }
 
     private func trioMealFooter(_ meal: TrioMealTreatment, needsNewerTrio: Bool) -> Text? {

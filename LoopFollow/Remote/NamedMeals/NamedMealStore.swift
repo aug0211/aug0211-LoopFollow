@@ -342,14 +342,14 @@ final class NamedMealStore {
 
     private var isRefreshingOutcomes = false
 
-    /// Works out how BG went after each named meal once 4 hours have passed,
+    /// Works out how BG went after each named meal once 3 hours have passed,
     /// from Nightscout readings and insulin. Each outcome is fetched once.
     func refreshOutcomes() {
         guard !isRefreshingOutcomes, !Storage.shared.url.value.isEmpty else { return }
         let now = Date()
         let pending = occurrences
-            // Also redoes outcomes from before overlap detection and BG curves.
-            .filter { $0.mealID != nil && ($0.outcome == nil || $0.outcome?.overlappedMeal == nil || $0.outcome?.curve == nil) }
+            // Also redoes outcomes from before the 3-hour stretch.
+            .filter { $0.mealID != nil && ($0.outcome == nil || $0.outcome?.measuredMinutes == nil) }
             .filter { $0.eatingStart.addingTimeInterval(MealOutcome.window + 600) < now }
             .sorted { $0.mealTime > $1.mealTime }
             .prefix(20)
@@ -400,17 +400,16 @@ final class NamedMealStore {
             "find[created_at][$lte]": Self.isoFormatter.string(from: end),
             "count": "300",
         ])
-        let insulin = treatments.reduce(0.0) { total, treatment in
-            total + ((treatment["insulin"] as? NSNumber)?.doubleValue ?? 0)
-        }
-        let overlapped = MealOutcome.hasOtherMeal(
+        let nextMeal = MealOutcome.nextMealStart(
             in: treatments,
             trioMealID: occurrence.trioMealID,
             mealTime: occurrence.mealTime,
             carbs: occurrence.carbs,
-            from: insulinFrom,
+            eatingStart: start,
             to: end
         )
+        let measuredEnd = min(end, max(start, nextMeal ?? end))
+        let insulin = MealOutcome.insulin(in: treatments, from: insulinFrom, to: measuredEnd)
 
         return MealOutcome.compute(
             readings: readings,
@@ -418,7 +417,7 @@ final class NamedMealStore {
             eatingStart: start,
             lowLine: lowLine,
             highLine: highLine,
-            overlappedMeal: overlapped
+            nextMeal: nextMeal
         )
     }
 

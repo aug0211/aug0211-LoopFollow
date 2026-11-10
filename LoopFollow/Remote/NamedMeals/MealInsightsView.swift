@@ -40,7 +40,7 @@ struct MealInsightsView: View {
                 }
             } else {
                 Section {
-                    Text("Insights appear once \(MealInsights.minimumMeals) meals have 4 hours of BG data with no other meal in that time (\(insights.measured) so far).")
+                    Text("Insights appear once \(MealInsights.minimumMeals) meals have at least \(MealOutcome.minimumMinutes) minutes of BG data before the next meal (\(insights.measured) so far).")
                         .foregroundColor(.secondary)
                 }
             }
@@ -65,7 +65,7 @@ struct MealInsightsView: View {
     private func patternsSection(_ insights: MealInsights) -> some View {
         Section(
             header: Text("Patterns"),
-            footer: Text("From the \(insights.measured) meals with 4 hours of BG data and no other meal in that time. For information only.")
+            footer: Text("From the \(insights.measured) meals with at least \(MealOutcome.minimumMinutes) minutes of BG data before the next meal. For information only.")
         ) {
             ForEach(insights.patterns, id: \.kind) { pattern in
                 Label {
@@ -82,7 +82,7 @@ struct MealInsightsView: View {
     private func summarySection(_ insights: MealInsights) -> some View {
         Section(
             header: Text("Typical result"),
-            footer: Text("Medians over \(insights.measured) meals, from when eating started to 4 hours later. In the graph, each meal is a faint line and the bold line is the typical one; the dashed line is when eating started and the band is the target range. Insulin includes boluses and SMBs from 30 minutes before the meal. For information only.")
+            footer: Text("Medians over \(insights.measured) meals, from when eating started to 3 hours later, or to the next meal if that came sooner. Carb entries of 10 g or less, such as low treatments, don't end it; fat/protein entries Trio adds are ignored. In the graph, each meal is a faint line and the bold line is the typical one; the dashed line is when eating started and the band is the target range. Insulin includes boluses and SMBs from 30 minutes before the meal to the end of that time. For information only.")
         ) {
             let curves = store.occurrences(ofMeal: mealID).compactMap { $0.outcome?.isUsable == true ? $0.outcome?.curve : nil }
             if !curves.isEmpty {
@@ -104,7 +104,7 @@ struct MealInsightsView: View {
                 valueRow("Time above range", duration(minutes))
             }
             if let insulin = insights.medianInsulin {
-                valueRow("Insulin (total in 4h)", InsulinFormatter.shared.string(insulin) + " U")
+                valueRow("Insulin (to 3h or next meal)", InsulinFormatter.shared.string(insulin) + " U")
             }
             if let trend = insights.trend {
                 valueRow("Trend", trendText(trend))
@@ -151,17 +151,20 @@ struct MealInsightsView: View {
             }
             Group {
                 if let outcome = occurrence.outcome {
+                    let measured = outcome.measuredMinutes ?? Int(MealOutcome.window / 60)
                     if outcome.hasEnoughData {
-                        Text("\(bg(outcome.startBG)) → peak \(bg(outcome.peakBG)) at \(duration(outcome.minutesToPeak)) · lowest \(bg(outcome.lowestBG))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U total in 4h")
+                        Text("\(bg(outcome.startBG)) → peak \(bg(outcome.peakBG)) at \(duration(outcome.minutesToPeak)) · lowest \(bg(outcome.lowestBG))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U over \(duration(measured))")
                         if outcome.overlappedMeal == true {
-                            Label("Overlapped with another meal, not in insights", systemImage: "square.on.square")
-                                .foregroundColor(.orange)
+                            Label("Next meal \(duration(measured)) after eating; measured to then", systemImage: "fork.knife")
                         }
+                    } else if outcome.overlappedMeal == true {
+                        Label("Next meal \(duration(measured)) after eating, too soon to measure", systemImage: "fork.knife")
+                            .foregroundColor(.orange)
                     } else {
                         Text("Not enough BG data")
                     }
                 } else if occurrence.eatingStart.addingTimeInterval(MealOutcome.window) > Date() {
-                    Text("Waiting for 4 hours of BG data")
+                    Text("Waiting for 3 hours of BG data")
                 } else {
                     Text("Loading…")
                 }
@@ -172,7 +175,6 @@ struct MealInsightsView: View {
             if let outcome = occurrence.outcome, outcome.hasEnoughData, let curve = outcome.curve {
                 MealSparkline(curves: [curve], color: outcome.sparklineColor)
                     .frame(height: 40)
-                    .opacity(outcome.overlappedMeal == true ? 0.5 : 1)
             }
         }
     }
