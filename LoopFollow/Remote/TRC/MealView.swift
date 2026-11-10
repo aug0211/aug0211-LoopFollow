@@ -40,6 +40,10 @@ struct MealView: View {
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
     @ObservedObject private var mealMatchTolerance = Storage.shared.mealMatchTolerance
     @State private var optionalPrebolusText = ""
+    /// Shown when the clipboard holds text with a number, which might be a meal.
+    @State private var clipboardMayHoldMeal = false
+    /// What the last paste filled in, shown under the Paste row.
+    @State private var pastedMealNote: String?
     @State private var optionalPrebolusNegative = false
 
     @FocusState private var carbsFieldIsFocused: Bool
@@ -92,6 +96,10 @@ struct MealView: View {
                             }
                             .listRowBackground(Color.orange.opacity(0.75))
                             .transition(.opacity)
+                        }
+
+                        if clipboardMayHoldMeal {
+                            pasteMealRow
                         }
 
                         MealMacroInputs(
@@ -259,6 +267,13 @@ struct MealView: View {
             }
             .onChange(of: mealOccurrences.value) { _ in
                 quickPickMeals.refresh(maxCarbs: maxCarbs.value.doubleValue(for: .gram()), includeFatProtein: mealWithFatProtein.value)
+            }
+            .onAppear(perform: checkClipboardForMeal)
+            .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
+                checkClipboardForMeal()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                checkClipboardForMeal()
             }
             .onDisappear {
                 // A calculation sheet can cover this view in compact layouts.
@@ -574,6 +589,7 @@ struct MealView: View {
                     selectedNamedMealID = nil
                     optionalPrebolusText = ""
                     optionalPrebolusNegative = false
+                    pastedMealNote = nil
                     selectedTime = nil
                     isScheduling = false
                     alertType = .statusSuccess
@@ -839,6 +855,92 @@ struct MealView: View {
         )
         // Every Quick-Pick replaces the previous bolus, including meals with no insulin.
         bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: min(selectedBolus, maxB))
+    }
+
+    // MARK: - Paste a meal from copied text
+
+    /// "Copied a meal?" with Apple's Paste button, which reads the clipboard only
+    /// when tapped, so there's no "Allow Paste" prompt.
+    private var pasteMealRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Copied a meal?")
+                    Text(mealWithFatProtein.value ? "Carbs, fat, protein, e.g. “Trio: 103, 53, 45”" : "Carbs, e.g. “Trio: 40”")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                PasteButton(payloadType: String.self) { strings in
+                    DispatchQueue.main.async { applyPastedMeal(strings.joined(separator: " ")) }
+                }
+                .buttonBorderShape(.capsule)
+                .labelStyle(.titleAndIcon)
+            }
+            if let pastedMealNote {
+                Text(pastedMealNote)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    /// Shows the Paste row when the clipboard has text containing a number. This
+    /// checks without reading the text, so it never triggers the paste prompt.
+    private func checkClipboardForMeal() {
+        let pasteboard = UIPasteboard.general
+        guard pasteboard.hasStrings else {
+            clipboardMayHoldMeal = false
+            return
+        }
+        pasteboard.detectPatterns(for: [.number]) { result in
+            let hasNumber = (try? result.get())?.contains(.number) ?? true
+            DispatchQueue.main.async { clipboardMayHoldMeal = hasNumber }
+        }
+    }
+
+    /// Fills carbs, fat and protein from pasted text. Nothing is sent; values over
+    /// the maximums are refused, not lowered.
+    private func applyPastedMeal(_ text: String) {
+        guard let meal = MealTextParser.parse(text) else {
+            pastedMealNote = nil
+            handleValidationError("Couldn't read a meal from the copied text. Use carbs, fat, protein in that order, for example “Trio: 103, 53, 45”, or label them, for example “103 carbs 53 fat 45 protein”.")
+            return
+        }
+
+        let includeFatProtein = mealWithFatProtein.value
+        var over: [String] = []
+        if Double(meal.carbs) > maxCarbs.value.doubleValue(for: .gram()) {
+            over.append("carbs \(meal.carbs) g (max \(Int(maxCarbs.value.doubleValue(for: .gram()))) g)")
+        }
+        if includeFatProtein, Double(meal.fat) > maxFat.value.doubleValue(for: .gram()) {
+            over.append("fat \(meal.fat) g (max \(Int(maxFat.value.doubleValue(for: .gram()))) g)")
+        }
+        if includeFatProtein, Double(meal.protein) > maxProtein.value.doubleValue(for: .gram()) {
+            over.append("protein \(meal.protein) g (max \(Int(maxProtein.value.doubleValue(for: .gram()))) g)")
+        }
+        guard over.isEmpty else {
+            pastedMealNote = nil
+            handleValidationError("The copied meal is over your maximum: \(over.joined(separator: ", ")). Nothing was filled in.")
+            return
+        }
+
+        UIApplication.shared.endEditing()
+        mealNameFocused = false
+        carbs = HKQuantity(unit: .gram(), doubleValue: Double(meal.carbs))
+        if includeFatProtein {
+            fat = HKQuantity(unit: .gram(), doubleValue: Double(meal.fat))
+            protein = HKQuantity(unit: .gram(), doubleValue: Double(meal.protein))
+        }
+        // Like picking a saved meal: an earlier pick's insulin never carries over.
+        bolusAmount = HKQuantity(unit: .internationalUnit(), doubleValue: 0)
+
+        let filled = NamedMealFormat.macros(carbs: meal.carbs, fat: meal.fat, protein: meal.protein, includeFatProtein: includeFatProtein)
+        if !includeFatProtein, meal.fat > 0 || meal.protein > 0 {
+            pastedMealNote = "Filled \(filled). Fat and protein were left out because meals are carbs only (Remote settings)."
+        } else {
+            pastedMealNote = "Filled \(filled) from the copied text. Check it, then send."
+        }
     }
 
     private func handleValidationError(_ message: String) {
