@@ -75,10 +75,11 @@ private func chartYDomainUpperBound(_ maxBG: Double) -> Double {
     return clampedMax + topPadding
 }
 
-/// Bottom of an override band, extended downward from its top edge so the
-/// band is at least `minSpan` (in mg/dL) tall on screen.
+/// Bottom of an override band: `minSpan` (in mg/dL) below its top edge, so the
+/// band is the same height on screen however tall the graph is. Before the plot
+/// has been measured (`minSpan` 0), the band's own height on the glucose scale.
 private func overrideBandBottom(_ band: BGChartModel.BandRect, minSpan: Double) -> Double {
-    min(band.yBottom, band.yTop - minSpan)
+    minSpan > 0 ? band.yTop - minSpan : band.yBottom
 }
 
 struct BGChartView: View {
@@ -175,7 +176,7 @@ private struct MainBGChart: View {
     /// Measured size of the visible selection pill (see PillSizePreferenceKey).
     @State private var pillSize: CGSize = .zero
 
-    /// Override bands are drawn at least this tall.
+    /// Override bands are drawn this tall, growing with the text size.
     @ScaledMetric(relativeTo: .caption2) private var overrideBandMinHeight: CGFloat = 22
 
     /// Fixed pill size, scaled with Dynamic Type.
@@ -1154,7 +1155,7 @@ private struct MainBGChart: View {
         ) * viewportWidth
     }
 
-    /// `overrideBandMinHeight` in mg/dL at the current scale.
+    /// `overrideBandMinHeight` (the band's fixed on-screen height) in mg/dL at the current scale.
     private var overrideBandMinSpan: Double {
         guard plotFrame.height > 0 else { return 0 }
         return Double(overrideBandMinHeight) * chartYDomainUpperBound(model.maxBG) / Double(plotFrame.height)
@@ -1412,7 +1413,7 @@ private struct BGChartCanvas: View, Equatable {
     let height: CGFloat
     let visibleSeconds: TimeInterval
     let timeZone: TimeZone
-    /// Minimum override band height in mg/dL (main chart only).
+    /// Override band height in mg/dL (main chart only; 0 keeps the band's own height).
     var overrideMinSpan: Double = 0
 
     static func == (lhs: BGChartCanvas, rhs: BGChartCanvas) -> Bool {
