@@ -3,7 +3,6 @@
 
 import Charts
 import SwiftUI
-import UIKit
 
 /// Shared generator for the light tick emitted when a scrub lands on a new
 /// anchor. File-scoped so it stays prepared across ticks instead of being
@@ -1211,30 +1210,9 @@ private struct MainBGChart: View {
         let x = xPosition(for: anchor.date, viewportWidth: viewportWidth)
         guard x >= 0, x <= viewportWidth else { return nil }
         let pillW = max(min(scaledPillWidth, min(300, viewportWidth - 16)), 1)
-        let pillH = max(min(pillHeight(for: anchor.texts, width: pillW), plotFrame.height - 8), 1)
+        let pillH = max(min(scaledPillHeight, plotFrame.height - 8), 1)
         let center = pillPosition(pillW: pillW, pillH: pillH, viewportWidth: viewportWidth)
         return CGRect(x: center.x - pillW / 2, y: center.y - pillH / 2, width: pillW, height: pillH)
-    }
-
-    /// The pill's height: the usual fixed height, or taller when a single entry's
-    /// text wraps to more lines (a long meal name), so its grams, time and
-    /// pre-bolus aren't cut off. Several stacked entries keep the fixed height.
-    private func pillHeight(for texts: [String], width: CGFloat) -> CGFloat {
-        guard texts.count == 1, let text = texts.first else { return scaledPillHeight }
-        let font = UIFont.preferredFont(forTextStyle: .caption1)
-        // Horizontal padding (6 each side) and room for the link chevron.
-        let textWidth = max(width - 12 - 18, 40)
-        let lines = text.components(separatedBy: "\n").reduce(0) { total, line in
-            let rect = (line as NSString).boundingRect(
-                with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
-                options: [.usesLineFragmentOrigin, .usesFontLeading],
-                attributes: [.font: font],
-                context: nil
-            )
-            return total + max(1, Int((rect.height / font.lineHeight).rounded(.up)))
-        }
-        // Vertical padding (3 each side) plus a little slack for rounding.
-        return max(scaledPillHeight, CGFloat(min(lines, 10)) * font.lineHeight + 12)
     }
 
     /// Fill for a linked pill: the override color while an override was active at
@@ -2150,5 +2128,8 @@ private struct PillLabel: View {
             .foregroundColor(showsLink ? linkTextColor : .primary)
             .multilineTextAlignment(.center)
             .lineLimit(lineLimit)
+            // Shrink a little rather than be cut off by the fixed-size pill
+            // (a long meal name).
+            .minimumScaleFactor(0.75)
     }
 }

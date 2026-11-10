@@ -175,6 +175,13 @@ enum NamedMealFormat {
         return "Post-bolus \(-minutes) min"
     }
 
+    /// "Pre 10m", "At start" or "Post 5m", for tight spaces like the graph popup.
+    static func prebolusShort(_ minutes: Int) -> String {
+        if minutes > 0 { return "Pre \(minutes)m" }
+        if minutes == 0 { return "At start" }
+        return "Post \(-minutes)m"
+    }
+
     /// Parses a typed pre-bolus. Empty means unknown (nil); out of range or not a number is invalid.
     static func parsePrebolus(_ text: String, negative: Bool) -> PrebolusInput {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
