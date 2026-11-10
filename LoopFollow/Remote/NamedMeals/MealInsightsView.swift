@@ -282,6 +282,16 @@ struct NamedMealsListView: View {
                         }
                     }
                 }
+                .contextMenu {
+                    // Right-click on the Mac, long-press on iPhone.
+                    if nsWriteAuth.value {
+                        Button { action = .rename(meal) } label: { Label("Rename", systemImage: "pencil") }
+                        Button { action = .merge(meal) } label: { Label("Merge into another meal…", systemImage: "arrow.triangle.merge") }
+                        if store.useCount(ofMeal: meal.id) == 0 {
+                            Button(role: .destructive) { action = .delete(meal) } label: { Label("Delete", systemImage: "trash") }
+                        }
+                    }
+                }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     if nsWriteAuth.value {
                         if store.useCount(ofMeal: meal.id) == 0 {
@@ -295,7 +305,7 @@ struct NamedMealsListView: View {
                 }
             }
             if nsWriteAuth.value, !namedMeals.value.isEmpty {
-                Text("Swipe a meal left to rename, merge or delete it. Meals marked with two squares have the same items as another meal; merge them to keep one history.")
+                Text("Swipe a meal left, long-press it, or right-click it on a Mac to rename, merge or delete it. Meals marked with two squares have the same items as another meal; merge them to keep one history.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .listRowBackground(Color.clear)
