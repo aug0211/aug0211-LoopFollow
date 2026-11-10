@@ -651,13 +651,14 @@ extension AnalyticsEngine {
             var count = 0
             for reading in readings {
                 if Double(reading.sgv) < lowLine {
-                    if current == nil {
+                    if var low = current {
+                        low.end = reading.date
+                        low.nadir = min(low.nadir, reading.sgv)
+                        current = low
+                        count += 1
+                    } else {
                         current = Low(start: reading.date, end: reading.date, nadir: reading.sgv)
                         count = 1
-                    } else {
-                        current?.end = reading.date
-                        current?.nadir = min(current?.nadir ?? reading.sgv, reading.sgv)
-                        count += 1
                     }
                 } else if let low = current, reading.sgv >= 80 {
                     if count >= 2 {
