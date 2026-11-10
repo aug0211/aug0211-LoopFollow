@@ -187,6 +187,8 @@ struct AggregatedStatsView: View {
 struct AggregatedStatsContentView: View {
     @StateObject private var viewModel: AggregatedStatsViewModel
     private let onDismiss: (() -> Void)?
+    /// Statistics (0) or Analytics (1), remembered between visits.
+    @AppStorage("statisticsAreaTab") private var tab = 0
 
     init(mainViewController: MainViewController?, onDismiss: (() -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: AggregatedStatsViewModel(mainViewController: mainViewController))
@@ -194,8 +196,23 @@ struct AggregatedStatsContentView: View {
     }
 
     var body: some View {
-        AggregatedStatsView(viewModel: viewModel, onDismiss: onDismiss)
-            .preferredColorScheme(Storage.shared.appearanceMode.value.colorScheme)
+        VStack(spacing: 0) {
+            Picker("View", selection: $tab) {
+                Label("Statistics", systemImage: "chart.bar.xaxis").tag(0)
+                Label("Analytics", systemImage: "sparkles").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+
+            if tab == 1 {
+                AnalyticsView(onDismiss: onDismiss)
+            } else {
+                AggregatedStatsView(viewModel: viewModel, onDismiss: onDismiss)
+            }
+        }
+        .preferredColorScheme(Storage.shared.appearanceMode.value.colorScheme)
     }
 }
 
