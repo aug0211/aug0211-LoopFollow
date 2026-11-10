@@ -172,11 +172,14 @@ extension MainViewController {
         updateTodaysCarbsFromEntries(entries: carbs)
         if carbs.count > 0 {
             processNSCarbs(entries: carbs)
+            NamedMealStore.shared.linkTrioMeals(carbData.compactMap { $0.detail?.trioMeal })
         } else {
             if carbData.count > 0 {
                 clearOldCarb()
             }
         }
+        // Meal names and pre-bolus times saved on other devices, for the graph.
+        NamedMealStore.shared.syncIfStale()
         if bgCheck.count > 0 {
             processNSBGCheck(entries: bgCheck)
         } else {

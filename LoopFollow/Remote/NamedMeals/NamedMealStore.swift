@@ -466,8 +466,48 @@ final class NamedMealStore {
     // MARK: - Nightscout download
 
     /// Merges meals and named meals saved by any caregiver's LoopFollow.
+    private var lastSync: Date?
+
+    /// Syncs if the last sync is more than `maxAge` old. Called with every
+    /// treatments refresh, so names saved on another device reach this device's
+    /// graph within minutes, without opening a meal screen.
+    func syncIfStale(maxAge: TimeInterval = 300) {
+        if let lastSync, Date().timeIntervalSince(lastSync) < maxAge { return }
+        syncFromNightscout()
+    }
+
+    /// Attaches Trio's meal ID to named meals that don't have it yet (named while
+    /// entering the meal or right after sending), once Trio's carb entry is here:
+    /// the same time (within 10 minutes) and exactly the same carbs, fat and
+    /// protein. The note is updated, so other devices match the meal by ID.
+    func linkTrioMeals(_ trioMeals: [TrioMealTreatment]) {
+        guard canWrite else { return }
+        var all = occurrences
+        var changed: [MealOccurrence] = []
+        for meal in trioMeals where !meal.isFPUChild {
+            let trioID = meal.mealID.uuidString
+            guard !all.contains(where: { $0.trioMealID == trioID }) else { continue }
+            let mealDate = Date(timeIntervalSince1970: meal.date)
+            let candidates = all.indices.filter { index in
+                let item = all[index]
+                return item.trioMealID == nil && (item.mealID != nil || item.prebolusMinutes != nil)
+                    && abs(item.mealTime.timeIntervalSince(mealDate)) <= 10 * 60
+                    && item.carbs == meal.carbsForEdit && item.fat == meal.fat && item.protein == meal.protein
+            }
+            guard let index = candidates.min(by: {
+                abs(all[$0].mealTime.timeIntervalSince(mealDate)) < abs(all[$1].mealTime.timeIntervalSince(mealDate))
+            }) else { continue }
+            all[index].trioMealID = trioID
+            changed.append(all[index])
+        }
+        guard !changed.isEmpty else { return }
+        occurrences = all
+        Task { await self.saveNotes(changed) }
+    }
+
     func syncFromNightscout() {
         guard !Storage.shared.url.value.isEmpty else { return }
+        lastSync = Date()
         Task {
             do {
                 let foods = try await self.fetchArray(path: "/api/v1/food.json", query: [:])
