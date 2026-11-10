@@ -459,7 +459,11 @@ enum AnalyticsEngine {
             observation: "Above \(c.highText) for 90+ minutes with no carbs in the 3 hours before, \(clean.count) times (\(String(format: "%.1f", hours)) hours in all).",
             count: clean.count, total: clean.count,
             comparisons: ["Trio delivered a median \(percent(medianDouble(ratios) ?? 1)) of scheduled basal during these."],
-            considerations: ["Basal", "The Dynamic ISF adjustment factor", "Food that wasn't logged"],
+            considerations: [
+                "Basal",
+                "How strongly Dynamic ISF (sigmoid) strengthens ISF at high BG: the adjustment factor and the autosens maximum",
+                "Food that wasn't logged",
+            ],
             instances: clean.compactMap { episode in
                 guard let first = episode.first else { return nil }
                 return AnalyticsInstance(id: "high-\(first.date.timeIntervalSince1970)", start: first.date,
