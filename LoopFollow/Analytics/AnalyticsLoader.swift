@@ -150,7 +150,7 @@ enum AnalyticsLoader {
                   let profile = store[name] as? [String: Any]
             else { return nil }
             if timeZone == nil, let identifier = profile["timezone"] as? String { timeZone = TimeZone(identifier: identifier) }
-            return AnalyticsProfile(start: start, basal: schedule(profile["basal"]), carbRatio: schedule(profile["carbratio"]))
+            return AnalyticsProfile(start: start, basal: schedule(profile["basal"]), carbRatio: schedule(profile["carbratio"]), sensitivity: schedule(profile["sens"]))
         }
         return (profiles.sorted { $0.start < $1.start }, timeZone)
     }

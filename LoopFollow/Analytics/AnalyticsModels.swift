@@ -82,6 +82,7 @@ struct AnalyticsProfile: Equatable {
     let start: Date
     let basal: AnalyticsSchedule
     let carbRatio: AnalyticsSchedule
+    var sensitivity = AnalyticsSchedule(entries: [])
 }
 
 // MARK: - Output
@@ -103,6 +104,8 @@ struct AnalyticsReport {
     let siteDays: [AnalyticsGroupBar]
     let lowLine: Double
     let highLine: Double
+    /// How settings were changed over the period, and how BG went with them.
+    var settings: AnalyticsSettingsHistory?
 }
 
 struct AnalyticsFinding: Identifiable {

@@ -111,6 +111,11 @@ struct AnalyticsView: View {
             AnalyticsGroupCard(groups: report.siteDays, tint: .teal, convert: true)
                 .padding(.horizontal)
         }
+
+        if let settings = report.settings, settings.saves > 0 || !settings.steady.isEmpty {
+            AnalyticsSectionHeader(title: "Settings history", subtitle: "How basal, carb ratio and ISF changed, and how BG went with them")
+            AnalyticsSettingsSection(history: settings)
+        }
     }
 }
 

@@ -48,7 +48,7 @@ enum AnalyticsEngine {
         let inRange = inPeriod.filter { Double($0.sgv) >= lowLine && Double($0.sgv) <= highLine }.count
         let expected = max(data.end.timeIntervalSince(data.start) / 300, 1)
 
-        return AnalyticsReport(
+        var report = AnalyticsReport(
             start: data.start,
             end: data.end,
             readingCount: inPeriod.count,
@@ -62,6 +62,8 @@ enum AnalyticsEngine {
             lowLine: lowLine,
             highLine: highLine
         )
+        report.settings = AnalyticsSettingsEngine.analyze(context)
+        return report
     }
 
     // MARK: - Overrides

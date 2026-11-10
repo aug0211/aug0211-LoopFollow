@@ -143,3 +143,60 @@ struct AnalyticsEngineTests {
         #expect(AnalyticsEngine.hourText(13) == "1 PM")
     }
 }
+
+struct AnalyticsSettingsTests {
+    private let utc = TimeZone(identifier: "UTC")!
+    private let base = Date(timeIntervalSince1970: 1_798_934_400)
+    private func at(_ hours: Double) -> Date { base.addingTimeInterval(hours * 3600) }
+
+    private func profile(_ hours: Double, basal: [(Int, Double)], carbRatio: Double = 10) -> AnalyticsProfile {
+        AnalyticsProfile(
+            start: at(hours),
+            basal: AnalyticsSchedule(entries: basal.map { .init(seconds: $0.0 * 3600, value: $0.1) }),
+            carbRatio: AnalyticsSchedule(entries: [.init(seconds: 0, value: carbRatio)])
+        )
+    }
+
+    @Test("Changes, returns to an earlier value, and merged time-of-day slots")
+    func slots() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        let timeline = [
+            profile(-24, basal: [(0, 1.0), (6, 0.5)]),
+            profile(10, basal: [(0, 1.2), (6, 0.5)]),
+            profile(30, basal: [(0, 1.0), (3, 1.0), (6, 0.5)]), // back within 3 days; a new boundary with the same values
+            profile(300, basal: [(0, 0.8), (3, 0.8), (6, 0.6)]),
+        ]
+        let slots = AnalyticsSettingsEngine.slotsFor(.basal, timeline: timeline, periodStart: base, calendar: calendar)
+        let night = slots.first { $0.label == "12 AM–6 AM" }
+        #expect(night?.changes == 3) // 1.0 → 1.2 → 1.0 → 0.8 (12–3 and 3–6 merged)
+        #expect(night?.returns == 1)
+        #expect(night?.quickReturns == 1)
+        #expect(slots.first { $0.label == "6 AM–12 AM" }?.changes == 1)
+    }
+
+    @Test("Saves within 2 hours are one sitting; steady stretches need 5 days at one value")
+    func sittingsAndStretches() {
+        var readings: [AnalyticsReading] = []
+        for minute in stride(from: 0.0, to: 21 * 24 * 60, by: 5) {
+            let date = base.addingTimeInterval(minute * 60)
+            let day = Int(minute / 1440)
+            readings.append(AnalyticsReading(date: date, sgv: day < 10 ? 120 : (Int(minute) % 120 < 30 ? 60 : 120)))
+        }
+        let data = AnalyticsDataset(
+            start: base, end: at(21 * 24), readings: readings, carbs: [], doses: [], tempBasals: [], overrides: [], siteChanges: [],
+            profiles: [
+                profile(-48, basal: [(0, 1.0)]),
+                profile(10 * 24, basal: [(0, 0.9)]),
+                profile(10 * 24 + 1, basal: [(0, 0.8)]), // same sitting
+            ],
+            timeZone: utc
+        )
+        let history = AnalyticsEngine.analyze(data, lowLine: 70, highLine: 180).settings
+        #expect(history?.saves == 2)
+        #expect(history?.sittings == 1)
+        let overnight = history?.steady.first { $0.kind == .basal && $0.block.hasPrefix("Overnight") }
+        #expect(overnight?.stretches.map(\.value) == [1.0, 0.8])
+        #expect(overnight?.stretches.first?.best == true) // no lows at 1.0
+    }
+}
