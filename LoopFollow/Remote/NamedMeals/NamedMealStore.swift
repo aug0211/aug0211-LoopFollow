@@ -348,8 +348,8 @@ final class NamedMealStore {
         guard !isRefreshingOutcomes, !Storage.shared.url.value.isEmpty else { return }
         let now = Date()
         let pending = occurrences
-            // Also redoes outcomes from before the 3-hour stretch.
-            .filter { $0.mealID != nil && ($0.outcome == nil || $0.outcome?.measuredMinutes == nil) }
+            // Also redoes outcomes worked out the older way.
+            .filter { $0.mealID != nil && $0.outcome?.version != MealOutcome.currentVersion }
             .filter { $0.eatingStart.addingTimeInterval(MealOutcome.window + 600) < now }
             .sorted { $0.mealTime > $1.mealTime }
             .prefix(20)
@@ -381,7 +381,9 @@ final class NamedMealStore {
         let start = occurrence.eatingStart
         let end = start.addingTimeInterval(MealOutcome.window)
         let readingsFrom = start.addingTimeInterval(-15 * 60)
-        let insulinFrom = min(occurrence.mealTime, start).addingTimeInterval(-30 * 60)
+        let anchor = min(occurrence.mealTime, start)
+        // Far enough back to see an early bolus and the meals around it.
+        let treatmentsFrom = anchor.addingTimeInterval(-MealOutcome.earlyBolusLookback - 15 * 60)
 
         let entries = try await fetchArray(path: "/api/v1/entries/sgv.json", query: [
             "find[date][$gte]": String(Int64(readingsFrom.timeIntervalSince1970 * 1000)),
@@ -396,7 +398,7 @@ final class NamedMealStore {
         }
 
         let treatments = try await fetchArray(path: "/api/v1/treatments.json", query: [
-            "find[created_at][$gte]": Self.isoFormatter.string(from: insulinFrom),
+            "find[created_at][$gte]": Self.isoFormatter.string(from: treatmentsFrom),
             "find[created_at][$lte]": Self.isoFormatter.string(from: end),
             "count": "300",
         ])
@@ -409,7 +411,14 @@ final class NamedMealStore {
             to: end
         )
         let measuredEnd = min(end, max(start, nextMeal ?? end))
-        let insulin = MealOutcome.insulin(in: treatments, from: insulinFrom, to: measuredEnd)
+        let insulinStart = MealOutcome.insulinStart(
+            in: treatments,
+            anchor: anchor,
+            trioMealID: occurrence.trioMealID,
+            mealTime: occurrence.mealTime,
+            carbs: occurrence.carbs
+        )
+        let insulin = MealOutcome.insulin(in: treatments, from: insulinStart.start, to: measuredEnd)
 
         return MealOutcome.compute(
             readings: readings,
@@ -417,7 +426,8 @@ final class NamedMealStore {
             eatingStart: start,
             lowLine: lowLine,
             highLine: highLine,
-            nextMeal: nextMeal
+            nextMeal: nextMeal,
+            earlyBolusMinutes: insulinStart.earlyBolusMinutes
         )
     }
 

@@ -10,9 +10,16 @@ struct MealOutcome: Codable, Equatable {
     static let window: TimeInterval = 3 * 3600
     /// Shortest stretch (before the next meal) that still counts toward insights.
     static let minimumMinutes = 90
-    /// Carb entries this size or smaller (for example low treatments) don't end the
-    /// stretch; they're part of how the meal went.
+    /// Carb-only entries this size or smaller (for example low treatments) don't end
+    /// the stretch; they're part of how the meal went.
     static let smallCarbs = 10.0
+    /// Insulin normally counts from this long before the meal.
+    static let insulinLookback: TimeInterval = 30 * 60
+    /// A manual bolus up to this long before the meal, not given for another meal,
+    /// is counted too (an early pre-bolus).
+    static let earlyBolusLookback: TimeInterval = 60 * 60
+    /// Bumped when the way outcomes are worked out changes, so stored ones are redone.
+    static let currentVersion = 2
 
     let startBG: Int
     let peakBG: Int
@@ -34,6 +41,10 @@ struct MealOutcome: Codable, Equatable {
     /// Minutes measured after eating started. Nil on outcomes from before the
     /// 3-hour stretch, which are worked out again.
     var measuredMinutes: Int? = nil
+    /// Minutes before the meal of an early manual bolus that was counted, if any.
+    var earlyBolusMinutes: Int? = nil
+    /// `currentVersion` when worked out; older or nil outcomes are redone.
+    var version: Int? = nil
 
     static let curveMinutes = Array(stride(from: -10, through: 180, by: 5))
 
@@ -51,7 +62,8 @@ struct MealOutcome: Codable, Equatable {
         eatingStart: Date,
         lowLine: Double,
         highLine: Double,
-        nextMeal: Date? = nil
+        nextMeal: Date? = nil,
+        earlyBolusMinutes: Int? = nil
     ) -> MealOutcome {
         let start = eatingStart
         let fullEnd = eatingStart.addingTimeInterval(window)
@@ -80,7 +92,8 @@ struct MealOutcome: Codable, Equatable {
         else {
             return MealOutcome(startBG: 0, peakBG: 0, minutesToPeak: 0, lowestBG: 0, hadLow: false,
                                minutesAboveRange: 0, insulin: insulin, hasEnoughData: false,
-                               overlappedMeal: cutShort, curve: curve, measuredMinutes: measured)
+                               overlappedMeal: cutShort, curve: curve, measuredMinutes: measured,
+                               earlyBolusMinutes: earlyBolusMinutes, version: currentVersion)
         }
 
         // Each reading stands for the time until the next one (at most 10 minutes).
@@ -101,15 +114,14 @@ struct MealOutcome: Codable, Equatable {
             hasEnoughData: enough,
             overlappedMeal: cutShort,
             curve: curve,
-            measuredMinutes: measured
+            measuredMinutes: measured,
+            earlyBolusMinutes: earlyBolusMinutes,
+            version: currentVersion
         )
     }
 
     /// When the next meal was entered after this one, from Nightscout `treatments`:
-    /// the first carb entry from 15 minutes before eating started up to `to`. Skips
-    /// this meal's own entry (by Trio meal ID, else the same carbs within 10 minutes
-    /// of its time), Trio's fat/protein follow-on entries, and small entries such as
-    /// low treatments (`smallCarbs`).
+    /// the first other meal (`isOtherMeal`) from 15 minutes before eating started up to `to`.
     static func nextMealStart(
         in treatments: [[String: Any]],
         trioMealID: String?,
@@ -120,16 +132,67 @@ struct MealOutcome: Codable, Equatable {
     ) -> Date? {
         let from = eatingStart.addingTimeInterval(-15 * 60)
         return treatments.compactMap { treatment -> Date? in
-            guard let amount = (treatment["carbs"] as? NSNumber)?.doubleValue, amount > smallCarbs,
-                  let date = parseDate(treatment["created_at"] as? String),
-                  date >= from, date <= to
+            guard let date = parseDate(treatment["created_at"] as? String), date >= from, date <= to,
+                  isOtherMeal(treatment, trioMealID: trioMealID, mealTime: mealTime, carbs: carbs)
             else { return nil }
-            let id = treatment["id"] as? String
-            if let id, let fpuID = treatment["fpuID"] as? String, id == fpuID { return nil }
-            if let trioMealID, id == trioMealID { return nil }
-            if abs(date.timeIntervalSince(mealTime)) <= 600, Int(amount.rounded()) == carbs { return nil }
             return date
         }.min()
+    }
+
+    /// A carb entry for a meal other than this one: more than `smallCarbs` grams, or
+    /// any fat or protein. Skips this meal's own entry (by Trio meal ID, else the same
+    /// carbs within 10 minutes of its time), Trio's fat/protein follow-on entries, and
+    /// small carb-only entries such as low treatments.
+    static func isOtherMeal(_ treatment: [String: Any], trioMealID: String?, mealTime: Date, carbs: Int) -> Bool {
+        let amount = (treatment["carbs"] as? NSNumber)?.doubleValue ?? 0
+        let fat = (treatment["fat"] as? NSNumber)?.doubleValue ?? 0
+        let protein = (treatment["protein"] as? NSNumber)?.doubleValue ?? 0
+        guard amount > smallCarbs || fat > 0 || protein > 0,
+              let date = parseDate(treatment["created_at"] as? String)
+        else { return false }
+        let id = treatment["id"] as? String
+        if let id, let fpuID = treatment["fpuID"] as? String, id == fpuID { return false }
+        if let trioMealID, id == trioMealID { return false }
+        if abs(date.timeIntervalSince(mealTime)) <= 600, Int(amount.rounded()) == carbs { return false }
+        return true
+    }
+
+    /// Where insulin counting starts: normally 30 minutes before `anchor` (the earlier
+    /// of meal entry and eating start), or earlier to include a manual bolus up to 60
+    /// minutes before it that wasn't given for another meal (no other meal from 15
+    /// minutes before that bolus up to this one). Returns the start and, when extended,
+    /// how many minutes before the meal that bolus was.
+    static func insulinStart(
+        in treatments: [[String: Any]],
+        anchor: Date,
+        trioMealID: String?,
+        mealTime: Date,
+        carbs: Int
+    ) -> (start: Date, earlyBolusMinutes: Int?) {
+        let normalStart = anchor.addingTimeInterval(-insulinLookback)
+        let otherMeals = treatments.compactMap { treatment -> Date? in
+            guard isOtherMeal(treatment, trioMealID: trioMealID, mealTime: mealTime, carbs: carbs) else { return nil }
+            return parseDate(treatment["created_at"] as? String)
+        }
+        let early = treatments.compactMap { treatment -> Date? in
+            guard isManualBolus(treatment),
+                  let date = parseDate(treatment["created_at"] as? String),
+                  date >= anchor.addingTimeInterval(-earlyBolusLookback), date < normalStart,
+                  !otherMeals.contains(where: { $0 >= date.addingTimeInterval(-15 * 60) && $0 < anchor })
+            else { return nil }
+            return date
+        }.min()
+        guard let early else { return (normalStart, nil) }
+        return (early, Int((anchor.timeIntervalSince(early) / 60).rounded()))
+    }
+
+    /// A bolus someone gave, not an SMB or other automatic dose.
+    static func isManualBolus(_ treatment: [String: Any]) -> Bool {
+        guard let amount = (treatment["insulin"] as? NSNumber)?.doubleValue, amount > 0 else { return false }
+        if (treatment["eventType"] as? String) == "SMB" { return false }
+        if (treatment["type"] as? String) == "SMB" { return false }
+        if (treatment["automatic"] as? Bool) == true || (treatment["isSMB"] as? Bool) == true { return false }
+        return true
     }
 
     /// Insulin (boluses and SMBs) in Nightscout `treatments` between `from` and `to`.

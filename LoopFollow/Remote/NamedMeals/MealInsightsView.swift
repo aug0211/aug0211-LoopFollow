@@ -82,7 +82,7 @@ struct MealInsightsView: View {
     private func summarySection(_ insights: MealInsights) -> some View {
         Section(
             header: Text("Typical result"),
-            footer: Text("Medians over \(insights.measured) meals, from when eating started to 3 hours later, or to the next meal if that came sooner. Carb entries of 10 g or less, such as low treatments, don't end it; fat/protein entries Trio adds are ignored. In the graph, each meal is a faint line and the bold line is the typical one; the dashed line is when eating started and the band is the target range. Insulin includes boluses and SMBs from 30 minutes before the meal to the end of that time. For information only.")
+            footer: Text("Medians over \(insights.measured) meals, from when eating started to 3 hours later, or to the next meal if that came sooner. Carb entries of 10 g or less, such as low treatments, don't end it; fat/protein entries Trio adds are ignored. In the graph, each meal is a faint line and the bold line is the typical one; the dashed line is when eating started and the band is the target range. Insulin includes boluses and SMBs from 30 minutes before the meal to the end of that time, or from up to 60 minutes before when a manual bolus was given then and not for another meal. For information only.")
         ) {
             let curves = store.occurrences(ofMeal: mealID).compactMap { $0.outcome?.isUsable == true ? $0.outcome?.curve : nil }
             if !curves.isEmpty {
@@ -156,6 +156,9 @@ struct MealInsightsView: View {
                         Text("\(bg(outcome.startBG)) → peak \(bg(outcome.peakBG)) at \(duration(outcome.minutesToPeak)) · lowest \(bg(outcome.lowestBG))\(outcome.hadLow ? " (low)" : "") · \(InsulinFormatter.shared.string(outcome.insulin)) U over \(duration(measured))")
                         if outcome.overlappedMeal == true {
                             Label("Next meal \(duration(measured)) after eating; measured to then", systemImage: "fork.knife")
+                        }
+                        if let early = outcome.earlyBolusMinutes {
+                            Label("Includes a manual bolus \(duration(early)) before the meal", systemImage: "syringe")
                         }
                     } else if outcome.overlappedMeal == true {
                         Label("Next meal \(duration(measured)) after eating, too soon to measure", systemImage: "fork.knife")

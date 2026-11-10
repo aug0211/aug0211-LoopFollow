@@ -860,6 +860,11 @@ struct TreatmentDetailView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                if let early = outcome.earlyBolusMinutes {
+                    Label("Includes a manual bolus \(Self.duration(early)) before the meal", systemImage: "syringe")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.vertical, 4)
         }

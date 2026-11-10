@@ -180,6 +180,33 @@ struct NamedMealTests {
         #expect(next([carbs(45, minutes: 4 * 60)]) == nil) // after the stretch
     }
 
+    @Test("An early manual bolus up to 60 minutes before extends the insulin window, unless it was for another meal")
+    func earlyBolus() {
+        let anchor = Date(timeIntervalSince1970: 1_800_000_000)
+        let iso = ISO8601DateFormatter()
+        func at(_ minutes: Double) -> String { iso.string(from: anchor.addingTimeInterval(minutes * 60)) }
+        func bolus(_ minutes: Double, _ units: Double = 1, smb: Bool = false) -> [String: Any] {
+            ["insulin": NSNumber(value: units), "eventType": smb ? "SMB" : "Bolus", "created_at": at(minutes)]
+        }
+        func meal(_ minutes: Double, carbs: Double, protein: Double = 0) -> [String: Any] {
+            ["carbs": NSNumber(value: carbs), "protein": NSNumber(value: protein), "created_at": at(minutes)]
+        }
+        func early(_ treatments: [[String: Any]]) -> Int? {
+            MealOutcome.insulinStart(in: treatments, anchor: anchor, trioMealID: nil, mealTime: anchor, carbs: 40).earlyBolusMinutes
+        }
+
+        #expect(early([bolus(-45)]) == 45)
+        #expect(MealOutcome.insulinStart(in: [bolus(-45)], anchor: anchor, trioMealID: nil, mealTime: anchor, carbs: 40).start
+            == anchor.addingTimeInterval(-45 * 60))
+        #expect(early([bolus(-45, smb: true)]) == nil) // automatic
+        #expect(early([bolus(-20)]) == nil) // already inside the normal 30 minutes
+        #expect(early([bolus(-70)]) == nil) // too early
+        #expect(early([bolus(-45), meal(-40, carbs: 30)]) == nil) // for another meal
+        #expect(early([bolus(-45), meal(-40, carbs: 6, protein: 26)]) == nil) // a protein shake is a meal too
+        #expect(early([bolus(-45), meal(-40, carbs: 4)]) == 45) // a low treatment isn't
+        #expect(early([bolus(-55), bolus(-40)]) == 55) // the earliest one
+    }
+
     @Test("Insulin counts only up to the end of the stretch")
     func insulinWindow() {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
