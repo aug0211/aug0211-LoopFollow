@@ -68,6 +68,30 @@ enum NamedMealMatcher {
             }
     }
 
+    /// The saved meal a new name probably means: the same items in a different order,
+    /// case or accents, with exactly the same carbs, fat and protein. Nil when the
+    /// name already matches a saved meal exactly or nothing has been entered. Most eaten first.
+    static func sameItems(
+        name: String,
+        carbs: Int,
+        fat: Int,
+        protein: Int,
+        in meals: [NamedMeal],
+        usage: [String: NamedMealSearch.Usage]
+    ) -> NamedMeal? {
+        let key = NamedMealFormat.itemsKey(name)
+        let nameKey = NamedMealFormat.nameKey(name)
+        guard !key.isEmpty, carbs > 0 || fat > 0 || protein > 0,
+              !meals.contains(where: { NamedMealFormat.nameKey($0.name) == nameKey })
+        else { return nil }
+        return meals
+            .filter {
+                NamedMealFormat.itemsKey($0.name) == key
+                    && $0.carbs == carbs && $0.fat == fat && $0.protein == protein
+            }
+            .max { (usage[$0.id]?.count ?? 0) < (usage[$1.id]?.count ?? 0) }
+    }
+
     private static func distance(_ meal: NamedMeal, carbs: Int, fat: Int, protein: Int) -> Int {
         abs(meal.carbs - carbs) + abs(meal.fat - fat) + abs(meal.protein - protein)
     }

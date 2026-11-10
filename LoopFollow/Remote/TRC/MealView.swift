@@ -44,6 +44,8 @@ struct MealView: View {
     @State private var clipboardMayHoldMeal = false
     /// What the last paste filled in, shown under the Paste row.
     @State private var pastedMealNote: String?
+    /// A "same meal as …?" prompt answered No, so it isn't shown again for that name.
+    @State private var declinedSameMeal: String?
     @State private var optionalPrebolusNegative = false
 
     @FocusState private var carbsFieldIsFocused: Bool
@@ -590,6 +592,7 @@ struct MealView: View {
                     optionalPrebolusText = ""
                     optionalPrebolusNegative = false
                     pastedMealNote = nil
+                    declinedSameMeal = nil
                     selectedTime = nil
                     isScheduling = false
                     alertType = .statusSuccess
@@ -639,6 +642,16 @@ struct MealView: View {
                         selectedNamedMealID = nil
                     }
                 }
+
+            if let same = sameItemsMeal {
+                SameMealPrompt(meal: same, includeFatProtein: mealWithFatProtein.value) {
+                    mealNameFocused = false
+                    optionalMealName = same.name
+                    selectedNamedMealID = same.id
+                } onNo: {
+                    declinedSameMeal = sameMealKey(same)
+                }
+            }
 
             if mealNameFocused, !trimmedMealName.isEmpty {
                 let results = Array(NamedMealSearch.search(
@@ -818,6 +831,24 @@ struct MealView: View {
 
     /// Name to save at send: a saved meal is kept only while its macros stay within
     /// the match tolerance (otherwise the name is dropped); an unknown name is new.
+    /// A saved meal with the typed name's items in another order and exactly the
+    /// entered carbs, fat and protein, unless already picked or declined.
+    private var sameItemsMeal: NamedMeal? {
+        guard nsWriteAuth.value, selectedNamedMealID == nil, !trimmedMealName.isEmpty else { return nil }
+        let includeFatProtein = mealWithFatProtein.value
+        guard let meal = NamedMealStore.shared.sameItemsMeal(
+            name: trimmedMealName,
+            carbs: Int(carbs.doubleValue(for: .gram()).rounded()),
+            fat: includeFatProtein ? Int(fat.doubleValue(for: .gram()).rounded()) : 0,
+            protein: includeFatProtein ? Int(protein.doubleValue(for: .gram()).rounded()) : 0
+        ), declinedSameMeal != sameMealKey(meal) else { return nil }
+        return meal
+    }
+
+    private func sameMealKey(_ meal: NamedMeal) -> String {
+        meal.id + "|" + NamedMealFormat.nameKey(trimmedMealName)
+    }
+
     private func resolvedMealName(carbs: Int, fat: Int, protein: Int) -> (existingID: String?, newName: String?) {
         let typed = trimmedMealName
         guard !typed.isEmpty else { return (nil, nil) }

@@ -148,6 +148,22 @@ final class NamedMealStore {
         return meals.filter { $0.id != meal.id && NamedMealFormat.itemsKey($0.name) == key }
     }
 
+    /// A saved meal that is probably what's being typed as a new name: the same items
+    /// in a different order (or case, or accents) and exactly the same carbs, fat and
+    /// protein. Nil when the typed name already matches a saved meal exactly, or when
+    /// nothing has been entered yet. Most eaten first.
+    func sameItemsMeal(name: String, carbs: Int, fat: Int, protein: Int) -> NamedMeal? {
+        NamedMealMatcher.sameItems(
+            name: name, carbs: carbs, fat: fat, protein: protein,
+            in: meals, usage: NamedMealSearch.usage(from: occurrences)
+        )
+    }
+
+    /// When a saved meal was last eaten, from the meals on this device.
+    func lastEaten(mealID: String) -> Date? {
+        occurrences.filter { $0.mealID == mealID }.map(\.mealTime).max()
+    }
+
     /// Renames a saved meal, and every meal eaten under it, for everyone.
     func rename(mealID: String, to newName: String) {
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)

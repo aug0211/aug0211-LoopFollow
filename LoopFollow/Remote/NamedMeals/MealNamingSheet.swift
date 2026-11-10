@@ -20,6 +20,8 @@ struct MealNamingSheet: View {
     @State private var prebolusText = ""
     @State private var prebolusNegative = false
     @State private var didLoad = false
+    /// A "same meal as …?" prompt answered No, so it isn't shown again for that name.
+    @State private var declinedSameMeal: String?
     @FocusState private var nameFieldFocused: Bool
 
     private let store = NamedMealStore.shared
@@ -89,6 +91,15 @@ struct MealNamingSheet: View {
                             .onChange(of: newName) { value in
                                 if !value.trimmingCharacters(in: .whitespaces).isEmpty { selectedMealID = nil }
                             }
+                        if let same = sameItemsMeal(for: occurrence) {
+                            SameMealPrompt(meal: same, includeFatProtein: Storage.shared.mealWithFatProtein.value) {
+                                nameFieldFocused = false
+                                newName = ""
+                                selectedMealID = same.id
+                            } onNo: {
+                                declinedSameMeal = same.id + "|" + NamedMealFormat.nameKey(trimmedName)
+                            }
+                        }
                     }
 
                     Section(
@@ -139,6 +150,16 @@ struct MealNamingSheet: View {
         case .empty:
             return "Minutes between the bolus and starting to eat. Choose After when the bolus came after eating started. Leave empty if unknown."
         }
+    }
+
+    /// A saved meal with the typed name's items in another order and exactly this
+    /// meal's carbs, fat and protein, unless declined.
+    private func sameItemsMeal(for occurrence: MealOccurrence) -> NamedMeal? {
+        guard !trimmedName.isEmpty,
+              let meal = store.sameItemsMeal(name: trimmedName, carbs: occurrence.carbs, fat: occurrence.fat, protein: occurrence.protein),
+              declinedSameMeal != meal.id + "|" + NamedMealFormat.nameKey(trimmedName)
+        else { return nil }
+        return meal
     }
 
     /// Matching saved meals, plus the meal it's already named as when that one

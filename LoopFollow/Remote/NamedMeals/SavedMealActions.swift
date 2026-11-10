@@ -157,3 +157,53 @@ struct MergeMealSheet: View {
         }
     }
 }
+
+/// "Same meal as “Bobo, Grapes, P3, Skinny Pop”?" with when it was last eaten and
+/// its macros, offered when a new name has the same items, reordered, and the same
+/// carbs, fat and protein as a saved meal. One tap either way.
+struct SameMealPrompt: View {
+    let meal: NamedMeal
+    var includeFatProtein: Bool
+    var onYes: () -> Void
+    var onNo: () -> Void
+
+    private let store = NamedMealStore.shared
+
+    private var whenText: String {
+        if let last = store.lastEaten(mealID: meal.id) {
+            return "Last eaten " + last.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
+        }
+        if meal.createdAt > .distantPast {
+            return "Saved " + meal.createdAt.formatted(.dateTime.month(.abbreviated).day().hour().minute()) + ", not eaten yet"
+        }
+        return "Not eaten yet"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Same meal as “\(meal.name)”?")
+                        .font(.subheadline.weight(.semibold))
+                    Text(whenText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Identical macros: " + NamedMealFormat.macros(carbs: meal.carbs, fat: meal.fat, protein: meal.protein, includeFatProtein: includeFatProtein))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } icon: {
+                Image(systemName: "square.on.square")
+                    .foregroundColor(.orange)
+            }
+            HStack(spacing: 10) {
+                Button("Yes, use it", action: onYes)
+                    .buttonStyle(.borderedProminent)
+                Button("No, keep my name", action: onNo)
+                    .buttonStyle(.bordered)
+            }
+            .font(.subheadline)
+        }
+        .padding(.vertical, 4)
+    }
+}

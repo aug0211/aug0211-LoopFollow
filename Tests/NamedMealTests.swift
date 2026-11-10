@@ -336,6 +336,20 @@ struct NamedMealTests {
         #expect(NamedMealFormat.itemsKey("Pizza") == NamedMealFormat.itemsKey(" pizza "))
     }
 
+    @Test("A new name with the same items reordered and identical macros suggests the saved meal")
+    func sameItemsSuggestion() {
+        let bobo = meal("Bobo, Grapes, P3, Skinny Pop", 57, 22, 17)
+        let other = meal("Pizza", 57, 22, 17)
+        func suggest(_ name: String, _ c: Int, _ f: Int, _ p: Int) -> String? {
+            NamedMealMatcher.sameItems(name: name, carbs: c, fat: f, protein: p, in: [bobo, other], usage: [:])?.name
+        }
+        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 57, 22, 17) == bobo.name)
+        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 58, 22, 17) == nil) // macros differ
+        #expect(suggest("Bobo, Grapes, P3, Skinny Pop", 57, 22, 17) == nil) // already the same name
+        #expect(suggest("Bobo, Grapes", 57, 22, 17) == nil) // different items
+        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 0, 0, 0) == nil) // nothing entered yet
+    }
+
     @Test("Pre-bolus wording")
     func prebolusWording() {
         #expect(NamedMealFormat.prebolus(13) == "Pre-bolus 13 min")
