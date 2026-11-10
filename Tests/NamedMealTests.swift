@@ -336,18 +336,30 @@ struct NamedMealTests {
         #expect(NamedMealFormat.itemsKey("Pizza") == NamedMealFormat.itemsKey(" pizza "))
     }
 
-    @Test("A new name with the same items reordered and identical macros suggests the saved meal")
-    func sameItemsSuggestion() {
+    @Test("Saved meals within the tolerance are suggested, with or without a name")
+    func suggestionsRule() {
         let bobo = meal("Bobo, Grapes, P3, Skinny Pop", 57, 22, 17)
-        let other = meal("Pizza", 57, 22, 17)
-        func suggest(_ name: String, _ c: Int, _ f: Int, _ p: Int) -> String? {
-            NamedMealMatcher.sameItems(name: name, carbs: c, fat: f, protein: p, in: [bobo, other], usage: [:])?.name
+        let pizza = meal("Pizza", 60, 25, 15)
+        let usage = ["Bobo, Grapes, P3, Skinny Pop": NamedMealSearch.Usage(count: 3, lastEaten: Date())]
+        func suggest(_ name: String, _ c: Int, _ f: Int, _ p: Int, fatProtein: Bool = true) -> [String] {
+            NamedMealMatcher.suggestions(name: name, carbs: c, fat: f, protein: p, in: [bobo, pizza],
+                                         usage: usage, tolerance: 5, includeFatProtein: fatProtein).map(\.name)
         }
-        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 57, 22, 17) == bobo.name)
-        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 58, 22, 17) == nil) // macros differ
-        #expect(suggest("Bobo, Grapes, P3, Skinny Pop", 57, 22, 17) == nil) // already the same name
-        #expect(suggest("Bobo, Grapes", 57, 22, 17) == nil) // different items
-        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 0, 0, 0) == nil) // nothing entered yet
+
+        // No name: anything within 5 g each, closest first.
+        #expect(suggest("", 57, 22, 17) == [bobo.name, pizza.name])
+        #expect(suggest("", 55, 23, 16).first == bobo.name)
+        #expect(suggest("", 63, 22, 17) == [pizza.name]) // carbs 6 g off Bobo
+        #expect(suggest("", 0, 0, 0).isEmpty) // nothing entered yet
+
+        // A new name: only meals whose items it reorders.
+        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 55, 23, 16) == [bobo.name])
+        #expect(suggest("Bobo, P3, Grapes, Skinny pop", 50, 22, 17).isEmpty) // 7 g off
+        #expect(suggest("Chicken", 57, 22, 17).isEmpty) // a different meal, named
+        #expect(suggest("Bobo, Grapes, P3, Skinny Pop", 57, 22, 17).isEmpty) // already its name
+
+        // Carbs-only meals compare carbs alone.
+        #expect(suggest("", 58, 0, 0, fatProtein: false).first == bobo.name)
     }
 
     @Test("Pre-bolus wording")

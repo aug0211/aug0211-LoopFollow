@@ -158,16 +158,28 @@ struct MergeMealSheet: View {
     }
 }
 
-/// "Same meal as “Bobo, Grapes, P3, Skinny Pop”?" with when it was last eaten and
-/// its macros, offered when a new name has the same items, reordered, and the same
-/// carbs, fat and protein as a saved meal. One tap either way.
+/// "Is this “Bobo, Grapes, P3, Skinny Pop”?" (no name typed) or "Same meal as …?"
+/// (a new name with the same items reordered), with when it was last eaten and how
+/// its macros compare. One tap either way.
 struct SameMealPrompt: View {
     let meal: NamedMeal
+    /// What's been entered, to compare with the saved meal.
+    let carbs: Int
+    let fat: Int
+    let protein: Int
     var includeFatProtein: Bool
+    /// A new name was typed, rather than none.
+    var nameTyped: Bool
+    /// Other saved meals that also match, offered after No.
+    var otherMatches: Int = 0
     var onYes: () -> Void
     var onNo: () -> Void
 
     private let store = NamedMealStore.shared
+
+    private var identical: Bool {
+        meal.carbs == carbs && (!includeFatProtein || (meal.fat == fat && meal.protein == protein))
+    }
 
     private var whenText: String {
         if let last = store.lastEaten(mealID: meal.id) {
@@ -179,18 +191,31 @@ struct SameMealPrompt: View {
         return "Not eaten yet"
     }
 
+    private var macrosText: String {
+        let saved = NamedMealFormat.macros(carbs: meal.carbs, fat: meal.fat, protein: meal.protein, includeFatProtein: includeFatProtein)
+        if identical { return "Identical macros: " + saved }
+        let entered = NamedMealFormat.macros(carbs: carbs, fat: fat, protein: protein, includeFatProtein: includeFatProtein)
+        let tolerance = Storage.shared.mealMatchTolerance.value
+        return "Saved as \(saved) · you entered \(entered) (within \(tolerance) g each)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Same meal as “\(meal.name)”?")
+                    Text(nameTyped ? "Same meal as “\(meal.name)”?" : "Is this “\(meal.name)”?")
                         .font(.subheadline.weight(.semibold))
                     Text(whenText)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("Identical macros: " + NamedMealFormat.macros(carbs: meal.carbs, fat: meal.fat, protein: meal.protein, includeFatProtein: includeFatProtein))
+                    Text(macrosText)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    if otherMatches > 0 {
+                        Text(otherMatches == 1 ? "1 other saved meal is close too." : "\(otherMatches) other saved meals are close too.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             } icon: {
                 Image(systemName: "square.on.square")
@@ -199,7 +224,7 @@ struct SameMealPrompt: View {
             HStack(spacing: 10) {
                 Button("Yes, use it", action: onYes)
                     .buttonStyle(.borderedProminent)
-                Button("No, keep my name", action: onNo)
+                Button(nameTyped ? "No, keep my name" : (otherMatches > 0 ? "No, next" : "No"), action: onNo)
                     .buttonStyle(.bordered)
             }
             .font(.subheadline)

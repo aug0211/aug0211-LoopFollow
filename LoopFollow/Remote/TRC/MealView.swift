@@ -44,8 +44,8 @@ struct MealView: View {
     @State private var clipboardMayHoldMeal = false
     /// What the last paste filled in, shown under the Paste row.
     @State private var pastedMealNote: String?
-    /// A "same meal as …?" prompt answered No, so it isn't shown again for that name.
-    @State private var declinedSameMeal: String?
+    /// Saved meals offered by the "Is this …?" prompt and answered No, for this entry.
+    @State private var declinedSuggestions: Set<String> = []
     @State private var optionalPrebolusNegative = false
 
     @FocusState private var carbsFieldIsFocused: Bool
@@ -592,7 +592,7 @@ struct MealView: View {
                     optionalPrebolusText = ""
                     optionalPrebolusNegative = false
                     pastedMealNote = nil
-                    declinedSameMeal = nil
+                    declinedSuggestions = []
                     selectedTime = nil
                     isScheduling = false
                     alertType = .statusSuccess
@@ -643,13 +643,24 @@ struct MealView: View {
                     }
                 }
 
-            if let same = sameItemsMeal {
-                SameMealPrompt(meal: same, includeFatProtein: mealWithFatProtein.value) {
+            let suggestions = mealSuggestions
+            if let suggestion = suggestions.first {
+                let entered = enteredMacros
+                SameMealPrompt(
+                    meal: suggestion,
+                    carbs: entered.carbs,
+                    fat: entered.fat,
+                    protein: entered.protein,
+                    includeFatProtein: mealWithFatProtein.value,
+                    nameTyped: !trimmedMealName.isEmpty,
+                    otherMatches: suggestions.count - 1
+                ) {
+                    // The entered amounts stay as they are; only the name is taken.
                     mealNameFocused = false
-                    optionalMealName = same.name
-                    selectedNamedMealID = same.id
+                    optionalMealName = suggestion.name
+                    selectedNamedMealID = suggestion.id
                 } onNo: {
-                    declinedSameMeal = sameMealKey(same)
+                    declinedSuggestions.insert(suggestionKey(suggestion))
                 }
             }
 
@@ -831,21 +842,33 @@ struct MealView: View {
 
     /// Name to save at send: a saved meal is kept only while its macros stay within
     /// the match tolerance (otherwise the name is dropped); an unknown name is new.
-    /// A saved meal with the typed name's items in another order and exactly the
-    /// entered carbs, fat and protein, unless already picked or declined.
-    private var sameItemsMeal: NamedMeal? {
-        guard nsWriteAuth.value, selectedNamedMealID == nil, !trimmedMealName.isEmpty else { return nil }
+    /// Carbs, fat and protein as entered, in whole grams (fat and protein 0 when meals are carbs only).
+    private var enteredMacros: (carbs: Int, fat: Int, protein: Int) {
         let includeFatProtein = mealWithFatProtein.value
-        guard let meal = NamedMealStore.shared.sameItemsMeal(
-            name: trimmedMealName,
-            carbs: Int(carbs.doubleValue(for: .gram()).rounded()),
-            fat: includeFatProtein ? Int(fat.doubleValue(for: .gram()).rounded()) : 0,
-            protein: includeFatProtein ? Int(protein.doubleValue(for: .gram()).rounded()) : 0
-        ), declinedSameMeal != sameMealKey(meal) else { return nil }
-        return meal
+        return (
+            Int(carbs.doubleValue(for: .gram()).rounded()),
+            includeFatProtein ? Int(fat.doubleValue(for: .gram()).rounded()) : 0,
+            includeFatProtein ? Int(protein.doubleValue(for: .gram()).rounded()) : 0
+        )
     }
 
-    private func sameMealKey(_ meal: NamedMeal) -> String {
+    /// Saved meals within the match tolerance of what's entered (with no name, or a
+    /// new name that reorders a saved meal's items), not yet declined. None once a
+    /// saved meal is picked, or while the name search is open.
+    private var mealSuggestions: [NamedMeal] {
+        guard nsWriteAuth.value, selectedNamedMealID == nil else { return [] }
+        if mealNameFocused, !trimmedMealName.isEmpty { return [] }
+        let entered = enteredMacros
+        return NamedMealStore.shared.suggestions(
+            name: trimmedMealName,
+            carbs: entered.carbs,
+            fat: entered.fat,
+            protein: entered.protein,
+            includeFatProtein: mealWithFatProtein.value
+        ).filter { !declinedSuggestions.contains(suggestionKey($0)) }
+    }
+
+    private func suggestionKey(_ meal: NamedMeal) -> String {
         meal.id + "|" + NamedMealFormat.nameKey(trimmedMealName)
     }
 

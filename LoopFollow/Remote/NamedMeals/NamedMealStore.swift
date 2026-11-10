@@ -148,14 +148,13 @@ final class NamedMealStore {
         return meals.filter { $0.id != meal.id && NamedMealFormat.itemsKey($0.name) == key }
     }
 
-    /// A saved meal that is probably what's being typed as a new name: the same items
-    /// in a different order (or case, or accents) and exactly the same carbs, fat and
-    /// protein. Nil when the typed name already matches a saved meal exactly, or when
-    /// nothing has been entered yet. Most eaten first.
-    func sameItemsMeal(name: String, carbs: Int, fat: Int, protein: Int) -> NamedMeal? {
-        NamedMealMatcher.sameItems(
+    /// Saved meals the meal being entered probably is; see `NamedMealMatcher.suggestions`.
+    func suggestions(name: String, carbs: Int, fat: Int, protein: Int, includeFatProtein: Bool) -> [NamedMeal] {
+        NamedMealMatcher.suggestions(
             name: name, carbs: carbs, fat: fat, protein: protein,
-            in: meals, usage: NamedMealSearch.usage(from: occurrences)
+            in: meals, usage: NamedMealSearch.usage(from: occurrences),
+            tolerance: Storage.shared.mealMatchTolerance.value,
+            includeFatProtein: includeFatProtein
         )
     }
 

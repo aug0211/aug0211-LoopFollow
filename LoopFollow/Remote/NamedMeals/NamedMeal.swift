@@ -68,28 +68,43 @@ enum NamedMealMatcher {
             }
     }
 
-    /// The saved meal a new name probably means: the same items in a different order,
-    /// case or accents, with exactly the same carbs, fat and protein. Nil when the
-    /// name already matches a saved meal exactly or nothing has been entered. Most eaten first.
-    static func sameItems(
+    /// Saved meals a meal being entered probably is, best first:
+    /// - no name typed: every saved meal with carbs, fat and protein each within
+    ///   `tolerance` grams (fat and protein ignored when meals are carbs only);
+    /// - a new name typed: saved meals with the same items in a different order, case
+    ///   or accents, within the same tolerance. None when the name already matches a
+    ///   saved meal exactly, since that one is used.
+    /// Closest macros first, then most eaten. Nothing until a macro is entered.
+    static func suggestions(
         name: String,
         carbs: Int,
         fat: Int,
         protein: Int,
         in meals: [NamedMeal],
-        usage: [String: NamedMealSearch.Usage]
-    ) -> NamedMeal? {
-        let key = NamedMealFormat.itemsKey(name)
-        let nameKey = NamedMealFormat.nameKey(name)
-        guard !key.isEmpty, carbs > 0 || fat > 0 || protein > 0,
-              !meals.contains(where: { NamedMealFormat.nameKey($0.name) == nameKey })
-        else { return nil }
-        return meals
-            .filter {
-                NamedMealFormat.itemsKey($0.name) == key
-                    && $0.carbs == carbs && $0.fat == fat && $0.protein == protein
-            }
-            .max { (usage[$0.id]?.count ?? 0) < (usage[$1.id]?.count ?? 0) }
+        usage: [String: NamedMealSearch.Usage],
+        tolerance: Int,
+        includeFatProtein: Bool
+    ) -> [NamedMeal] {
+        guard carbs > 0 || fat > 0 || protein > 0 else { return [] }
+        let typed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var candidates = meals.filter {
+            $0.stillMatches(carbs: carbs, fat: fat, protein: protein, tolerance: max(0, tolerance), includeFatProtein: includeFatProtein)
+        }
+        if !typed.isEmpty {
+            let nameKey = NamedMealFormat.nameKey(typed)
+            guard !meals.contains(where: { NamedMealFormat.nameKey($0.name) == nameKey }) else { return [] }
+            let key = NamedMealFormat.itemsKey(typed)
+            candidates = candidates.filter { NamedMealFormat.itemsKey($0.name) == key }
+        }
+        func gap(_ meal: NamedMeal) -> Int {
+            abs(meal.carbs - carbs) + (includeFatProtein ? abs(meal.fat - fat) + abs(meal.protein - protein) : 0)
+        }
+        return candidates.sorted { lhs, rhs in
+            if gap(lhs) != gap(rhs) { return gap(lhs) < gap(rhs) }
+            let lhsCount = usage[lhs.id]?.count ?? 0, rhsCount = usage[rhs.id]?.count ?? 0
+            if lhsCount != rhsCount { return lhsCount > rhsCount }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
     }
 
     private static func distance(_ meal: NamedMeal, carbs: Int, fat: Int, protein: Int) -> Int {

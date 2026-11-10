@@ -92,7 +92,14 @@ struct MealNamingSheet: View {
                                 if !value.trimmingCharacters(in: .whitespaces).isEmpty { selectedMealID = nil }
                             }
                         if let same = sameItemsMeal(for: occurrence) {
-                            SameMealPrompt(meal: same, includeFatProtein: Storage.shared.mealWithFatProtein.value) {
+                            SameMealPrompt(
+                                meal: same,
+                                carbs: occurrence.carbs,
+                                fat: occurrence.fat,
+                                protein: occurrence.protein,
+                                includeFatProtein: Storage.shared.mealWithFatProtein.value,
+                                nameTyped: true
+                            ) {
                                 nameFieldFocused = false
                                 newName = ""
                                 selectedMealID = same.id
@@ -152,14 +159,18 @@ struct MealNamingSheet: View {
         }
     }
 
-    /// A saved meal with the typed name's items in another order and exactly this
-    /// meal's carbs, fat and protein, unless declined.
+    /// A saved meal whose items the typed name reorders, within the match tolerance
+    /// of this meal's macros, unless declined. (With no name, the "Is this…" list above
+    /// already offers the close matches.)
     private func sameItemsMeal(for occurrence: MealOccurrence) -> NamedMeal? {
-        guard !trimmedName.isEmpty,
-              let meal = store.sameItemsMeal(name: trimmedName, carbs: occurrence.carbs, fat: occurrence.fat, protein: occurrence.protein),
-              declinedSameMeal != meal.id + "|" + NamedMealFormat.nameKey(trimmedName)
-        else { return nil }
-        return meal
+        guard !trimmedName.isEmpty else { return nil }
+        return store.suggestions(
+            name: trimmedName,
+            carbs: occurrence.carbs,
+            fat: occurrence.fat,
+            protein: occurrence.protein,
+            includeFatProtein: Storage.shared.mealWithFatProtein.value
+        ).first { declinedSameMeal != $0.id + "|" + NamedMealFormat.nameKey(trimmedName) }
     }
 
     /// Matching saved meals, plus the meal it's already named as when that one
