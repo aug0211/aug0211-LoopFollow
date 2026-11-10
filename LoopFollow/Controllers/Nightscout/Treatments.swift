@@ -170,6 +170,10 @@ extension MainViewController {
             }
         }
         updateTodaysCarbsFromEntries(entries: carbs)
+        // Meal names and pre-bolus times are LoopFollow notes, already in this
+        // download: take them from here, so names saved on another device reach
+        // the graph with the same refresh as the carbs, with no extra request.
+        NamedMealStore.shared.mergeMealNotes(fromTreatments: note)
         if carbs.count > 0 {
             processNSCarbs(entries: carbs)
             NamedMealStore.shared.linkTrioMeals(carbData.compactMap { $0.detail?.trioMeal })
@@ -178,8 +182,6 @@ extension MainViewController {
                 clearOldCarb()
             }
         }
-        // Meal names and pre-bolus times saved on other devices, for the graph.
-        NamedMealStore.shared.syncIfStale()
         if bgCheck.count > 0 {
             processNSBGCheck(entries: bgCheck)
         } else {

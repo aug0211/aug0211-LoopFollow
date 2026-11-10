@@ -466,14 +466,15 @@ final class NamedMealStore {
     // MARK: - Nightscout download
 
     /// Merges meals and named meals saved by any caregiver's LoopFollow.
-    private var lastSync: Date?
-
-    /// Syncs if the last sync is more than `maxAge` old. Called with every
-    /// treatments refresh, so names saved on another device reach this device's
-    /// graph within minutes, without opening a meal screen.
-    func syncIfStale(maxAge: TimeInterval = 300) {
-        if let lastSync, Date().timeIntervalSince(lastSync) < maxAge { return }
-        syncFromNightscout()
+    /// Takes LoopFollow's meal notes from a treatments download the app already
+    /// made (the graph's regular refresh), so names and pre-bolus times saved on
+    /// another device show here without a separate request.
+    func mergeMealNotes(fromTreatments entries: [[String: AnyObject]]) {
+        let notes: [[String: Any]] = entries
+            .filter { ($0["enteredBy"] as? String) == "LoopFollow" && !((($0["lfOccurrenceId"] as? String) ?? "").isEmpty) }
+            .map { $0 as [String: Any] }
+        guard !notes.isEmpty else { return }
+        merge(notes: notes)
     }
 
     /// Attaches Trio's meal ID to named meals that don't have it yet (named while
@@ -507,7 +508,6 @@ final class NamedMealStore {
 
     func syncFromNightscout() {
         guard !Storage.shared.url.value.isEmpty else { return }
-        lastSync = Date()
         Task {
             do {
                 let foods = try await self.fetchArray(path: "/api/v1/food.json", query: [:])
