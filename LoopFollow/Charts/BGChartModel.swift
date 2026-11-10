@@ -396,13 +396,16 @@ final class BGChartModel: ObservableObject {
 
     /// "Carbs, 45g, time", with the meal's saved name in place of "Carbs" and its
     /// pre-bolus on a last line when they've been recorded.
-    /// Item / amount / time, like every other entry: "Carbs", or the meal's
-    /// saved name; then its carbs, with fat and protein when it has them
+    /// Item / amount / time, like every other entry: "Carbs", "FPU Carbs" for
+    /// Trio's fat/protein entries, or the meal's saved name; then its carbs, with fat and protein when it has them
     /// ("22g • 18g • 14g"); then the time.
     private static func carbPillText(grams: Int, time: String, detail: Treatment?) -> String {
         var item = "Carbs"
         var amount = "\(grams)g"
-        if let meal = detail?.trioMeal, !meal.isFPUChild {
+        if detail?.trioMeal?.isFPUChild == true {
+            // One of the carb entries Trio adds for a meal's fat and protein.
+            item = "FPU Carbs"
+        } else if let meal = detail?.trioMeal {
             if let name = NamedMealStore.shared.occurrence(for: meal)?.mealName, !name.isEmpty {
                 item = name
             }
