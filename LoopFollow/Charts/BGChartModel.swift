@@ -396,21 +396,21 @@ final class BGChartModel: ObservableObject {
 
     /// "Carbs, 45g, time", with the meal's saved name in place of "Carbs" and its
     /// pre-bolus on a last line when they've been recorded.
-    /// "Carbs / 21g / 11:31 AM", or for a named meal its name over one compact
-    /// line, "22g · 10:46 AM · Pre 10m", so it fits the same pill.
+    /// Item / amount / time, like every other entry: "Carbs", or the meal's
+    /// saved name; then its carbs, with fat and protein when it has them
+    /// ("22g • 18g • 14g"); then the time.
     private static func carbPillText(grams: Int, time: String, detail: Treatment?) -> String {
-        guard let meal = detail?.trioMeal, !meal.isFPUChild,
-              let occurrence = NamedMealStore.shared.occurrence(for: meal),
-              occurrence.mealName?.isEmpty == false || occurrence.prebolusMinutes != nil
-        else {
-            return ["Carbs", "\(grams)g", time].joined(separator: "\n")
+        var item = "Carbs"
+        var amount = "\(grams)g"
+        if let meal = detail?.trioMeal, !meal.isFPUChild {
+            if let name = NamedMealStore.shared.occurrence(for: meal)?.mealName, !name.isEmpty {
+                item = name
+            }
+            if meal.fat > 0 || meal.protein > 0 {
+                amount = "\(grams)g • \(meal.fat)g • \(meal.protein)g"
+            }
         }
-        var details = ["\(grams)g", time]
-        if let minutes = occurrence.prebolusMinutes {
-            details.append(NamedMealFormat.prebolusShort(minutes))
-        }
-        let name = occurrence.mealName.flatMap { $0.isEmpty ? nil : $0 } ?? "Carbs"
-        return [name, details.joined(separator: " · ")].joined(separator: "\n")
+        return [item, amount, time].joined(separator: "\n")
     }
 
     /// Schedules a rebuild, coalescing bursts: a refresh cycle calls a dozen
