@@ -87,7 +87,7 @@ struct AnalyticsEngineTests {
         #expect(report.overrides.first?.newLows == 4)
     }
 
-    @Test("Meal factors use overrides set around the meal, never ones started because of a low")
+    @Test("Meal factors count overrides set up to 3h after the meal, never ones started because of a low")
     func mealFactorsExcludeConsequences() {
         var list: [AnalyticsReading] = []
         var carbs: [AnalyticsCarb] = []
@@ -97,7 +97,8 @@ struct AnalyticsEngineTests {
             carbs.append(AnalyticsCarb(date: at(dinner), carbs: 60, fat: 25, protein: 30, isFPUChild: false))
             let withFPU = day % 2 == 0
             if withFPU {
-                overrides.append(AnalyticsOverride(start: at(dinner + 0.2), end: at(dinner + 3), name: "High FPU"))
+                // Set 2 hours in, as a slow fatty meal starts to rise: still part of the meal.
+                overrides.append(AnalyticsOverride(start: at(dinner + 2), end: at(dinner + 5), name: "High FPU"))
             }
             let lowAt = 120.0 // minutes after dinner
             if !withFPU {

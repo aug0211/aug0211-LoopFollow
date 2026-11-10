@@ -21,6 +21,8 @@ enum AnalyticsEngine {
     static let mealMinimumCarbs = 15.0
     static let mealClearWindow: TimeInterval = 3 * 3600
     static let mealLookahead: TimeInterval = 5 * 3600
+    /// Overrides started this long after a meal still belong to it (High FPU for slow, fatty meals).
+    static let mealOverrideWindow: TimeInterval = 3 * 3600
 
     static func analyze(_ data: AnalyticsDataset, lowLine: Double, highLine: Double) -> AnalyticsReport {
         let context = Context(data: data, lowLine: lowLine, highLine: highLine)
@@ -238,7 +240,12 @@ enum AnalyticsEngine {
             let high: Bool
             let dose: Double
             let startBG: Int
-            let overrides: Set<String>
+            /// Overrides for this meal (running at it or started within 3 hours after,
+            /// such as High FPU for a slow fatty meal) set before the first low,
+            /// so an override started because of the low isn't counted for it.
+            let overridesBeforeLow: Set<String>
+            /// The same, set before BG first went high.
+            let overridesBeforeHigh: Set<String>
         }
         let windows: [(label: String, from: Int, to: Int)] = [
             ("breakfast", 5, 10), ("lunch", 10, 15), ("afternoon snacks", 15, 17), ("dinner", 17, 21),
@@ -260,11 +267,13 @@ enum AnalyticsEngine {
                 let firstLow = c.readings(from: meal.date.addingTimeInterval(3600), to: end).first { Double($0.sgv) < c.lowLine }?.date
                 let carbRatio = c.profile(at: meal.date)?.carbRatio.value(atSecondsFromMidnight: c.secondsFromMidnight(meal.date)) ?? 0
                 let bolus = c.manualBolus(from: meal.date.addingTimeInterval(-30 * 60), to: meal.date.addingTimeInterval(30 * 60))
-                // Overrides around the meal, but never one started after a low it caused.
-                let limit = firstLow ?? end
-                let names = Set(c.data.overrides.filter {
-                    $0.start <= meal.date.addingTimeInterval(60 * 60) && $0.end >= meal.date.addingTimeInterval(-30 * 60) && $0.start < limit
-                }.map(\.name))
+                let firstHigh = all.first { Double($0.sgv) > c.highLine }?.date
+                let forMeal = c.data.overrides.filter {
+                    $0.start <= meal.date.addingTimeInterval(mealOverrideWindow) && $0.end >= meal.date.addingTimeInterval(-30 * 60)
+                }
+                func names(before limit: Date?) -> Set<String> {
+                    Set(forMeal.filter { $0.start < (limit ?? end) }.map(\.name))
+                }
                 return Row(
                     meal: meal,
                     low: firstLow != nil,
@@ -272,21 +281,22 @@ enum AnalyticsEngine {
                     high: c.minutesAbove(all, level: c.highLine) >= Double(highMinutesForMeal),
                     dose: carbRatio > 0 ? bolus / max(meal.carbs / carbRatio, 0.1) : 0,
                     startBG: first.sgv,
-                    overrides: names
+                    overridesBeforeLow: names(before: firstLow),
+                    overridesBeforeHigh: names(before: firstHigh)
                 )
             }
             guard rows.count >= 5 else { continue }
             let medianDose = medianDouble(rows.map(\.dose)) ?? 0
-            var nameCounts: [String: Int] = [:]
-            for row in rows { for name in row.overrides { nameCounts[name, default: 0] += 1 } }
-            func factors(_ outcome: (Row) -> Bool) -> [String] {
+            func factors(_ outcome: (Row) -> Bool, overrides: (Row) -> Set<String>) -> [String] {
                 var list = [
                     compare(rows, outcome, "Meal bolus above \(percent(medianDose)) of carbs ÷ CR") { $0.dose > medianDose },
                     compare(rows, outcome, "20 g fat or more") { $0.meal.fat >= 20 },
                     compare(rows, outcome, "Started above 140") { $0.startBG > 140 },
                 ]
+                var nameCounts: [String: Int] = [:]
+                for row in rows { for name in overrides(row) { nameCounts[name, default: 0] += 1 } }
                 for (name, count) in nameCounts where count >= factorMinimumGroup {
-                    list.append(compare(rows, outcome, "With \(name)") { $0.overrides.contains(name) })
+                    list.append(compare(rows, outcome, "With \(name)") { overrides($0).contains(name) })
                 }
                 return topFactors(list)
             }
@@ -310,7 +320,7 @@ enum AnalyticsEngine {
                     title: "Lows after \(window.label)",
                     observation: "A low 1 to 5 hours after \(lows) of \(rows.count) meals" + (early >= 2 ? ", \(early) of them within about 1.5 hours." : "."),
                     count: lows, total: rows.count,
-                    comparisons: factors(\.low),
+                    comparisons: factors(\.low, overrides: \.overridesBeforeLow),
                     considerations: [
                         "The carb ratio for this time of day",
                         early >= 2 ? "Bolus timing: insulin may be peaking before the food (high-fat meals absorb slowly)" : "Bolus timing",
@@ -326,7 +336,7 @@ enum AnalyticsEngine {
                     title: "Highs after \(window.label)",
                     observation: "Above \(c.highText) for \(highMinutesForMeal)+ minutes after \(highs) of \(rows.count) meals.",
                     count: highs, total: rows.count,
-                    comparisons: factors(\.high),
+                    comparisons: factors(\.high, overrides: \.overridesBeforeHigh),
                     considerations: ["Pre-bolus timing", "The carb ratio for this time of day"],
                     instances: instances(\.high)
                 ))
