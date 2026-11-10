@@ -13,7 +13,12 @@ final class NamedMealStore {
     static let shared = NamedMealStore()
 
     private static let keepOccurrences: TimeInterval = 365 * 24 * 3600
-    private static let syncDays = 30
+    /// Every device sees meals eaten in the last 6 months, whoever entered them. The
+    /// full 6 months are fetched at most every 12 hours; syncs in between fetch the
+    /// last 30 days, which is where new and edited meals are.
+    private static let fullSyncDays = 183
+    private static let recentSyncDays = 30
+    private static let fullSyncInterval: TimeInterval = 12 * 3600
 
     private init() {}
 
@@ -466,16 +471,21 @@ final class NamedMealStore {
         Task {
             do {
                 let foods = try await self.fetchArray(path: "/api/v1/food.json", query: [:])
-                let since = Date().addingTimeInterval(-Double(Self.syncDays) * 24 * 3600)
+                let now = Date()
+                let lastFull = Date(timeIntervalSince1970: Storage.shared.namedMealsFullSyncAt.value)
+                let full = now.timeIntervalSince(lastFull) > Self.fullSyncInterval
+                let days = full ? Self.fullSyncDays : Self.recentSyncDays
+                let since = now.addingTimeInterval(-Double(days) * 24 * 3600)
                 let notes = try await self.fetchArray(path: "/api/v1/treatments.json", query: [
                     "find[eventType]": "Note",
                     "find[enteredBy]": "LoopFollow",
                     "find[created_at][$gte]": Self.isoFormatter.string(from: since),
-                    "count": "1000",
+                    "count": "5000",
                 ])
                 await MainActor.run {
                     self.merge(foods: foods)
                     self.merge(notes: notes)
+                    if full { Storage.shared.namedMealsFullSyncAt.value = now.timeIntervalSince1970 }
                 }
             } catch {
                 LogManager.shared.log(category: .nightscout, message: "Named meal sync failed: \(error.localizedDescription)")
@@ -487,8 +497,11 @@ final class NamedMealStore {
         var all = meals
         // A meal uploaded before but no longer in Nightscout was renamed away,
         // merged or deleted on another device.
+        // An empty answer is never taken to mean every meal was deleted.
         let remoteIDs = Set(foods.compactMap { $0["lfMealId"] as? String })
-        all.removeAll { $0.nightscoutID != nil && !remoteIDs.contains($0.id) }
+        if !remoteIDs.isEmpty {
+            all.removeAll { $0.nightscoutID != nil && !remoteIDs.contains($0.id) }
+        }
         for food in foods {
             guard let id = food["lfMealId"] as? String, !id.isEmpty,
                   let name = food["name"] as? String
@@ -587,7 +600,7 @@ final class NamedMealStore {
             .filter { $0.mealID != nil && $0.outcome?.version != MealOutcome.currentVersion }
             .filter { $0.eatingStart.addingTimeInterval(MealOutcome.window + 600) < now }
             .sorted { $0.mealTime > $1.mealTime }
-            .prefix(20)
+            .prefix(40)
         guard !pending.isEmpty else { return }
         isRefreshingOutcomes = true
 
