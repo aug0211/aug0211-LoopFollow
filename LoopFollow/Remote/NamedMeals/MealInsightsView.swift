@@ -276,10 +276,7 @@ struct NamedMealsListView: View {
                                 .foregroundColor(.secondary)
                         }
                         Spacer(minLength: 0)
-                        if insights.hasSummary, let typical = insights.typicalCurve {
-                            MealSparkline(curves: [typical], color: insights.hasWarning ? .orange : .accentColor)
-                                .frame(width: 70, height: 30)
-                        }
+                        listSparkline(for: meal, insights: insights)
                     }
                 }
                 .contextMenu {
@@ -317,6 +314,28 @@ struct NamedMealsListView: View {
         .onAppear {
             store.syncFromNightscout()
             store.refreshOutcomes()
+        }
+    }
+
+    /// The typical curve once 3 meals were measured. With 1 or 2, each meal's own
+    /// curve, faint and gray, with the count: a hint, not a pattern yet.
+    @ViewBuilder
+    private func listSparkline(for meal: NamedMeal, insights: MealInsights) -> some View {
+        if insights.hasSummary, let typical = insights.typicalCurve {
+            MealSparkline(curves: [typical], color: insights.hasWarning ? .orange : .accentColor)
+                .frame(width: 70, height: 30)
+        } else {
+            let curves = store.occurrences(ofMeal: meal.id).compactMap { $0.outcome?.isUsable == true ? $0.outcome?.curve : nil }
+            if !curves.isEmpty {
+                VStack(spacing: 1) {
+                    MealSparkline(curves: curves, color: Color.gray.opacity(0.7))
+                        .frame(width: 70, height: 30)
+                        .opacity(0.8)
+                    Text(curves.count == 1 ? "1 meal" : "\(curves.count) meals")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
         }
     }
 }
