@@ -134,6 +134,16 @@ enum NamedMealFormat {
         case invalid
     }
 
+    /// The items in a meal name, ignoring order, case and accents, to spot the same
+    /// meal saved twice: "Bobo, P3, Grapes" and "bobo, grapes, p3" match.
+    static func itemsKey(_ name: String) -> String {
+        name.components(separatedBy: CharacterSet(charactersIn: ",;+&/"))
+            .map { NamedMealSearch.normalize($0) }
+            .filter { !$0.isEmpty }
+            .sorted()
+            .joined(separator: "|")
+    }
+
     /// Normalized form used to recognize the same name typed twice.
     static func nameKey(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

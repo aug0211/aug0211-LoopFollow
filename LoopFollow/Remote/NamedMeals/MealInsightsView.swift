@@ -10,6 +10,9 @@ struct MealInsightsView: View {
 
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
     @ObservedObject private var namedMeals = Storage.shared.namedMeals
+    @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var action: SavedMealAction?
     private let store = NamedMealStore.shared
 
     private var meal: NamedMeal? {
@@ -26,6 +29,12 @@ struct MealInsightsView: View {
                     Text(meal.macroSummary)
                     Text(insights.timesEaten == 1 ? "Eaten once" : "Eaten \(insights.timesEaten) times")
                         .foregroundColor(.secondary)
+                    let same = store.sameItems(as: meal)
+                    if !same.isEmpty {
+                        Label("Same items as “\(same.map(\.name).joined(separator: "”, “"))”. Merge them to keep one history.", systemImage: "square.on.square")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
                 }
             }
 
@@ -53,6 +62,23 @@ struct MealInsightsView: View {
         }
         .navigationTitle(meal?.name ?? "Meal")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if nsWriteAuth.value, let meal {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button { action = .rename(meal) } label: { Label("Rename", systemImage: "pencil") }
+                        Button { action = .merge(meal) } label: { Label("Merge into another meal…", systemImage: "arrow.triangle.merge") }
+                        if store.useCount(ofMeal: meal.id) == 0 {
+                            Button(role: .destructive) { action = .delete(meal) } label: { Label("Delete", systemImage: "trash") }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("Edit saved meal")
+                }
+            }
+        }
+        .savedMealActions($action) { presentationMode.wrappedValue.dismiss() }
         .onAppear {
             store.syncFromNightscout()
             store.refreshOutcomes()
@@ -215,6 +241,8 @@ struct MealInsightsView: View {
 struct NamedMealsListView: View {
     @ObservedObject private var namedMeals = Storage.shared.namedMeals
     @ObservedObject private var mealOccurrences = Storage.shared.mealOccurrences
+    @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
+    @State private var action: SavedMealAction?
     private let store = NamedMealStore.shared
 
     var body: some View {
@@ -230,6 +258,12 @@ struct NamedMealsListView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
                                 Text(meal.name)
+                                if !store.sameItems(as: meal).isEmpty {
+                                    Image(systemName: "square.on.square")
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                        .accessibilityLabel("Same items as another saved meal")
+                                }
                                 if insights.hasWarning {
                                     Image(systemName: "exclamationmark.triangle.fill")
                                         .font(.caption)
@@ -248,10 +282,28 @@ struct NamedMealsListView: View {
                         }
                     }
                 }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if nsWriteAuth.value {
+                        if store.useCount(ofMeal: meal.id) == 0 {
+                            Button(role: .destructive) { action = .delete(meal) } label: { Label("Delete", systemImage: "trash") }
+                        }
+                        Button { action = .merge(meal) } label: { Label("Merge", systemImage: "arrow.triangle.merge") }
+                            .tint(.indigo)
+                        Button { action = .rename(meal) } label: { Label("Rename", systemImage: "pencil") }
+                            .tint(.blue)
+                    }
+                }
+            }
+            if nsWriteAuth.value, !namedMeals.value.isEmpty {
+                Text("Swipe a meal left to rename, merge or delete it. Meals marked with two squares have the same items as another meal; merge them to keep one history.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .listRowBackground(Color.clear)
             }
         }
         .navigationTitle("Saved Meals")
         .navigationBarTitleDisplayMode(.inline)
+        .savedMealActions($action)
         .onAppear {
             store.syncFromNightscout()
             store.refreshOutcomes()

@@ -328,6 +328,14 @@ struct NamedMealTests {
         #expect(pizza.stillMatches(carbs: 62, fat: 0, protein: 0, tolerance: 5, includeFatProtein: false))
     }
 
+    @Test("Meals with the same items in a different order or case are recognized")
+    func sameItems() {
+        #expect(NamedMealFormat.itemsKey("Bobo, P3, Grapes, Skinny pop") == NamedMealFormat.itemsKey("Bobo, Grapes, P3, Skinny Pop"))
+        #expect(NamedMealFormat.itemsKey("Crème brûlée; Coffee") == NamedMealFormat.itemsKey("coffee, creme brulee"))
+        #expect(NamedMealFormat.itemsKey("Bobo, Grapes") != NamedMealFormat.itemsKey("Bobo, Grapes, P3"))
+        #expect(NamedMealFormat.itemsKey("Pizza") == NamedMealFormat.itemsKey(" pizza "))
+    }
+
     @Test("Pre-bolus wording")
     func prebolusWording() {
         #expect(NamedMealFormat.prebolus(13) == "Pre-bolus 13 min")

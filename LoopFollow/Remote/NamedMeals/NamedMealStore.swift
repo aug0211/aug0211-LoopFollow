@@ -102,6 +102,7 @@ final class NamedMealStore {
         // Editing is only offered with Nightscout write access; nothing is kept on the device alone.
         guard canWrite, var occurrence = occurrence(id: occurrenceID) else { return }
 
+        let previousMealID = occurrence.mealID
         var meal: NamedMeal?
         if let existingMealID {
             meal = meals.first { $0.id == existingMealID }
@@ -121,6 +122,108 @@ final class NamedMealStore {
         replace(occurrence)
 
         Task { await self.upload(occurrence: occurrence, meal: meal) }
+
+        // Renaming a meal right after saving it (a typo, the wrong meal) would leave
+        // the first name behind unused. Remove it if it's new and nothing else uses it.
+        if let previousMealID, previousMealID != occurrence.mealID,
+           let previous = meals.first(where: { $0.id == previousMealID }),
+           previous.createdAt > Date().addingTimeInterval(-24 * 3600),
+           !occurrences.contains(where: { $0.mealID == previousMealID })
+        {
+            delete(mealID: previousMealID)
+        }
+    }
+
+    // MARK: - Managing saved meals
+
+    /// Times eaten under each saved meal, from the meals on this device.
+    func useCount(ofMeal mealID: String) -> Int {
+        occurrences.filter { $0.mealID == mealID }.count
+    }
+
+    /// Other saved meals with the same items, in any order or case, such as
+    /// "Bobo, P3, Grapes" and "Bobo, Grapes, P3".
+    func sameItems(as meal: NamedMeal) -> [NamedMeal] {
+        let key = NamedMealFormat.itemsKey(meal.name)
+        return meals.filter { $0.id != meal.id && NamedMealFormat.itemsKey($0.name) == key }
+    }
+
+    /// Renames a saved meal, and every meal eaten under it, for everyone.
+    func rename(mealID: String, to newName: String) {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canWrite, !name.isEmpty, var meal = meals.first(where: { $0.id == mealID }), meal.name != name else { return }
+        meal.name = name
+        replace(meal)
+        let changed = relabel(fromMeal: mealID, to: meal)
+        let saved = meal
+        Task {
+            do {
+                if saved.nightscoutID == nil {
+                    var uploaded = saved
+                    uploaded.nightscoutID = try await self.createFood(saved)
+                    let result = uploaded
+                    await MainActor.run { self.replace(result) }
+                } else {
+                    try await self.updateFood(saved)
+                }
+            } catch {
+                LogManager.shared.log(category: .nightscout, message: "Saved meal rename failed: \(error.localizedDescription)")
+            }
+            await self.saveNotes(changed)
+        }
+    }
+
+    /// Moves every meal eaten under `source` to `target` and removes `source`, for
+    /// everyone. Each eaten meal keeps its own carbs, fat and protein.
+    func merge(mealID source: String, into target: String) {
+        guard canWrite, source != target,
+              let targetMeal = meals.first(where: { $0.id == target }),
+              let sourceMeal = meals.first(where: { $0.id == source })
+        else { return }
+        let changed = relabel(fromMeal: source, to: targetMeal)
+        meals = meals.filter { $0.id != source }
+        Task {
+            await self.saveNotes(changed)
+            await self.deleteFood(sourceMeal)
+        }
+    }
+
+    /// Removes a saved meal nothing was eaten under, for everyone.
+    func delete(mealID: String) {
+        guard canWrite, useCount(ofMeal: mealID) == 0, let meal = meals.first(where: { $0.id == mealID }) else { return }
+        meals = meals.filter { $0.id != mealID }
+        Task { await self.deleteFood(meal) }
+    }
+
+    /// Points every meal eaten under `mealID` at `meal`; returns the changed ones.
+    private func relabel(fromMeal mealID: String, to meal: NamedMeal) -> [MealOccurrence] {
+        var all = occurrences
+        var changed: [MealOccurrence] = []
+        for index in all.indices where all[index].mealID == mealID {
+            all[index].mealID = meal.id
+            all[index].mealName = meal.name
+            changed.append(all[index])
+        }
+        if !changed.isEmpty { occurrences = all }
+        return changed
+    }
+
+    private func saveNotes(_ changed: [MealOccurrence]) async {
+        for occurrence in changed {
+            do {
+                let nightscoutID = try await saveNote(occurrence)
+                if occurrence.nightscoutID == nil, let nightscoutID {
+                    await MainActor.run {
+                        if var current = self.occurrence(id: occurrence.id) {
+                            current.nightscoutID = nightscoutID
+                            self.replace(current)
+                        }
+                    }
+                }
+            } catch {
+                LogManager.shared.log(category: .nightscout, message: "Meal note update failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Reuses a saved meal with the same name and macros instead of making a duplicate.
@@ -213,6 +316,35 @@ final class NamedMealStore {
         return Self.createdID(from: data)
     }
 
+    private func updateFood(_ meal: NamedMeal) async throws {
+        guard let nightscoutID = meal.nightscoutID else { return }
+        let body: [String: Any] = [
+            "_id": nightscoutID,
+            "type": "food",
+            "category": "LoopFollow",
+            "subcategory": "",
+            "name": meal.name,
+            "portion": 1,
+            "unit": "serving",
+            "carbs": meal.carbs,
+            "fat": meal.fat,
+            "protein": meal.protein,
+            "energy": 0,
+            "gi": 2,
+            "lfMealId": meal.id,
+        ]
+        _ = try await send(method: "PUT", path: "/api/v1/food", body: body)
+    }
+
+    private func deleteFood(_ meal: NamedMeal) async {
+        guard let nightscoutID = meal.nightscoutID else { return }
+        do {
+            _ = try await send(method: "DELETE", path: "/api/v1/food/\(nightscoutID)", body: nil)
+        } catch {
+            LogManager.shared.log(category: .nightscout, message: "Saved meal delete failed: \(error.localizedDescription)")
+        }
+    }
+
     /// Creates the meal's note, or updates it when it was uploaded before.
     private func saveNote(_ occurrence: MealOccurrence) async throws -> String? {
         var body: [String: Any] = [
@@ -267,6 +399,10 @@ final class NamedMealStore {
 
     private func merge(foods: [[String: Any]]) {
         var all = meals
+        // A meal uploaded before but no longer in Nightscout was renamed away,
+        // merged or deleted on another device.
+        let remoteIDs = Set(foods.compactMap { $0["lfMealId"] as? String })
+        all.removeAll { $0.nightscoutID != nil && !remoteIDs.contains($0.id) }
         for food in foods {
             guard let id = food["lfMealId"] as? String, !id.isEmpty,
                   let name = food["name"] as? String
@@ -282,12 +418,25 @@ final class NamedMealStore {
                     carbs: Self.int(food["carbs"]),
                     fat: Self.int(food["fat"]),
                     protein: Self.int(food["protein"]),
-                    createdAt: Date(),
+                    createdAt: (food["created_at"] as? String).flatMap(NightscoutUtils.parseDate) ?? .distantPast,
                     nightscoutID: nightscoutID
                 ))
             }
         }
         if all != meals { meals = all }
+
+        // Keep the name on meals eaten under a renamed meal, including ones older
+        // than the notes synced from Nightscout.
+        let names = Dictionary(all.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        var eaten = occurrences
+        var renamed = false
+        for index in eaten.indices {
+            if let mealID = eaten[index].mealID, let name = names[mealID], eaten[index].mealName != name {
+                eaten[index].mealName = name
+                renamed = true
+            }
+        }
+        if renamed { occurrences = eaten }
     }
 
     private func merge(notes: [[String: Any]]) {
@@ -454,7 +603,7 @@ final class NamedMealStore {
         return (try JSONSerialization.jsonObject(with: data) as? [[String: Any]]) ?? []
     }
 
-    private func send(method: String, path: String, body: Any) async throws -> Data {
+    private func send(method: String, path: String, body: Any?) async throws -> Data {
         let jwt = try await NightscoutUtils.retrieveJWTToken()
         guard let url = URL(string: Storage.shared.url.value + path) else { throw NightscoutUtils.NightscoutError.invalidURL }
 
@@ -462,7 +611,7 @@ final class NamedMealStore {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        if let body { request.httpBody = try JSONSerialization.data(withJSONObject: body) }
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let status = (response as? HTTPURLResponse)?.statusCode, (200 ..< 300).contains(status) else {

@@ -107,6 +107,8 @@ struct TreatmentsView: View {
                 .padding(.top, 1)
                 .padding(.bottom, 1)
 
+                historyCoverageLine
+
                 if let timeZoneNoticeText {
                     HStack(spacing: 6) {
                         Image(systemName: "globe")
@@ -133,13 +135,12 @@ struct TreatmentsView: View {
                             Text("No loaded meals match “\(mealNameFilter.trimmingCharacters(in: .whitespaces))”.")
                                 .foregroundColor(.secondary)
                                 .padding()
-                            Button("Load older treatments") { viewModel.loadMoreIfNeeded() }
-                                .disabled(viewModel.isLoadingMore)
                         } else {
-                            Text("No recent treatments")
+                            Text("No treatments in the loaded history")
                                 .foregroundColor(.secondary)
                                 .padding()
                         }
+                        loadMoreSection
                     } else {
                         ForEach(sortedDayKeys, id: \.self) { dayKey in
                             Section {
@@ -170,34 +171,7 @@ struct TreatmentsView: View {
                             }
                         }
 
-                        Section {
-                            if viewModel.isLoadingMore {
-                                HStack {
-                                    Spacer()
-                                    ProgressView()
-                                        .padding()
-                                    Spacer()
-                                }
-                            } else {
-                                Button(action: {
-                                    viewModel.loadMoreIfNeeded()
-                                }) {
-                                    HStack {
-                                        Spacer()
-                                        VStack {
-                                            Text("Load More")
-                                                .font(.headline)
-                                                .foregroundColor(.blue)
-                                            Text("Tap to load older treatments")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 8)
-                                }
-                            }
-                        }
+                        loadMoreSection
                     }
                 }
                 .listStyle(.plain)
@@ -242,6 +216,83 @@ struct TreatmentsView: View {
     }
 
     // Filtered grouped treatments based on selectedFilter
+    /// "Showing since Tue Nov 3, 8:15 PM (7 days)", or the load in progress.
+    @ViewBuilder
+    private var historyCoverageLine: some View {
+        if let since = viewModel.loadedSince {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                Text(coverageText(since: since))
+                Spacer(minLength: 0)
+                if viewModel.loadingBackTo != nil {
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+        }
+    }
+
+    private func coverageText(since: Date) -> String {
+        let days = max(1, Int((Date().timeIntervalSince(since) / 86400).rounded()))
+        let span = days == 1 ? "1 day" : "\(days) days"
+        var text = "Showing since \(TreatmentsViewModel.rangeFormatter.string(from: since)) (\(span))"
+        if let target = viewModel.loadingBackTo {
+            text += " · loading back to \(TreatmentsViewModel.dayFormatter.string(from: target))…"
+        }
+        return text
+    }
+
+    /// "Load 1 more month (back to Oct 4)", a progress row while loading, and any error.
+    @ViewBuilder
+    private var loadMoreSection: some View {
+        Section {
+            if viewModel.isLoadingMore, let target = viewModel.loadingBackTo {
+                HStack(spacing: 10) {
+                    Spacer()
+                    ProgressView()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Loading back to \(TreatmentsViewModel.dayFormatter.string(from: target))…")
+                            .font(.subheadline)
+                        if let since = viewModel.loadedSince {
+                            Text("Loaded to \(TreatmentsViewModel.rangeFormatter.string(from: since))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            } else if let since = viewModel.loadedSince {
+                Button(action: {
+                    viewModel.loadMoreIfNeeded()
+                }) {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 2) {
+                            Text("Load 1 more month")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                            Text("Back to \(TreatmentsViewModel.dayFormatter.string(from: since.addingTimeInterval(-TreatmentsViewModel.moreSpan))) · showing since \(TreatmentsViewModel.dayFormatter.string(from: since))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+            if let error = viewModel.loadError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+        }
+    }
+
     private var filteredGroupedTreatments: [String: [Treatment]] {
         switch selectedFilter {
         case .all:
@@ -1594,14 +1645,24 @@ class TreatmentsViewModel: ObservableObject {
     private var allTreatments: [Treatment] = []
     private var rootMealsByFPUID: [UUID: Treatment] = [:]
     private var processedNightscoutIds = Set<String>() // Track which NS entries we've already processed
-    private var oldestFetchedDate: Date? // Track the oldest treatment date we've fetched
-    /// The first load covers the last 24 hours (a busy Trio day is a few hundred
-    /// records: SMBs and temp basals every 5 minutes), capped for safety.
-    private let initialWindow: TimeInterval = 24 * 3600
-    private let initialLimit = 1000
-    /// Each Load More fetches this many Nightscout records.
-    private let pageSize = 300
+    /// Start of the history loaded so far; everything from here to now is loaded.
+    @Published var loadedSince: Date?
+    /// How far back the load in progress will reach.
+    @Published var loadingBackTo: Date?
+    /// Set when a chunk failed to load; Load More retries from where it stopped.
+    @Published var loadError: String?
+
+    /// The first load covers a week; each Load More adds a month.
+    static let initialSpan: TimeInterval = 7 * 24 * 3600
+    static let moreSpan: TimeInterval = 30 * 24 * 3600
+    /// Loaded in 3-day requests (a busy Trio day is several hundred records: SMBs
+    /// and temp basals every 5 minutes), so the list fills in as it goes and no
+    /// single request is huge. A request that hits the cap continues from its oldest record.
+    private let chunkSpan: TimeInterval = 3 * 24 * 3600
+    private let chunkLimit = 3000
     private var isFetching = false
+    /// Bumped on refresh so a load still running from before is dropped.
+    private var loadGeneration = 0
 
     func loadInitialTreatments() {
         guard !isInitialLoading, !isFetching else {
@@ -1609,34 +1670,16 @@ class TreatmentsViewModel: ObservableObject {
         }
 
         isInitialLoading = true
-        isFetching = true
         allTreatments.removeAll()
         processedNightscoutIds.removeAll()
-        oldestFetchedDate = nil
         hasMoreData = true
         hasSMBEntries = false
         hasAutomaticEntries = false
+        loadError = nil
 
-        // Start with the last 24 hours, then Load More goes further back.
         let now = Date()
-        fetchTreatments(endDate: now, startDate: now.addingTimeInterval(-initialWindow), limit: initialLimit) { [weak self] treatments, _ in
-            guard let self = self else { return }
-
-            DispatchQueue.main.async {
-                self.allTreatments = treatments
-                self.regroupTreatments()
-
-                // Load More continues from the oldest treatment, or from the start
-                // of the 24 hours when there were none.
-                self.oldestFetchedDate = treatments.last.map { Date(timeIntervalSince1970: $0.date) }
-                    ?? now.addingTimeInterval(-self.initialWindow)
-
-                // Older treatments may exist before the first 24 hours.
-                self.hasMoreData = true
-                self.isInitialLoading = false
-                self.isFetching = false
-            }
-        }
+        loadedSince = nil
+        loadRange(backTo: now.addingTimeInterval(-Self.initialSpan), from: now)
     }
 
     /// The root meal for an FPU child, when it is loaded.
@@ -1645,46 +1688,82 @@ class TreatmentsViewModel: ObservableObject {
     }
 
     func refreshTreatments() {
-        allTreatments.removeAll()
-        processedNightscoutIds.removeAll()
-        oldestFetchedDate = nil
-        hasMoreData = true
+        loadGeneration += 1
         isFetching = false
+        isInitialLoading = false
+        isLoadingMore = false
         loadInitialTreatments()
     }
 
+    /// Loads one more month before what's loaded.
     func loadMoreIfNeeded() {
-        guard !isLoadingMore, !isFetching, hasMoreData, let oldestDate = oldestFetchedDate else {
+        guard !isLoadingMore, !isFetching, let since = loadedSince else {
             return
         }
+        loadError = nil
+        loadRange(backTo: since.addingTimeInterval(-Self.moreSpan), from: since)
+    }
 
-        isLoadingMore = true
+    /// Fetches from `from` back to `target` in chunks, newest first, adding each
+    /// chunk to the list as it arrives.
+    private func loadRange(backTo target: Date, from cursor: Date) {
         isFetching = true
+        if !isInitialLoading { isLoadingMore = true }
+        loadingBackTo = target
+        let generation = loadGeneration
+        let chunkStart = max(target, cursor.addingTimeInterval(-chunkSpan))
 
-        // Fetch treatments older than the oldest we have
-        fetchTreatments(endDate: oldestDate, limit: pageSize) { [weak self] treatments, rawCount in
-            guard let self = self else { return }
-
+        fetchTreatments(endDate: cursor, startDate: chunkStart, limit: chunkLimit) { [weak self] treatments, rawCount, rawOldest, failed in
             DispatchQueue.main.async {
+                guard let self, generation == self.loadGeneration else { return }
+                if failed {
+                    self.loadError = "Couldn't load treatments before \(Self.rangeFormatter.string(from: cursor)). Tap Load More or pull to refresh to try again."
+                    self.finishLoading()
+                    return
+                }
                 self.allTreatments.append(contentsOf: treatments)
                 self.regroupTreatments()
 
-                // Update oldest date from the last (oldest) treatment in the new batch
-                if let oldest = treatments.last {
-                    self.oldestFetchedDate = Date(timeIntervalSince1970: oldest.date)
+                // A full chunk may have more records older than its oldest one.
+                var next = chunkStart
+                if rawCount >= self.chunkLimit, let rawOldest, rawOldest < cursor, rawOldest > chunkStart {
+                    next = rawOldest
                 }
+                self.loadedSince = next
+                self.isInitialLoading = false
 
-                // Has more data if we got a full page from Nightscout
-                self.hasMoreData = rawCount >= self.pageSize
-                self.isLoadingMore = false
-                self.isFetching = false
+                if next > target {
+                    self.loadRange(backTo: target, from: next)
+                } else {
+                    self.finishLoading()
+                }
             }
         }
     }
 
-    private func fetchTreatments(endDate: Date, startDate: Date? = nil, limit: Int, completion: @escaping ([Treatment], Int) -> Void) {
+    private func finishLoading() {
+        isFetching = false
+        isInitialLoading = false
+        isLoadingMore = false
+        loadingBackTo = nil
+    }
+
+    static let rangeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE MMM d, h:mm a")
+        return formatter
+    }()
+
+    static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMM d")
+        return formatter
+    }()
+
+    /// Completion: parsed treatments, raw record count, the oldest raw record's date, and whether the request failed.
+    private func fetchTreatments(endDate: Date, startDate: Date? = nil, limit: Int, completion: @escaping ([Treatment], Int, Date?, Bool) -> Void) {
         guard IsNightscoutEnabled() else {
-            completion([], 0)
+            completion([], 0, nil, false)
             return
         }
 
@@ -1692,7 +1771,7 @@ class TreatmentsViewModel: ObservableObject {
         let token = Storage.shared.token.value
 
         guard !baseURL.isEmpty else {
-            completion([], 0)
+            completion([], 0, nil, false)
             return
         }
 
@@ -1721,7 +1800,7 @@ class TreatmentsViewModel: ObservableObject {
             endpoint: "/api/v1/treatments.json",
             parameters: parameters
         ) else {
-            completion([], 0)
+            completion([], 0, nil, true)
             return
         }
 
@@ -1734,18 +1813,18 @@ class TreatmentsViewModel: ObservableObject {
 
             if let error = error {
                 LogManager.shared.log(category: .nightscout, message: "Failed to fetch treatments: \(error.localizedDescription)")
-                completion([], 0)
+                completion([], 0, nil, true)
                 return
             }
 
             guard let data = data else {
-                completion([], 0)
+                completion([], 0, nil, true)
                 return
             }
 
             do {
                 guard let entries = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: AnyObject]] else {
-                    completion([], 0)
+                    completion([], 0, nil, true)
                     return
                 }
 
@@ -1762,11 +1841,12 @@ class TreatmentsViewModel: ObservableObject {
                     }
                 }
 
-                completion(result.treatments, rawCount)
+                let rawOldest = entries.compactMap { ($0["created_at"] as? String).flatMap(NightscoutUtils.parseDate) }.min()
+                completion(result.treatments, rawCount, rawOldest, false)
 
             } catch {
                 LogManager.shared.log(category: .nightscout, message: "Failed to parse treatments: \(error.localizedDescription)")
-                completion([], 0)
+                completion([], 0, nil, true)
             }
         }
 
