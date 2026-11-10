@@ -107,6 +107,23 @@ enum NamedMealMatcher {
         }
     }
 
+    /// Whether giving an entry a new name should rename its saved meal in place
+    /// (keeping the meal's ID) rather than move the entry to another saved meal: only
+    /// when that saved meal is this entry's alone, and no saved meal already has the
+    /// new name (then the entry joins that one).
+    static func renamesInPlace(
+        _ meal: NamedMeal,
+        to newName: String,
+        for occurrence: MealOccurrence,
+        meals: [NamedMeal],
+        occurrences: [MealOccurrence]
+    ) -> Bool {
+        let key = NamedMealFormat.nameKey(newName)
+        guard !key.isEmpty, occurrence.mealID == meal.id, NamedMealFormat.nameKey(meal.name) != key else { return false }
+        guard !meals.contains(where: { NamedMealFormat.nameKey($0.name) == key }) else { return false }
+        return !occurrences.contains { $0.mealID == meal.id && $0.id != occurrence.id }
+    }
+
     private static func distance(_ meal: NamedMeal, carbs: Int, fat: Int, protein: Int) -> Int {
         abs(meal.carbs - carbs) + abs(meal.fat - fat) + abs(meal.protein - protein)
     }

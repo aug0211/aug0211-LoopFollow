@@ -104,10 +104,24 @@ final class NamedMealStore {
 
         let previousMealID = occurrence.mealID
         var meal: NamedMeal?
+        /// Set when the entry's own saved meal is renamed in place (same ID).
+        var renamed: (before: NamedMeal, after: NamedMeal)?
         if let existingMealID {
             meal = meals.first { $0.id == existingMealID }
         } else if let newName, !NamedMealFormat.nameKey(newName).isEmpty {
-            meal = findOrCreateMeal(name: newName, for: occurrence)
+            if let previous = meals.first(where: { $0.id == previousMealID }),
+               NamedMealMatcher.renamesInPlace(previous, to: newName, for: occurrence, meals: meals, occurrences: occurrences)
+            {
+                // The saved meal is only this entry's, so its name was wrong: keep its
+                // ID and rename it rather than leave the old name behind.
+                var updated = previous
+                updated.name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                replace(updated)
+                meal = updated
+                renamed = (previous, updated)
+            } else {
+                meal = findOrCreateMeal(name: newName, for: occurrence)
+            }
         }
 
         if let meal {
@@ -121,16 +135,73 @@ final class NamedMealStore {
         occurrence.prebolusMinutes = prebolusMinutes
         replace(occurrence)
 
-        Task { await self.upload(occurrence: occurrence, meal: meal) }
+        let saved = occurrence
+        Task {
+            if let renamed {
+                await self.finishRename(renamed, occurrence: saved)
+            } else {
+                await self.upload(occurrence: saved, meal: meal)
+            }
+            // Moving the entry to another saved meal can leave its old one unused.
+            if let previousMealID, previousMealID != saved.mealID {
+                await self.removeIfUnused(mealID: previousMealID, besides: saved.id)
+            }
+        }
+    }
 
-        // Renaming a meal right after saving it (a typo, the wrong meal) would leave
-        // the first name behind unused. Remove it if it's new and nothing else uses it.
-        if let previousMealID, previousMealID != occurrence.mealID,
-           let previous = meals.first(where: { $0.id == previousMealID }),
-           previous.createdAt > Date().addingTimeInterval(-24 * 3600),
-           !occurrences.contains(where: { $0.mealID == previousMealID })
-        {
-            delete(mealID: previousMealID)
+    /// Uploads an in-place rename, unless Nightscout shows the meal was eaten in
+    /// entries this device doesn't have (older than its sync): then the old name is
+    /// put back and this entry gets a saved meal of its own.
+    private func finishRename(_ renamed: (before: NamedMeal, after: NamedMeal), occurrence: MealOccurrence) async {
+        guard await hasOtherNotes(mealID: renamed.after.id, besides: occurrence.id) == false else {
+            let moved: (MealOccurrence, NamedMeal)? = await MainActor.run {
+                self.replace(renamed.before)
+                guard var current = self.occurrence(id: occurrence.id) else { return nil }
+                let own = self.findOrCreateMeal(name: renamed.after.name, for: current)
+                current.mealID = own.id
+                current.mealName = own.name
+                self.replace(current)
+                return (current, own)
+            }
+            if let moved { await upload(occurrence: moved.0, meal: moved.1) }
+            return
+        }
+        do {
+            if renamed.after.nightscoutID == nil {
+                var uploaded = renamed.after
+                uploaded.nightscoutID = try await createFood(renamed.after)
+                let result = uploaded
+                await MainActor.run { self.replace(result) }
+            } else {
+                try await updateFood(renamed.after)
+            }
+        } catch {
+            LogManager.shared.log(category: .nightscout, message: "Saved meal rename failed: \(error.localizedDescription)")
+        }
+        await upload(occurrence: occurrence, meal: nil)
+    }
+
+    /// Deletes a saved meal nothing is eaten under any more, here or in Nightscout.
+    private func removeIfUnused(mealID: String, besides occurrenceID: String) async {
+        let usedHere = await MainActor.run { self.occurrences.contains { $0.mealID == mealID } }
+        guard !usedHere, await hasOtherNotes(mealID: mealID, besides: occurrenceID) == false else { return }
+        await MainActor.run { self.delete(mealID: mealID) }
+    }
+
+    /// Whether Nightscout has meal notes under `mealID` other than `occurrenceID`'s.
+    /// Nil (treated as yes) when it can't be checked, so nothing is renamed or
+    /// deleted on a guess.
+    private func hasOtherNotes(mealID: String, besides occurrenceID: String) async -> Bool? {
+        do {
+            let notes = try await fetchArray(path: "/api/v1/treatments.json", query: [
+                "find[eventType]": "Note",
+                "find[lfMealId]": mealID,
+                "count": "50",
+            ])
+            return notes.contains { ($0["lfOccurrenceId"] as? String) != occurrenceID }
+        } catch {
+            LogManager.shared.log(category: .nightscout, message: "Saved meal check failed: \(error.localizedDescription)")
+            return nil
         }
     }
 

@@ -362,6 +362,29 @@ struct NamedMealTests {
         #expect(suggest("", 58, 0, 0, fatProtein: false).first == bobo.name)
     }
 
+    @Test("A new name renames the entry's saved meal in place only when no other entry uses it")
+    func renameInPlaceRule() {
+        let bobo = meal("Bobo, P3, Grapes, Skinny pop", 80, 14, 20)
+        let yogurt = meal("Yogurt, Granola, Sausage", 18, 11, 27)
+        var lunch = occurrence("lunch", at: Date(), 80, 14, 20)
+        lunch.mealID = bobo.id
+        var breakfast1 = occurrence("b1", at: Date(), 18, 11, 27)
+        breakfast1.mealID = yogurt.id
+        var breakfast2 = occurrence("b2", at: Date(), 18, 11, 27)
+        breakfast2.mealID = yogurt.id
+        let meals = [bobo, yogurt]
+        let all = [lunch, breakfast1, breakfast2]
+
+        // Bobo is only this lunch's: fixing the name keeps the meal's ID.
+        #expect(NamedMealMatcher.renamesInPlace(bobo, to: "Chicken fried rice", for: lunch, meals: meals, occurrences: all))
+        // Yogurt is used by another breakfast too: this entry gets its own meal instead.
+        #expect(!NamedMealMatcher.renamesInPlace(yogurt, to: "Oatmeal", for: breakfast1, meals: meals, occurrences: all))
+        // The new name is already a saved meal: the entry joins that one.
+        #expect(!NamedMealMatcher.renamesInPlace(bobo, to: "yogurt, granola, sausage", for: lunch, meals: meals, occurrences: all))
+        // Same name, nothing to rename.
+        #expect(!NamedMealMatcher.renamesInPlace(bobo, to: "Bobo, P3, Grapes, Skinny pop", for: lunch, meals: meals, occurrences: all))
+    }
+
     @Test("Pre-bolus wording")
     func prebolusWording() {
         #expect(NamedMealFormat.prebolus(13) == "Pre-bolus 13 min")
