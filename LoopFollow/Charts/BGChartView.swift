@@ -14,8 +14,6 @@ private enum BGChartConfig {
     static let minVisibleSeconds: TimeInterval = 15 * 60
     /// Widest pinch-out zoom.
     static let maxVisibleSeconds: TimeInterval = 24 * 3600
-    /// Double-tap cycles the visible window through these presets.
-    static let zoomPresets: [TimeInterval] = [3600, 3 * 3600, 6 * 3600, 12 * 3600, 24 * 3600]
     /// Buttons additionally expose the legacy feature's 2-hour preset.
     static let buttonZoomPresets: [TimeInterval] = [3600, 2 * 3600, 3 * 3600, 6 * 3600, 12 * 3600, 24 * 3600]
     /// Increment used by the magnifying-glass buttons.
@@ -474,16 +472,19 @@ private struct MainBGChart: View {
         .contentShape(Rectangle())
         .simultaneousGesture(panAndInspectGesture(viewportWidth: viewportWidth))
         .simultaneousGesture(magnifyGesture(viewportWidth: viewportWidth))
-        // Double-tap zooms. Single-tap waits for the double-tap window before
-        // selecting a mark or following a pill's link.
+        // Double-tap zooms in and triple-tap zooms out, one step of the
+        // magnifying-glass buttons. A single tap waits for the multi-tap window
+        // before selecting a mark or following a pill's link.
         .simultaneousGesture(
-            SpatialTapGesture(count: 2)
-                .exclusively(before: SpatialTapGesture())
+            SpatialTapGesture(count: 3)
+                .exclusively(before: SpatialTapGesture(count: 2).exclusively(before: SpatialTapGesture()))
                 .onEnded { value in
                     switch value {
                     case .first:
-                        cycleZoomPreset()
-                    case let .second(tap):
+                        tapZoom(by: BGChartConfig.buttonZoomFactor)
+                    case .second(.first):
+                        tapZoom(by: 1 / BGChartConfig.buttonZoomFactor)
+                    case let .second(.second(tap)):
                         handleTap(at: tap.location, viewportWidth: viewportWidth, mainHeight: mainHeight)
                     }
                 }
@@ -914,27 +915,11 @@ private struct MainBGChart: View {
         return UnitPoint(x: pinch.anchorFraction * viewportWidth / canvasWidth, y: 0.5)
     }
 
-    /// Double-tap cycles the zoom presets. Snap, no animation: animating the
-    /// zoom would animate canvasWidth, re-laying the canvas every frame.
-    private func cycleZoomPreset() {
-        let presets = BGChartConfig.zoomPresets
-        let current = interaction.visibleSeconds
-        let next = presets.first(where: { $0 > current + 1 }) ?? presets[0]
-        momentumTask?.cancel()
-        momentumTask = nil
-        tapped = nil
-        let trailing = interaction.scrollPosition.addingTimeInterval(current)
-        interaction.visibleSeconds = next
-        if interaction.followLatest {
-            interaction.scrollPosition = clampedLeadingEdge(
-                model.now.addingTimeInterval(-next * BGChartConfig.followNowFraction)
-            )
-        } else {
-            interaction.scrollPosition = clampedLeadingEdge(trailing.addingTimeInterval(-next))
-        }
-        updateRenderWindow(force: true)
-        interaction.persistZoom()
-        // A double tap is over at once: hide the button and fade it back in.
+    /// Double- and triple-tap zoom: the same step as the magnifying-glass
+    /// buttons, keeping the middle of the view in place.
+    private func tapZoom(by factor: Double) {
+        applyButtonZoom(interaction.visibleSeconds * factor, anchorToNow: false)
+        // A tap zoom is over at once: hide the button and fade it back in.
         showJumpToNow = false
         updateJumpToNowVisibility(interacting: false)
     }
