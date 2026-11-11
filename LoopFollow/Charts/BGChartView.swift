@@ -35,6 +35,8 @@ private enum BGChartConfig {
     /// How far (pt) a one-finger touch may travel and still count as a
     /// stationary press-to-inspect; beyond this the touch becomes a pan.
     static let inspectMovementTolerance: CGFloat = 10
+    /// How long after a tap another tap still counts toward a double- or triple-tap.
+    static let multiTapWindow: TimeInterval = 0.3
     /// How long (s) a one-finger touch must rest before inspect latches.
     static let inspectHoldDelay: TimeInterval = 0.2
     /// How close the visible window's trailing edge must sit to "now" before
@@ -173,6 +175,13 @@ private struct MainBGChart: View {
 
     /// Measured size of the visible selection pill (see PillSizePreferenceKey).
     @State private var pillSize: CGSize = .zero
+
+    /// Taps counted for the multi-tap window: one selects, two zoom in, three
+    /// zoom out. Counted by hand rather than with chained tap gestures, which
+    /// SwiftUI resolves unreliably (a double-tap behind a triple-tap may never fire).
+    @State private var pendingTapCount = 0
+    @State private var pendingTapLocation: CGPoint?
+    @State private var tapResolveWork: DispatchWorkItem?
 
     /// Override bands are drawn this tall, growing with the text size.
     @ScaledMetric(relativeTo: .caption2) private var overrideBandMinHeight: CGFloat = 22
@@ -473,20 +482,12 @@ private struct MainBGChart: View {
         .simultaneousGesture(panAndInspectGesture(viewportWidth: viewportWidth))
         .simultaneousGesture(magnifyGesture(viewportWidth: viewportWidth))
         // Double-tap zooms in and triple-tap zooms out, one step of the
-        // magnifying-glass buttons. A single tap waits for the multi-tap window
-        // before selecting a mark or following a pill's link.
+        // magnifying-glass buttons; a single tap selects a mark or follows a
+        // pill's link. See registerTap.
         .simultaneousGesture(
-            SpatialTapGesture(count: 3)
-                .exclusively(before: SpatialTapGesture(count: 2).exclusively(before: SpatialTapGesture()))
-                .onEnded { value in
-                    switch value {
-                    case .first:
-                        tapZoom(by: BGChartConfig.buttonZoomFactor)
-                    case .second(.first):
-                        tapZoom(by: 1 / BGChartConfig.buttonZoomFactor)
-                    case let .second(.second(tap)):
-                        handleTap(at: tap.location, viewportWidth: viewportWidth, mainHeight: mainHeight)
-                    }
+            SpatialTapGesture()
+                .onEnded { tap in
+                    registerTap(at: tap.location, viewportWidth: viewportWidth, mainHeight: mainHeight)
                 }
         )
         .onPreferenceChange(PlotFramePreferenceKey.self) { plotFrame = $0 }
@@ -913,6 +914,36 @@ private struct MainBGChart: View {
     private func pinchScaleAnchor(viewportWidth: CGFloat, canvasWidth: CGFloat) -> UnitPoint {
         guard let pinch = pinchAnchor, canvasWidth > 0 else { return .center }
         return UnitPoint(x: pinch.anchorFraction * viewportWidth / canvasWidth, y: 0.5)
+    }
+
+    /// Counts taps within the multi-tap window. A third tap zooms out at once;
+    /// otherwise, once the window passes with no further tap, two taps zoom in
+    /// and one selects what's under the first tap.
+    private func registerTap(at location: CGPoint, viewportWidth: CGFloat, mainHeight: CGFloat) {
+        tapResolveWork?.cancel()
+        pendingTapCount += 1
+        if pendingTapLocation == nil { pendingTapLocation = location }
+
+        if pendingTapCount >= 3 {
+            pendingTapCount = 0
+            pendingTapLocation = nil
+            tapZoom(by: BGChartConfig.buttonZoomFactor)
+            return
+        }
+
+        let work = DispatchWorkItem {
+            let count = pendingTapCount
+            let first = pendingTapLocation
+            pendingTapCount = 0
+            pendingTapLocation = nil
+            if count == 2 {
+                tapZoom(by: 1 / BGChartConfig.buttonZoomFactor)
+            } else if let first {
+                handleTap(at: first, viewportWidth: viewportWidth, mainHeight: mainHeight)
+            }
+        }
+        tapResolveWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + BGChartConfig.multiTapWindow, execute: work)
     }
 
     /// Double- and triple-tap zoom: the same step as the magnifying-glass
