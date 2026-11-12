@@ -106,6 +106,11 @@ struct AnalyticsReport {
     let highLine: Double
     /// How settings were changed over the period, and how BG went with them.
     var settings: AnalyticsSettingsHistory?
+
+    /// Findings that are patterns (60%+ of 5 or more), strongest first.
+    var patterns: [AnalyticsFinding] { findings.filter { !$0.isWatching } }
+    /// Findings below that bar but common enough to keep an eye on.
+    var watching: [AnalyticsFinding] { findings.filter(\.isWatching) }
 }
 
 struct AnalyticsFinding: Identifiable {
@@ -145,6 +150,10 @@ struct AnalyticsFinding: Identifiable {
     var groups: [AnalyticsGroupBar] = []
 
     var share: Double { total > 0 ? Double(count) / Double(total) : 0 }
+
+    /// Not a pattern yet (under 60%, or fewer than 5), but common enough to list
+    /// under "Worth watching". Findings without a count are never this.
+    var isWatching: Bool { total > 0 && !AnalyticsEngine.isPattern(count, of: total) }
 
     /// "Strong" for three quarters or more of plenty of instances; findings start at 60%.
     var strength: String {

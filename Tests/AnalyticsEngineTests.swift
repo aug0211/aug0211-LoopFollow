@@ -123,6 +123,11 @@ struct AnalyticsEngineTests {
         #expect(!AnalyticsEngine.isPattern(4, of: 8)) // half isn't a pattern
         #expect(!AnalyticsEngine.isPattern(4, of: 5)) // too few
         #expect(!AnalyticsEngine.isPattern(14, of: 31))
+        // Below that, 40%+ of at least 4 is listed as worth watching.
+        #expect(AnalyticsEngine.isWorthShowing(4, of: 8))
+        #expect(AnalyticsEngine.isWorthShowing(14, of: 31))
+        #expect(!AnalyticsEngine.isWorthShowing(3, of: 8))
+        #expect(!AnalyticsEngine.isWorthShowing(3, of: 5))
     }
 
     @Test("A factor is reported only with 3+ in each group and a clear gap")

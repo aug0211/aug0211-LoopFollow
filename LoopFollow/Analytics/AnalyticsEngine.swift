@@ -22,6 +22,16 @@ enum AnalyticsEngine {
     static func isPattern(_ count: Int, of total: Int) -> Bool {
         total > 0 && count >= patternMinimumCount && Double(count) / Double(total) >= patternShare
     }
+
+    /// Below a pattern but common enough to list under "Worth watching".
+    static let watchShare = 0.4
+    static let watchMinimumCount = 4
+
+    /// A pattern, or at least worth watching.
+    static func isWorthShowing(_ count: Int, of total: Int) -> Bool {
+        isPattern(count, of: total)
+            || (total > 0 && count >= watchMinimumCount && Double(count) / Double(total) >= watchShare)
+    }
     static let factorMinimumGroup = 3
     static let factorMinimumGap = 0.25
     static let newLowAfterRecoveryTo = 80
@@ -163,7 +173,8 @@ enum AnalyticsEngine {
                 }.sorted(by: instanceOrder)
             }
 
-            if isPattern(lowHighs, of: rows.count) {
+            // A rebound pattern, unless new lows alone are the stronger finding.
+            if isWorthShowing(lowHighs, of: rows.count), isPattern(lowHighs, of: rows.count) || !isPattern(lows, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "lowhigh-" + name, kind: .overrideLowThenHigh, severity: .warning,
                     title: "\(name): low, then rebound high",
@@ -173,7 +184,7 @@ enum AnalyticsEngine {
                     considerations: ["A slow-acting carb at the start, to cover the low without a spike", "A smaller fast-carb treatment for the low"],
                     instances: instances(\.lowThenHigh)
                 ))
-            } else if isPattern(lows, of: rows.count) {
+            } else if isWorthShowing(lows, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "lows-" + name, kind: .overrideLows, severity: .warning,
                     title: "\(name): new lows",
@@ -184,7 +195,7 @@ enum AnalyticsEngine {
                     instances: instances { $0.newLow != nil }
                 ))
             }
-            if isPattern(highs, of: rows.count) {
+            if isWorthShowing(highs, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "highs-" + name, kind: .overrideHighs, severity: .watch,
                     title: "\(name): BG went high",
@@ -217,7 +228,7 @@ enum AnalyticsEngine {
         }
         guard rows.count >= 6 else { return [] }
         let rebounds = rows.filter(\.rebound).count
-        guard isPattern(rebounds, of: rows.count) else { return [] }
+        guard isWorthShowing(rebounds, of: rows.count) else { return [] }
         let medianGrams = medianDouble(rows.map(\.grams)) ?? 0
         return [AnalyticsFinding(
             id: "treated-lows", kind: .treatedLowRebound, severity: .watch,
@@ -324,7 +335,7 @@ enum AnalyticsEngine {
             }
 
             let lows = rows.filter(\.low).count
-            if isPattern(lows, of: rows.count) {
+            if isWorthShowing(lows, of: rows.count) {
                 let early = rows.filter { $0.low && $0.earlyLow }.count
                 findings.append(AnalyticsFinding(
                     id: "meal-lows-" + window.label, kind: .mealLows, severity: .warning,
@@ -341,7 +352,7 @@ enum AnalyticsEngine {
                 ))
             }
             let highs = rows.filter(\.high).count
-            if isPattern(highs, of: rows.count) {
+            if isWorthShowing(highs, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "meal-highs-" + window.label, kind: .mealHighs, severity: .watch,
                     title: "Highs after \(window.label)",
@@ -405,7 +416,7 @@ enum AnalyticsEngine {
         }
         var findings: [AnalyticsFinding] = []
 
-        if nights >= 7, isPattern(lowNights.count, of: nights) {
+        if nights >= 7, isWorthShowing(lowNights.count, of: nights) {
             var hourCounts: [Int: Int] = [:]
             for item in lowNights { hourCounts[c.hour(of: item.low.start), default: 0] += 1 }
             let commonHour = hourCounts.max { $0.value < $1.value }?.key ?? 0

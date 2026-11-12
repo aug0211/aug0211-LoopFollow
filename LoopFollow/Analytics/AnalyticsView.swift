@@ -69,21 +69,39 @@ struct AnalyticsView: View {
 
     @ViewBuilder
     private func content(_ report: AnalyticsReport) -> some View {
-        if report.findings.isEmpty {
+        if report.patterns.isEmpty {
             AnalyticsMessageCard(
                 symbol: "checkmark.seal.fill", tint: .green, title: "Nothing stood out",
-                message: "No pattern came up often enough to flag in this period. The sections below still show how things went."
+                message: "Nothing happened in most instances (60% or more of at least 5) in this period. The sections below still show how things went."
             )
         } else {
-            AnalyticsSectionHeader(title: "Worth a look", subtitle: "\(report.findings.count) pattern\(report.findings.count == 1 ? "" : "s"), strongest first")
+            AnalyticsSectionHeader(title: "Worth a look", subtitle: "\(report.patterns.count) pattern\(report.patterns.count == 1 ? "" : "s"), each in 60% or more of at least 5 times")
             VStack(spacing: 12) {
-                ForEach(report.findings) { finding in
+                ForEach(report.patterns) { finding in
                     NavigationLink(destination: AnalyticsFindingDetailView(finding: finding, report: report)) {
                         AnalyticsFindingCard(finding: finding, report: report)
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal)
+        }
+
+        if !report.watching.isEmpty {
+            AnalyticsSectionHeader(title: "Worth watching", subtitle: "Happened in 40–60% of times: not a pattern yet")
+            VStack(spacing: 0) {
+                ForEach(report.watching) { finding in
+                    NavigationLink(destination: AnalyticsFindingDetailView(finding: finding, report: report)) {
+                        AnalyticsWatchRow(finding: finding)
+                    }
+                    .buttonStyle(.plain)
+                    if finding.id != report.watching.last?.id {
+                        Divider().padding(.leading, 52)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(.secondarySystemGroupedBackground)))
             .padding(.horizontal)
         }
 
@@ -146,11 +164,11 @@ private struct AnalyticsHero: View {
 
             if let report {
                 HStack(alignment: .lastTextBaseline, spacing: 6) {
-                    Text("\(report.findings.count)")
+                    Text("\(report.patterns.count)")
                         .font(.system(size: 54, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
                         .contentTransition(.numericText())
-                    Text(report.findings.count == 1 ? "pattern worth a look" : "patterns worth a look")
+                    Text(report.patterns.count == 1 ? "pattern worth a look" : "patterns worth a look")
                         .font(.headline)
                         .foregroundColor(.white.opacity(0.9))
                 }
@@ -230,6 +248,7 @@ private extension AnalyticsFinding {
     }
 
     var severityText: String {
+        if isWatching { return "Worth watching" }
         switch severity {
         case .warning: return "Look at this"
         case .watch: return "Keep an eye on"
@@ -323,6 +342,42 @@ private struct AnalyticsFindingCard: View {
                     .frame(height: 64)
             }
         }
+    }
+}
+
+/// A compact row for a finding that's worth watching: icon, title, how often.
+private struct AnalyticsWatchRow: View {
+    let finding: AnalyticsFinding
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(finding.tint.opacity(0.12))
+                Image(systemName: finding.symbol)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(finding.tint.opacity(0.8))
+            }
+            .frame(width: 30, height: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(finding.title)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                Text("\(finding.count) of \(finding.total) times")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer(minLength: 0)
+            Text(AnalyticsEngine.percent(finding.share))
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundColor(.secondary)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(.secondary.opacity(0.6))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 }
 
