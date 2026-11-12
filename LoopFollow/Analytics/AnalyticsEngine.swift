@@ -13,6 +13,15 @@ import Foundation
 enum AnalyticsEngine {
     // Thresholds, checked against real history before shipping.
     static let minimumInstances = 4
+    /// A finding needs the pattern in more instances than not, clearly: at least
+    /// this share of them, and at least `patternMinimumCount`.
+    static let patternShare = 0.6
+    static let patternMinimumCount = 5
+
+    /// Whether `count` of `total` is a pattern worth flagging.
+    static func isPattern(_ count: Int, of total: Int) -> Bool {
+        total > 0 && count >= patternMinimumCount && Double(count) / Double(total) >= patternShare
+    }
     static let factorMinimumGroup = 3
     static let factorMinimumGap = 0.25
     static let newLowAfterRecoveryTo = 80
@@ -154,7 +163,7 @@ enum AnalyticsEngine {
                 }.sorted(by: instanceOrder)
             }
 
-            if lowHighs >= 3, Double(lowHighs) / Double(rows.count) >= 0.3 {
+            if isPattern(lowHighs, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "lowhigh-" + name, kind: .overrideLowThenHigh, severity: .warning,
                     title: "\(name): low, then rebound high",
@@ -164,7 +173,7 @@ enum AnalyticsEngine {
                     considerations: ["A slow-acting carb at the start, to cover the low without a spike", "A smaller fast-carb treatment for the low"],
                     instances: instances(\.lowThenHigh)
                 ))
-            } else if lows >= 3, Double(lows) / Double(rows.count) >= 0.4 {
+            } else if isPattern(lows, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "lows-" + name, kind: .overrideLows, severity: .warning,
                     title: "\(name): new lows",
@@ -175,7 +184,7 @@ enum AnalyticsEngine {
                     instances: instances { $0.newLow != nil }
                 ))
             }
-            if highs >= 3, Double(highs) / Double(rows.count) >= 0.4 {
+            if isPattern(highs, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "highs-" + name, kind: .overrideHighs, severity: .watch,
                     title: "\(name): BG went high",
@@ -208,7 +217,7 @@ enum AnalyticsEngine {
         }
         guard rows.count >= 6 else { return [] }
         let rebounds = rows.filter(\.rebound).count
-        guard rebounds >= 4, Double(rebounds) / Double(rows.count) >= 0.3 else { return [] }
+        guard isPattern(rebounds, of: rows.count) else { return [] }
         let medianGrams = medianDouble(rows.map(\.grams)) ?? 0
         return [AnalyticsFinding(
             id: "treated-lows", kind: .treatedLowRebound, severity: .watch,
@@ -315,7 +324,7 @@ enum AnalyticsEngine {
             }
 
             let lows = rows.filter(\.low).count
-            if lows >= 3, Double(lows) / Double(rows.count) >= 0.3 {
+            if isPattern(lows, of: rows.count) {
                 let early = rows.filter { $0.low && $0.earlyLow }.count
                 findings.append(AnalyticsFinding(
                     id: "meal-lows-" + window.label, kind: .mealLows, severity: .warning,
@@ -332,7 +341,7 @@ enum AnalyticsEngine {
                 ))
             }
             let highs = rows.filter(\.high).count
-            if highs >= 3, Double(highs) / Double(rows.count) >= 0.4 {
+            if isPattern(highs, of: rows.count) {
                 findings.append(AnalyticsFinding(
                     id: "meal-highs-" + window.label, kind: .mealHighs, severity: .watch,
                     title: "Highs after \(window.label)",
@@ -396,7 +405,7 @@ enum AnalyticsEngine {
         }
         var findings: [AnalyticsFinding] = []
 
-        if nights >= 7, lowNights.count >= 3, Double(lowNights.count) / Double(nights) >= 0.25 {
+        if nights >= 7, isPattern(lowNights.count, of: nights) {
             var hourCounts: [Int: Int] = [:]
             for item in lowNights { hourCounts[c.hour(of: item.low.start), default: 0] += 1 }
             let commonHour = hourCounts.max { $0.value < $1.value }?.key ?? 0
@@ -421,7 +430,7 @@ enum AnalyticsEngine {
             let hours = (0 ..< 7).filter { hour in
                 guard let values = ratios[hour], values.count >= 7, let median = medianDouble(values) else { return false }
                 let share = Double(values.filter { direction ? $0 > 1.5 : $0 < 0.6 }.count) / Double(values.count)
-                return (direction ? median >= 1.4 : median <= 0.6) && share >= 0.55
+                return (direction ? median >= 1.4 : median <= 0.6) && share >= patternShare
             }
             guard let first = hours.first, let last = hours.last else { continue }
             let values = hours.flatMap { ratios[$0] ?? [] }

@@ -75,16 +75,16 @@ struct AnalyticsEngineTests {
             list += readings(from: start - 1, to: start + 4) { minute in
                 if minute < 60 { return 110 }
                 if minute < 75 { return 62 } // the low the override was started for
-                if day < 4, minute >= 150, minute < 170 { return 58 } // a new low on 4 of 6 days
+                if day < 5, minute >= 150, minute < 170 { return 58 } // a new low on 5 of 6 days
                 return 110
             }
         }
         // Each override starts with its low (an hour into that day's readings).
         let report = AnalyticsEngine.analyze(dataset(days: 7, readings: list, overrides: overrides), lowLine: 70, highLine: 180)
         let finding = report.findings.first { $0.kind == .overrideLows }
-        #expect(finding?.count == 4)
+        #expect(finding?.count == 5)
         #expect(finding?.total == 6)
-        #expect(report.overrides.first?.newLows == 4)
+        #expect(report.overrides.first?.newLows == 5)
     }
 
     @Test("Meal factors count overrides set up to 3h after the meal, never ones started because of a low")
@@ -95,7 +95,7 @@ struct AnalyticsEngineTests {
         for day in 0 ..< 8 {
             let dinner = Double(day) * 24 + 18
             carbs.append(AnalyticsCarb(date: at(dinner), carbs: 60, fat: 25, protein: 30, isFPUChild: false))
-            let withFPU = day % 2 == 0
+            let withFPU = day % 2 == 0 && day < 6 // High FPU on 3 of 8 dinners
             if withFPU {
                 // Set 2 hours in, as a slow fatty meal starts to rise: still part of the meal.
                 overrides.append(AnalyticsOverride(start: at(dinner + 2), end: at(dinner + 5), name: "High FPU"))
@@ -112,9 +112,17 @@ struct AnalyticsEngineTests {
         }
         let report = AnalyticsEngine.analyze(dataset(days: 8, readings: list, carbs: carbs, overrides: overrides), lowLine: 70, highLine: 180)
         let finding = report.findings.first { $0.kind == .mealLows }
-        #expect(finding?.count == 4)
-        #expect(finding?.comparisons.contains { $0.hasPrefix("With High FPU: 0 of 4") } == true)
+        #expect(finding?.count == 5)
+        #expect(finding?.comparisons.contains { $0.hasPrefix("With High FPU: 0 of 3") } == true)
         #expect(finding?.comparisons.contains { $0.contains("Post Low") } == false)
+    }
+
+    @Test("A finding needs the pattern in at least 60% and at least 5 instances")
+    func patternBar() {
+        #expect(AnalyticsEngine.isPattern(5, of: 8))
+        #expect(!AnalyticsEngine.isPattern(4, of: 8)) // half isn't a pattern
+        #expect(!AnalyticsEngine.isPattern(4, of: 5)) // too few
+        #expect(!AnalyticsEngine.isPattern(14, of: 31))
     }
 
     @Test("A factor is reported only with 3+ in each group and a clear gap")

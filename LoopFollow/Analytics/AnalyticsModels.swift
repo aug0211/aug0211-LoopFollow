@@ -146,11 +146,10 @@ struct AnalyticsFinding: Identifiable {
 
     var share: Double { total > 0 ? Double(count) / Double(total) : 0 }
 
-    /// "Strong" for most instances with plenty of them, "Emerging" for fewer.
+    /// "Strong" for three quarters or more of plenty of instances; findings start at 60%.
     var strength: String {
-        if total >= 10, share >= 0.5 { return "Strong" }
-        if total >= 6, share >= 0.35 { return "Moderate" }
-        return "Emerging"
+        if total >= 8, share >= 0.75 { return "Strong" }
+        return "Moderate"
     }
 
     var symbol: String {
