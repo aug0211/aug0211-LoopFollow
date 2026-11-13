@@ -313,6 +313,15 @@ class WatchRemoteService {
                         // next send re-signs.
                         invalidateJWTCache()
                     }
+                    if code == 410 || code == 400 {
+                        // Trio's push token is no longer valid (410) or not one
+                        // Apple recognizes (400): Trio was rebuilt or reinstalled
+                        // and has a new one. Ask the iPhone to re-read it from
+                        // Nightscout; the new token comes back with the config.
+                        WatchSessionManager.shared.requestConfigFromPhone(refreshProfile: true)
+                        completion(false, "Trio's address changed (APNS \(code)). Updating from the iPhone: open LoopFollow there, then try again.")
+                        return
+                    }
                     completion(false, "APNS error: \(code)")
                 }
             }

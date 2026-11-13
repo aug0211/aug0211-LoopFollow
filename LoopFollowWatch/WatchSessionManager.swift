@@ -21,13 +21,18 @@ class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 
-    /// Request the iPhone app to re-send its config via all available channels
-    func requestConfigFromPhone() {
+    /// Request the iPhone app to re-send its config via all available channels.
+    /// With `refreshProfile`, the iPhone first re-reads Trio's profile from
+    /// Nightscout (for example to pick up Trio's new push token after Trio was
+    /// rebuilt or reinstalled), and the updated config follows on its own.
+    func requestConfigFromPhone(refreshProfile: Bool = false) {
         guard WCSession.default.activationState == .activated else { return }
+        var request: [String: Any] = ["requestConfig": true]
+        if refreshProfile { request["refreshProfile"] = true }
 
         // sendMessage is the fastest path — works if iPhone app is reachable
         if WCSession.default.isReachable {
-            WCSession.default.sendMessage(["requestConfig": true], replyHandler: { reply in
+            WCSession.default.sendMessage(request, replyHandler: { reply in
                 // iPhone may reply with config directly
                 if reply["nsURL"] != nil || reply["dexUsername"] != nil {
                     self.handleReceivedConfig(reply)
@@ -36,7 +41,7 @@ class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
         }
 
         // transferUserInfo is queued and delivered even if iPhone app isn't running
-        WCSession.default.transferUserInfo(["requestConfig": true])
+        WCSession.default.transferUserInfo(request)
     }
 
     // MARK: - WCSessionDelegate

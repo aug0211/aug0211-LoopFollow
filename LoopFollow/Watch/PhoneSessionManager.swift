@@ -168,6 +168,7 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
     // Handle Watch requesting config via applicationContext
     func session(_: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         if applicationContext["requestConfig"] != nil {
+            refreshProfileIfAsked(applicationContext)
             sendConfig()
         }
     }
@@ -175,6 +176,7 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
     // Handle Watch requesting config via sendMessage (with reply)
     func session(_: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
         if message["requestConfig"] != nil {
+            refreshProfileIfAsked(message)
             let config = buildConfig()
             replyHandler(config)
             // Also update application context so it's cached
@@ -186,6 +188,7 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
 
     func session(_: WCSession, didReceiveMessage message: [String: Any]) {
         if message["requestConfig"] != nil {
+            refreshProfileIfAsked(message)
             sendConfig()
         }
     }
@@ -193,7 +196,18 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
     // Handle Watch requesting config via transferUserInfo
     func session(_: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         if userInfo["requestConfig"] != nil {
+            refreshProfileIfAsked(userInfo)
             sendConfig()
+        }
+    }
+
+    /// The Watch was told Trio's push token is no longer valid: re-read Trio's
+    /// profile from Nightscout. A changed token is sent to the Watch by the
+    /// settings sync as soon as it's stored.
+    private func refreshProfileIfAsked(_ request: [String: Any]) {
+        guard request["refreshProfile"] != nil else { return }
+        DispatchQueue.main.async {
+            MainViewController.shared?.webLoadNSProfile()
         }
     }
 }
