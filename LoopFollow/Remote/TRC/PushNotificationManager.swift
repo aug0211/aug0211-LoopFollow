@@ -249,12 +249,27 @@ class PushNotificationManager {
                 main.webLoadNSProfile {
                     let changed = !self.deviceToken.isEmpty &&
                         (self.deviceToken != sentToken || self.productionEnvironment != sentProduction)
-                    guard changed else {
-                        completion(false, Self.staleTokenMessage)
+                    if changed {
+                        LogManager.shared.log(category: .apns, message: "Found a new Trio push token; sending again")
+                        self.sendEncryptedCommand(payload: payload, retryOnStaleToken: false, completion: completion)
                         return
                     }
-                    LogManager.shared.log(category: .apns, message: "Found a new Trio push token; sending again")
-                    self.sendEncryptedCommand(payload: payload, retryOnStaleToken: false, completion: completion)
+                    // Same token: Trio may have reported the wrong APNs environment.
+                    // The first send was refused, so trying the other one can't deliver twice.
+                    let other = !sentProduction
+                    LogManager.shared.log(category: .apns, message: "Trying Trio's token on the \(other ? "production" : "sandbox") APNs environment")
+                    self.sendEncryptedCommandOnce(payload: payload, production: other) { success, error in
+                        guard success else {
+                            completion(false, APNSDelivery.isStaleToken(error) ? Self.staleTokenMessage : error)
+                            return
+                        }
+                        LogManager.shared.log(category: .apns, message: "Trio's token works on the \(other ? "production" : "sandbox") environment; using it from now on")
+                        DispatchQueue.main.async {
+                            Storage.shared.apnsEnvironmentFlippedToken.value = sentToken
+                            Storage.shared.productionEnvironment.value = other
+                        }
+                        completion(true, nil)
+                    }
                 }
             }
         }
@@ -263,7 +278,7 @@ class PushNotificationManager {
 
     static let staleTokenMessage = "Trio's push token in Nightscout is out of date, so nothing was sent. Open Trio on the looping phone so it uploads its new token, wait a minute, then try again."
 
-    private func sendEncryptedCommandOnce(payload: CommandPayload, completion: @escaping (Bool, String?) -> Void) {
+    private func sendEncryptedCommandOnce(payload: CommandPayload, production: Bool? = nil, completion: @escaping (Bool, String?) -> Void) {
         var missingFields = [String]()
         if sharedSecret.isEmpty { missingFields.append("sharedSecret") }
         if apnsKey.isEmpty { missingFields.append("apnsKey") }
@@ -302,7 +317,7 @@ class PushNotificationManager {
                 body: JSONEncoder().encode(finalMessage),
                 deviceToken: deviceToken,
                 topic: bundleId,
-                production: productionEnvironment,
+                production: production ?? productionEnvironment,
                 keyId: keyId,
                 teamId: teamId,
                 apnsKey: apnsKey,

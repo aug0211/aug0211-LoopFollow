@@ -121,7 +121,12 @@ final class ProfileManager {
         Storage.shared.bundleId.value = profileData.bundleIdentifier ?? profileData.loopSettings?.bundleIdentifier ?? ""
 
         if let isProduction = profileData.isAPNSProduction {
-            Storage.shared.productionEnvironment.value = isProduction
+            // Trio decides "production" by whether it's a TestFlight build, so an
+            // ad hoc or other distribution-signed build reports the wrong one.
+            // Keep the environment that was proven to work for this token.
+            let token = Storage.shared.deviceToken.value
+            let flipped = !token.isEmpty && token == Storage.shared.apnsEnvironmentFlippedToken.value
+            Storage.shared.productionEnvironment.value = flipped ? !isProduction : isProduction
         }
 
         Storage.shared.teamId.value = profileData.teamID ?? Storage.shared.teamId.value ?? ""

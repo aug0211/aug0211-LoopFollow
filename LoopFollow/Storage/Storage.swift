@@ -14,6 +14,9 @@ class Storage {
     var expirationDate = StorageValue<Date?>(key: "expirationDate", defaultValue: nil)
     var sharedSecret = StorageValue<String>(key: "sharedSecret", defaultValue: "")
     var productionEnvironment = StorageValue<Bool>(key: "productionEnvironment", defaultValue: false)
+    /// A Trio push token that only works on the other APNs environment than
+    /// the one Trio reports (see `PushNotificationManager`).
+    var apnsEnvironmentFlippedToken = StorageValue<String>(key: "apnsEnvironmentFlippedToken", defaultValue: "")
     var remoteApnsKey = StorageValue<String>(key: "remoteApnsKey", defaultValue: "")
     var teamId = StorageValue<String?>(key: "teamId", defaultValue: nil)
     var remoteKeyId = StorageValue<String>(key: "remoteKeyId", defaultValue: "")
