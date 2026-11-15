@@ -83,6 +83,13 @@ enum APNSDelivery {
         }.resume()
     }
 
+    /// The push token was rejected because it's old or belongs to another
+    /// build of the app (410 Unregistered, 400 BadDeviceToken or DeviceTokenNotForTopic).
+    static func isStaleToken(_ errorMessage: String?) -> Bool {
+        guard let errorMessage else { return false }
+        return ["Unregistered", "BadDeviceToken", "DeviceTokenNotForTopic"].contains { errorMessage.hasSuffix($0) }
+    }
+
     static func message(forStatus status: Int) -> String {
         switch status {
         case 400: "Bad request. The request was invalid or malformed."

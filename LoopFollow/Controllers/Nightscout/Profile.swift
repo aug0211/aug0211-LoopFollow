@@ -5,7 +5,8 @@ import Foundation
 
 extension MainViewController {
     // NS Profile Web Call
-    func webLoadNSProfile() {
+    /// `completion`, if given, runs on the main queue once the profile has loaded or failed.
+    func webLoadNSProfile(completion: (() -> Void)? = nil) {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let parameters: [String: String] = [
@@ -17,11 +18,14 @@ extension MainViewController {
             case let .success(profiles):
                 guard let profileData = profiles.first else {
                     LogManager.shared.log(category: .nightscout, message: "webLoadNSProfile, no profile records returned")
-                    return
+                    break
                 }
                 self.updateProfile(profileData: profileData)
             case let .failure(error):
                 LogManager.shared.log(category: .nightscout, message: "webLoadNSProfile, error fetching profile data: \(error.localizedDescription)")
+            }
+            if let completion {
+                DispatchQueue.main.async(execute: completion)
             }
         }
     }

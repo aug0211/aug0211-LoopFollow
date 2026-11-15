@@ -5,21 +5,21 @@ import Foundation
 import HealthKit
 
 class PushNotificationManager {
-    private var deviceToken: String
     private var sharedSecret: String
-    private var productionEnvironment: Bool
     private var apnsKey: String
     private var teamId: String
     private var keyId: String
     private var user: String
-    private var bundleId: String
+
+    /// Trio's push address, read at send time: screens keep one manager open,
+    /// and the profile may bring a new token while they do.
+    private var deviceToken: String { Storage.shared.deviceToken.value }
+    private var productionEnvironment: Bool { Storage.shared.productionEnvironment.value }
+    private var bundleId: String { Storage.shared.bundleId.value }
 
     init() {
-        deviceToken = Storage.shared.deviceToken.value
         sharedSecret = Storage.shared.sharedSecret.value
-        productionEnvironment = Storage.shared.productionEnvironment.value
         user = Storage.shared.user.value
-        bundleId = Storage.shared.bundleId.value
 
         let resolved = RemoteSigningKey.resolve(
             lfTeamID: BuildDetails.default.teamID ?? "",
@@ -226,6 +226,44 @@ class PushNotificationManager {
     }
 
     private func sendEncryptedCommand(payload: CommandPayload, completion: @escaping (Bool, String?) -> Void) {
+        sendEncryptedCommand(payload: payload, retryOnStaleToken: true, completion: completion)
+    }
+
+    /// When Trio is rebuilt or reinstalled it gets a new push token, and APNs
+    /// rejects the old one. Nothing was delivered, so re-read the token from
+    /// Nightscout and, if Trio has uploaded a new one, send once more.
+    private func sendEncryptedCommand(payload: CommandPayload, retryOnStaleToken: Bool, completion: @escaping (Bool, String?) -> Void) {
+        let sentToken = deviceToken
+        let sentProduction = productionEnvironment
+        let finish: (Bool, String?) -> Void = { success, error in
+            guard !success, retryOnStaleToken, APNSDelivery.isStaleToken(error) else {
+                completion(success, error)
+                return
+            }
+            LogManager.shared.log(category: .apns, message: "Trio's push token was rejected; reloading the Nightscout profile")
+            DispatchQueue.main.async {
+                guard let main = MainViewController.shared else {
+                    completion(false, Self.staleTokenMessage)
+                    return
+                }
+                main.webLoadNSProfile {
+                    let changed = !self.deviceToken.isEmpty &&
+                        (self.deviceToken != sentToken || self.productionEnvironment != sentProduction)
+                    guard changed else {
+                        completion(false, Self.staleTokenMessage)
+                        return
+                    }
+                    LogManager.shared.log(category: .apns, message: "Found a new Trio push token; sending again")
+                    self.sendEncryptedCommand(payload: payload, retryOnStaleToken: false, completion: completion)
+                }
+            }
+        }
+        sendEncryptedCommandOnce(payload: payload, completion: finish)
+    }
+
+    static let staleTokenMessage = "Trio's push token in Nightscout is out of date, so nothing was sent. Open Trio on the looping phone so it uploads its new token, wait a minute, then try again."
+
+    private func sendEncryptedCommandOnce(payload: CommandPayload, completion: @escaping (Bool, String?) -> Void) {
         var missingFields = [String]()
         if sharedSecret.isEmpty { missingFields.append("sharedSecret") }
         if apnsKey.isEmpty { missingFields.append("apnsKey") }
