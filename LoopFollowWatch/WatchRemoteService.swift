@@ -319,7 +319,7 @@ class WatchRemoteService {
                         // and has a new one. Ask the iPhone to re-read it from
                         // Nightscout; the new token comes back with the config.
                         WatchSessionManager.shared.requestConfigFromPhone(refreshProfile: true)
-                        completion(false, "Trio's address changed (APNS \(code)). Updating from the iPhone: open LoopFollow there, then try again.")
+                        completion(false, "Trio's push token was refused (APNS \(code)). Getting Trio's latest from the iPhone. If this repeats, open Trio on the looping phone.")
                         return
                     }
                     completion(false, "APNS error: \(code)")
