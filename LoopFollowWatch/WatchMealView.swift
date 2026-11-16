@@ -16,9 +16,10 @@ struct WatchMealView: View {
     @State private var lastHapticValue: Int = 0
     @State private var showBolusStep = false
     @State private var showSavedMeals = false
-    /// The tile edited last, so leaving edit mode doesn't jump back to the top.
-    @State private var lastEditedField: EditField = .carbs
-    @FocusState private var crownFocused: Bool
+    /// Where each tile sits in the visible area, to scroll only when one is cut off.
+    @State private var tileFrames: [EditField: CGRect] = [:]
+    @State private var viewportHeight: CGFloat = 0
+    private static let scrollSpace = "mealScroll"
 
     enum EditField {
         case carbs, protein, fat, time
@@ -84,58 +85,38 @@ struct WatchMealView: View {
     }
 
     var body: some View {
-        Group {
-            if editingField != nil {
-                // ── Tile-editing mode ──
-                // ScrollView for identical layout, but crown modifiers on the
-                // wrapper outside it. .digitalCrownRotation() is ONLY in this
-                // branch, so it never poisons the browse branch's native scrolling.
-                // Its scroll position starts at the top, so bring the tile being
-                // edited fully into view (on small watches it can be off-screen).
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 4) {
-                            entryView
-                        }
-                    }
-                    .scrollDisabled(true)
-                    .focusable()
-                    .focused($crownFocused)
-                    .digitalCrownRotation(
-                        guardedCrownBinding,
+        // One ScrollView for both modes, so its position never resets. While a
+        // tile is being edited, an invisible overlay takes the crown (the
+        // ScrollView itself never gets crown modifiers, which would break its
+        // native crown scrolling) and touch scrolling is paused.
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 4) {
+                    entryView
+                }
+            }
+            .coordinateSpace(name: Self.scrollSpace)
+            .scrollDisabled(editingField != nil)
+            .background(GeometryReader { geo in
+                Color.clear
+                    .onAppear { viewportHeight = geo.size.height }
+                    .onChange(of: geo.size.height) { viewportHeight = $0 }
+            })
+            .onPreferenceChange(TileFramesKey.self) { tileFrames = $0 }
+            .overlay {
+                if let field = editingField {
+                    CrownCaptureView(
+                        value: guardedCrownBinding,
                         from: crownRange.lowerBound,
                         through: crownRange.upperBound,
                         by: crownStep,
-                        sensitivity: .medium,
-                        isContinuous: false,
-                        isHapticFeedbackEnabled: false
+                        sensitivity: .medium
                     )
-                    .onAppear {
-                        crownFocused = true
-                        reveal(editingField, with: proxy)
-                    }
-                    .onChange(of: editingField) { field in
-                        reveal(field, with: proxy)
-                    }
-                }
-            } else {
-                // ── Browse mode ──
-                // Plain ScrollView, ZERO crown modifiers anywhere.
-                // Native watchOS crown scrolling works unimpeded.
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 4) {
-                            entryView
-                        }
-                    }
-                    .onAppear { reveal(lastEditedField, with: proxy, animated: false) }
+                    .id(field)
                 }
             }
-        }
-        .onChange(of: editingField) { field in
-            if let field {
-                crownFocused = true
-                lastEditedField = field
+            .onChange(of: editingField) { field in
+                revealIfHidden(field, with: proxy)
             }
         }
         .onChange(of: carbs) { _ in playHaptic(Int(carbs.rounded())) }
@@ -316,18 +297,28 @@ struct WatchMealView: View {
         }
         .buttonStyle(.plain)
         .id(field)
+        .background(GeometryReader { geo in
+            Color.clear.preference(
+                key: TileFramesKey.self,
+                value: [field: geo.frame(in: .named(Self.scrollSpace))]
+            )
+        })
     }
 
-    /// Scrolls so the whole tile shows, near the bottom so the − / + row above
-    /// stays visible where the screen allows.
-    private func reveal(_ field: EditField?, with proxy: ScrollViewProxy, animated: Bool = true) {
-        guard let field else { return }
-        DispatchQueue.main.async {
-            if animated {
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(field, anchor: UnitPoint(x: 0.5, y: 0.8)) }
-            } else {
-                proxy.scrollTo(field, anchor: UnitPoint(x: 0.5, y: 0.8))
-            }
+    /// Scrolls only if the tapped tile is partly off-screen, just far enough to
+    /// show all of it (clear of the page dots at the bottom).
+    private func revealIfHidden(_ field: EditField?, with proxy: ScrollViewProxy) {
+        guard let field, let frame = tileFrames[field], viewportHeight > 0 else { return }
+        let anchor: UnitPoint
+        if frame.maxY > viewportHeight - 12 {
+            anchor = UnitPoint(x: 0.5, y: 0.9)
+        } else if frame.minY < 0 {
+            anchor = UnitPoint(x: 0.5, y: 0.1)
+        } else {
+            return
+        }
+        withAnimation(.easeOut(duration: 0.2)) {
+            proxy.scrollTo(field, anchor: anchor)
         }
     }
 
@@ -336,5 +327,12 @@ struct WatchMealView: View {
             lastHapticValue = newValue
             WKInterfaceDevice.current().play(.click)
         }
+    }
+}
+
+private struct TileFramesKey: PreferenceKey {
+    static let defaultValue: [WatchMealView.EditField: CGRect] = [:]
+    static func reduce(value: inout [WatchMealView.EditField: CGRect], nextValue: () -> [WatchMealView.EditField: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
 }

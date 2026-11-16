@@ -16,8 +16,11 @@ struct CrownCaptureView: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
+        // Full size, like the focusable views elsewhere, but it lets taps
+        // through to whatever is underneath.
         Color.clear
-            .frame(width: 0, height: 0)
+            .contentShape(Rectangle())
+            .allowsHitTesting(false)
             .focusable()
             .focused($isFocused)
             .digitalCrownRotation(
