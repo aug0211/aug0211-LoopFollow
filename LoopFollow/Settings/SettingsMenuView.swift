@@ -6,9 +6,14 @@ import UIKit
 
 struct SettingsMenuView: View {
     @ObservedObject private var nightscoutURL = Storage.shared.url
+    @ObservedObject private var backgroundRefreshType = Storage.shared.backgroundRefreshType
+    @ObservedObject private var hubConfirmed = HubClient.shared.hubConfirmed
 
     var body: some View {
         List {
+            if HubModeWarning.isShown {
+                Section { HubModeWarning() }
+            }
             ForEach(SettingsRoute.menuSections(nightscoutConfigured: !nightscoutURL.value.isEmpty), id: \.0) { section, routes in
                 Section(section.rawValue) {
                     ForEach(routes) { route in
@@ -54,6 +59,7 @@ enum SettingsRoute: Hashable, Identifiable {
     case nightscout, dexcom
     case backgroundRefresh
     case bolusCalculator
+    case hub
     case general, graph
     case tabSettings
     case infoDisplay
@@ -86,6 +92,7 @@ enum SettingsRoute: Hashable, Identifiable {
         case .units: return "Units and Metrics"
         case .tabSettings: return "Tabs"
         case .backgroundRefresh: return "Background Refresh"
+        case .hub: return "LF Hub"
         case .importExport: return "Import/Export"
         case .apn: return "APN"
         #if !targetEnvironment(macCatalyst)
@@ -111,6 +118,7 @@ enum SettingsRoute: Hashable, Identifiable {
         case .units: return "scalemass"
         case .tabSettings: return "rectangle.3.group"
         case .backgroundRefresh: return "arrow.clockwise"
+        case .hub: return "server.rack"
         case .importExport: return "square.and.arrow.down"
         case .apn: return "bell.and.waves.left.and.right"
         #if !targetEnvironment(macCatalyst)
@@ -133,6 +141,7 @@ enum SettingsRoute: Hashable, Identifiable {
         case .units: return ["mmol", "mgdl", "metrics"]
         case .infoDisplay: return ["info"]
         case .apn: return ["push", "notification"]
+        case .hub: return ["server", "hub", "alarm"]
         #if !targetEnvironment(macCatalyst)
             case .liveActivity: return ["dynamic island", "lock screen"]
         #endif
@@ -211,6 +220,9 @@ enum SettingsRoute: Hashable, Identifiable {
             ]
         case .backgroundRefresh: return [
                 SettingsLeaf("Background Refresh Type", ["silent tune", "bluetooth", "rileylink", "omnipod", "heartbeat"]),
+            ]
+        case .hub: return [
+                SettingsLeaf("Send Test Alarm", ["alarm", "test"]),
             ]
         case .importExport: return [
                 SettingsLeaf("Scan QR Code to Import Settings", ["qr"]),
@@ -293,8 +305,13 @@ enum SettingsRoute: Hashable, Identifiable {
             app.append(.remote)
         }
 
+        var data: [SettingsRoute] = [.nightscout, .dexcom]
+        if HubClient.isSupported {
+            data.append(.hub)
+        }
+
         return [
-            (.data, [.nightscout, .dexcom]),
+            (.data, data),
             (.display, display),
             (.app, app),
             (.alarms, [.alarmSettings]),
@@ -312,6 +329,7 @@ enum SettingsRoute: Hashable, Identifiable {
         case .dexcom: DexcomSettingsView(viewModel: .init())
         case .backgroundRefresh: BackgroundRefreshSettingsView(viewModel: .init())
         case .bolusCalculator: BolusCalculatorSettingsView()
+        case .hub: HubSettingsView()
         case .general: GeneralSettingsView()
         case .graph: GraphSettingsView()
         case .tabSettings: TabCustomizationModal()

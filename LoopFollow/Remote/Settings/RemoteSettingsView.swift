@@ -12,6 +12,7 @@ struct RemoteSettingsView: View {
     @ObservedObject private var watchRemoteCommands = Storage.shared.watchRemoteCommands
     @ObservedObject private var mealMatchTolerance = Storage.shared.mealMatchTolerance
     @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
+    @ObservedObject private var loopMaxFutureCarbHours = Storage.shared.loopMaxFutureCarbHours
 
     @State private var showAlert: Bool = false
     @State private var alertType: AlertType? = nil
@@ -104,6 +105,19 @@ struct RemoteSettingsView: View {
                             value: $mealMatchTolerance.value,
                             in: NamedMealFormat.toleranceRange
                         )
+                    }
+                }
+            }
+
+            if viewModel.remoteType == .loopAPNS {
+                Section(
+                    header: Text("Meal Settings"),
+                    footer: Text("How far ahead carbs can be entered. Loop accepts up to 1 hr; use 4 hr if Loop is built with the future_carbs_4h customization.")
+                ) {
+                    Picker("Max Future Carbs", selection: $loopMaxFutureCarbHours.value) {
+                        ForEach(1 ... 4, id: \.self) { hours in
+                            Text("\(hours) hr").tag(hours)
+                        }
                     }
                 }
             }
