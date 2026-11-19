@@ -33,6 +33,7 @@ extension MainViewController {
     // NS Profile Response Processor
     func updateProfile(profileData: NSProfile) {
         guard let store = profileData.store["default"] ?? profileData.store["Default"] else {
+            LogManager.shared.log(category: .nightscout, message: "Profile document not loaded, its Default entry could not be read")
             return
         }
         let isFirstProfile = profileManager.isfSchedule.isEmpty && profileManager.basalSchedule.isEmpty

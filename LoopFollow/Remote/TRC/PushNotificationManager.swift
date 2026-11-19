@@ -182,6 +182,139 @@ class PushNotificationManager {
     }
 
     private static let returnNotificationRequiredMessage = "Editing or deleting a meal needs LoopFollow's own APNS credentials so Trio can confirm the result. Configure them in App Settings → APN."
+    private static let profileReturnNotificationRequiredMessage = "Profile commands need LoopFollow's own APNS credentials so Trio can confirm the result. Configure them in App Settings → APN."
+
+    func sendProfileSwitchPushNotification(name: String, fingerprint: String, commandID: String, completion: @escaping (Bool, String?) -> Void) {
+        sendProfileCommand(commandType: .switchProfile, name: name, baseFingerprint: fingerprint, commandID: commandID, completion: completion)
+    }
+
+    /// Creates `name` when `originalName` is nil; otherwise updates `originalName`, which Trio only changes while
+    /// its values still have `baseFingerprint`.
+    func sendProfileSavePushNotification(
+        name: String,
+        originalName: String?,
+        baseFingerprint: String?,
+        values: TherapyProfileValues,
+        commandID: String,
+        completion: @escaping (Bool, String?) -> Void
+    ) {
+        sendProfileCommand(
+            commandType: .saveProfile,
+            name: name,
+            originalName: originalName,
+            baseFingerprint: baseFingerprint,
+            values: values,
+            commandID: commandID,
+            completion: completion
+        )
+    }
+
+    func sendProfileDeletePushNotification(name: String, fingerprint: String, commandID: String, completion: @escaping (Bool, String?) -> Void) {
+        sendProfileCommand(commandType: .deleteProfile, name: name, baseFingerprint: fingerprint, commandID: commandID, completion: completion)
+    }
+
+    /// Replaces Trio's scheduled switches, which Trio only does while its list has `baseFingerprint`.
+    func sendScheduledSwitchesSavePushNotification(
+        entries: [ScheduledProfileSwitch],
+        baseFingerprint: String,
+        commandID: String,
+        completion: @escaping (Bool, String?) -> Void
+    ) {
+        guard let returnNotification = ReturnNotificationInfo.loopFollow() else {
+            completion(false, Self.profileReturnNotificationRequiredMessage)
+            return
+        }
+        LogManager.shared.log(category: .apns, message: "Sending \(TRCCommandType.saveScheduledSwitches.rawValue) base=\(baseFingerprint) new=\(ScheduledProfileSwitch.fingerprint(entries))")
+        let payload = scheduledSwitchesPayload(entries: entries, baseFingerprint: baseFingerprint, commandID: commandID, returnNotification: returnNotification)
+        sendEncryptedCommand(payload: payload, tooLargeMessage: ScheduledSwitchesPushSize.tooLargeMessage, completion: completion)
+    }
+
+    /// The size of the push a scheduled switches save would send. Nil when it can not be built.
+    func scheduledSwitchesSavePushSize(entries: [ScheduledProfileSwitch], baseFingerprint: String) -> Int? {
+        guard let returnNotification = ReturnNotificationInfo.loopFollow() else { return nil }
+        let payload = scheduledSwitchesPayload(entries: entries, baseFingerprint: baseFingerprint, commandID: UUID().uuidString, returnNotification: returnNotification)
+        return try? encryptedBody(payload).count
+    }
+
+    private func scheduledSwitchesPayload(
+        entries: [ScheduledProfileSwitch],
+        baseFingerprint: String,
+        commandID: String,
+        returnNotification: ReturnNotificationInfo
+    ) -> CommandPayload {
+        CommandPayload(
+            user: user,
+            commandType: .saveScheduledSwitches,
+            timestamp: Date().timeIntervalSince1970,
+            commandID: commandID,
+            baseFingerprint: baseFingerprint,
+            scheduledSwitches: entries,
+            returnNotification: returnNotification
+        )
+    }
+
+    /// The size of the push a profile save would send. Nil when it can not be built.
+    func profileSavePushSize(name: String, originalName: String?, baseFingerprint: String?, values: TherapyProfileValues) -> Int? {
+        guard let returnNotification = ReturnNotificationInfo.loopFollow() else { return nil }
+        let payload = profilePayload(
+            commandType: .saveProfile,
+            name: name,
+            originalName: originalName,
+            baseFingerprint: baseFingerprint,
+            values: values,
+            commandID: UUID().uuidString,
+            returnNotification: returnNotification
+        )
+        return try? encryptedBody(payload).count
+    }
+
+    private func profilePayload(
+        commandType: TRCCommandType,
+        name: String,
+        originalName: String? = nil,
+        baseFingerprint: String?,
+        values: TherapyProfileValues? = nil,
+        commandID: String,
+        returnNotification: ReturnNotificationInfo
+    ) -> CommandPayload {
+        CommandPayload(
+            user: user,
+            commandType: commandType,
+            timestamp: Date().timeIntervalSince1970,
+            commandID: commandID,
+            profileName: name,
+            originalProfileName: originalName,
+            baseFingerprint: baseFingerprint,
+            profile: values,
+            returnNotification: returnNotification
+        )
+    }
+
+    private func sendProfileCommand(
+        commandType: TRCCommandType,
+        name: String,
+        originalName: String? = nil,
+        baseFingerprint: String?,
+        values: TherapyProfileValues? = nil,
+        commandID: String,
+        completion: @escaping (Bool, String?) -> Void
+    ) {
+        guard let returnNotification = ReturnNotificationInfo.loopFollow() else {
+            completion(false, Self.profileReturnNotificationRequiredMessage)
+            return
+        }
+        LogManager.shared.log(category: .apns, message: "Sending \(commandType.rawValue) base=\(baseFingerprint ?? "-")\(values.map { " new=\($0.fingerprint)" } ?? "")")
+        let payload = profilePayload(
+            commandType: commandType,
+            name: name,
+            originalName: originalName,
+            baseFingerprint: baseFingerprint,
+            values: values,
+            commandID: commandID,
+            returnNotification: returnNotification
+        )
+        sendEncryptedCommand(payload: payload, tooLargeMessage: values == nil ? nil : ProfilePushSize.tooLargeMessage, completion: completion)
+    }
 
     private func validateCredentials() -> [String]? {
         var errors = [String]()
@@ -225,14 +358,32 @@ class PushNotificationManager {
         return keyLines.joined()
     }
 
-    private func sendEncryptedCommand(payload: CommandPayload, completion: @escaping (Bool, String?) -> Void) {
-        sendEncryptedCommand(payload: payload, retryOnStaleToken: true, completion: completion)
+    /// The push body: the payload encrypted with the shared secret.
+    private func encryptedBody(_ payload: CommandPayload) throws -> Data {
+        guard let messenger = SecureMessenger(sharedSecret: sharedSecret) else {
+            throw EncryptionError.invalidSharedSecret
+        }
+        let encryptedDataString = try messenger.encrypt(payload)
+        return try JSONEncoder().encode(EncryptedPushMessage(encryptedData: encryptedDataString, commandType: payload.commandType))
+    }
+
+    private enum EncryptionError: LocalizedError {
+        case invalidSharedSecret
+
+        var errorDescription: String? {
+            "Failed to initialize security module. Check shared secret."
+        }
+    }
+
+    /// `tooLargeMessage` explains a push over the APNs size limit; such a push is never sent.
+    private func sendEncryptedCommand(payload: CommandPayload, tooLargeMessage: ((Int) -> String)? = nil, completion: @escaping (Bool, String?) -> Void) {
+        sendEncryptedCommand(payload: payload, tooLargeMessage: tooLargeMessage, retryOnStaleToken: true, completion: completion)
     }
 
     /// When Trio is rebuilt or reinstalled it gets a new push token, and APNs
     /// rejects the old one. Nothing was delivered, so re-read the token from
     /// Nightscout and, if Trio has uploaded a new one, send once more.
-    private func sendEncryptedCommand(payload: CommandPayload, retryOnStaleToken: Bool, completion: @escaping (Bool, String?) -> Void) {
+    private func sendEncryptedCommand(payload: CommandPayload, tooLargeMessage: ((Int) -> String)?, retryOnStaleToken: Bool, completion: @escaping (Bool, String?) -> Void) {
         let sentToken = deviceToken
         let sentProduction = productionEnvironment
         let finish: (Bool, String?) -> Void = { success, error in
@@ -251,14 +402,14 @@ class PushNotificationManager {
                         (self.deviceToken != sentToken || self.productionEnvironment != sentProduction)
                     if changed {
                         LogManager.shared.log(category: .apns, message: "Found a new Trio push token; sending again")
-                        self.sendEncryptedCommand(payload: payload, retryOnStaleToken: false, completion: completion)
+                        self.sendEncryptedCommand(payload: payload, tooLargeMessage: tooLargeMessage, retryOnStaleToken: false, completion: completion)
                         return
                     }
                     // Same token: Trio may have reported the wrong APNs environment.
                     // The first send was refused, so trying the other one can't deliver twice.
                     let other = !sentProduction
                     LogManager.shared.log(category: .apns, message: "Trying Trio's token on the \(other ? "production" : "sandbox") APNs environment")
-                    self.sendEncryptedCommandOnce(payload: payload, production: other) { success, error in
+                    self.sendEncryptedCommandOnce(payload: payload, tooLargeMessage: tooLargeMessage, production: other) { success, error in
                         guard success else {
                             completion(false, APNSDelivery.isStaleToken(error) ? Self.staleTokenMessage : error)
                             return
@@ -273,12 +424,12 @@ class PushNotificationManager {
                 }
             }
         }
-        sendEncryptedCommandOnce(payload: payload, completion: finish)
+        sendEncryptedCommandOnce(payload: payload, tooLargeMessage: tooLargeMessage, completion: finish)
     }
 
     static let staleTokenMessage = "Trio's push token in Nightscout is out of date, so nothing was sent. Open Trio on the looping phone so it uploads its new token, wait a minute, then try again."
 
-    private func sendEncryptedCommandOnce(payload: CommandPayload, production: Bool? = nil, completion: @escaping (Bool, String?) -> Void) {
+    private func sendEncryptedCommandOnce(payload: CommandPayload, tooLargeMessage: ((Int) -> String)?, production: Bool? = nil, completion: @escaping (Bool, String?) -> Void) {
         var missingFields = [String]()
         if sharedSecret.isEmpty { missingFields.append("sharedSecret") }
         if apnsKey.isEmpty { missingFields.append("apnsKey") }
@@ -303,18 +454,15 @@ class PushNotificationManager {
         }
 
         do {
-            guard let messenger = SecureMessenger(sharedSecret: sharedSecret) else {
-                let errorMessage = "Failed to initialize security module. Check shared secret."
-                LogManager.shared.log(category: .apns, message: errorMessage)
-                completion(false, errorMessage)
+            let body = try encryptedBody(payload)
+            if let tooLargeMessage, body.count > APNSDelivery.maxPayloadBytes {
+                LogManager.shared.log(category: .apns, message: "Command not sent: \(body.count) bytes")
+                completion(false, tooLargeMessage(body.count))
                 return
             }
 
-            let encryptedDataString = try messenger.encrypt(payload)
-            let finalMessage = EncryptedPushMessage(encryptedData: encryptedDataString, commandType: payload.commandType)
-
-            try APNSDelivery.send(
-                body: JSONEncoder().encode(finalMessage),
+            APNSDelivery.send(
+                body: body,
                 deviceToken: deviceToken,
                 topic: bundleId,
                 production: production ?? productionEnvironment,
