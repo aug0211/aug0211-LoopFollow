@@ -17,37 +17,63 @@ struct RemoteControlView: View {
 
     var body: some View {
         NavigationStack {
-            LazyVGrid(columns: columns, spacing: 8) {
-                Button {
-                    router.activeDestination = .bolus
-                } label: {
-                    RemoteTile(icon: "drop.fill", label: "Bolus", color: .blue)
-                }
-                .buttonStyle(.plain)
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    Button {
+                        router.activeDestination = .bolus
+                    } label: {
+                        RemoteTile(icon: "drop.fill", label: "Bolus", color: .blue)
+                    }
+                    .buttonStyle(.plain)
 
-                Button {
-                    router.activeDestination = .meal
-                } label: {
-                    RemoteTile(icon: "fork.knife", label: "Meal", color: .yellow)
-                }
-                .buttonStyle(.plain)
+                    Button {
+                        router.activeDestination = .meal
+                    } label: {
+                        RemoteTile(icon: "fork.knife", label: "Meal", color: .yellow)
+                    }
+                    .buttonStyle(.plain)
 
-                Button {
-                    router.activeDestination = .override
-                } label: {
-                    RemoteTile(icon: "bolt.fill", label: "Override", color: .purple)
-                }
-                .buttonStyle(.plain)
+                    Button {
+                        router.activeDestination = .override
+                    } label: {
+                        RemoteTile(icon: "bolt.fill", label: "Override", color: .purple)
+                    }
+                    .buttonStyle(.plain)
 
-                Button {
-                    router.activeDestination = .tempTarget
-                } label: {
-                    RemoteTile(icon: "target", label: "Temp", color: tempColor)
+                    Button {
+                        router.activeDestination = .tempTarget
+                    } label: {
+                        RemoteTile(icon: "target", label: "Temp", color: tempColor)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
+
+                // Used less often: a slim full-width bar under the grid, as on the iPhone.
+                if config.therapyProfiles != nil {
+                    Button {
+                        router.activeDestination = .profiles
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 15))
+                            Text("Profiles")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(
+                            LinearGradient(colors: [watchProfileColor, watchProfileColor.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                        )
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 6)
+                }
             }
-            .padding(.horizontal, 4)
-            .padding(.top, 2)
             .navigationDestination(item: $router.activeDestination) { destination in
                 switch destination {
                 case .bolus:
@@ -66,6 +92,8 @@ struct RemoteControlView: View {
                     WatchOverrideView(config: config, bgFetcher: bgFetcher)
                 case .tempTarget:
                     WatchTempTargetView(config: config, bgFetcher: bgFetcher)
+                case .profiles:
+                    WatchProfilesView()
                 }
             }
         }

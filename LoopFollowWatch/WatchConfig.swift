@@ -65,6 +65,10 @@ struct WatchConfig: Equatable {
     /// Saved meals, most eaten first (synced from iPhone).
     var namedMeals: [WatchNamedMeal]
 
+    /// Remote profiles, as the iPhone sent them; nil when profile commands aren't available.
+    var therapyProfilesSource: NSDictionary?
+    var therapyProfiles: WatchProfileSet?
+
     var hasDexcomCredentials: Bool {
         !dexUsername.isEmpty && !dexPassword.isEmpty
     }
@@ -88,7 +92,7 @@ struct WatchConfig: Equatable {
     }
 
     func toDictionary() -> [String: Any] {
-        [
+        var dict: [String: Any] = [
             "nsURL": nsURL,
             "nsToken": nsToken,
             "dexUsername": dexUsername,
@@ -125,6 +129,10 @@ struct WatchConfig: Equatable {
             "maxFat": maxFat,
             "namedMeals": namedMeals.map { meal -> [String: Any] in ["name": meal.name, "carbs": meal.carbs, "fat": meal.fat, "protein": meal.protein] },
         ]
+        if let therapyProfilesSource {
+            dict["therapyProfiles"] = therapyProfilesSource
+        }
+        return dict
     }
 
     init(from dict: [String: Any]) {
@@ -167,6 +175,9 @@ struct WatchConfig: Equatable {
             func number(_ key: String) -> Double { (entry[key] as? NSNumber)?.doubleValue ?? 0 }
             return WatchNamedMeal(name: name, carbs: number("carbs"), fat: number("fat"), protein: number("protein"))
         }
+        let profiles = dict["therapyProfiles"] as? [String: Any]
+        therapyProfilesSource = profiles.map { $0 as NSDictionary }
+        therapyProfiles = WatchProfileSet(profiles)
     }
 
     func saveToDefaults() {

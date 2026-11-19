@@ -77,6 +77,10 @@ class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
     }
 
     private func handleReceivedConfig(_ dict: [String: Any]) {
+        if let result = dict["profileCommandResult"] as? [String: Any] {
+            WatchProfileCommandSender.shared.receive(result)
+            return
+        }
         // Ignore if this is a requestConfig message from Watch itself
         guard dict["requestConfig"] == nil else { return }
         // Ignore if it doesn't look like a config (needs at least one data source key)

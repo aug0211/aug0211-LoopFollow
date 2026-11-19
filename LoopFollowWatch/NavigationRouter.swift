@@ -4,7 +4,7 @@
 import SwiftUI
 
 enum DeepLinkDestination: Hashable {
-    case bolus, meal, override, tempTarget
+    case bolus, meal, override, tempTarget, profiles
 }
 
 class NavigationRouter: ObservableObject {

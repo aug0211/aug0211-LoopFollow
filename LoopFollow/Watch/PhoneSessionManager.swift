@@ -60,6 +60,9 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             s.mealWithFatProtein.$value.map { _ in () }.eraseToAnyPublisher(),
             s.namedMeals.$value.map { _ in () }.eraseToAnyPublisher(),
             Observable.shared.loopFollowDeviceToken.$value.map { _ in () }.eraseToAnyPublisher(),
+            Observable.shared.therapyProfiles.$value.map { _ in () }.eraseToAnyPublisher(),
+            s.remoteCommands.$value.map { _ in () }.eraseToAnyPublisher(),
+            s.loopRemoteCommands.$value.map { _ in () }.eraseToAnyPublisher(),
         ]
         Publishers.MergeMany(changes.map { $0.dropFirst() })
             .debounce(for: .seconds(1), scheduler: DispatchQueue.main)
@@ -81,7 +84,7 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
         // thresholds depend on timeInRangeMode, which the watch never sees.
         let bgColorThresholds = UnitSettingsStore.shared.effectiveThresholds()
 
-        return [
+        var config: [String: Any] = [
             "nsURL": Storage.shared.url.value,
             "nsToken": Storage.shared.token.value,
             "dexUsername": Storage.shared.shareUserName.value,
@@ -118,6 +121,10 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             "maxFat": Storage.shared.maxFat.value.doubleValue(for: .gram()),
             "namedMeals": Self.watchNamedMeals(),
         ]
+        if let profiles = WatchProfileBridge.configEntry() {
+            config["therapyProfiles"] = profiles
+        }
+        return config
     }
 
     /// Saved meals for the Watch's meal picker, most eaten first.
@@ -175,7 +182,9 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
 
     // Handle Watch requesting config via sendMessage (with reply)
     func session(_: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
-        if message["requestConfig"] != nil {
+        if let request = message["profileCommand"] as? [String: Any] {
+            WatchProfileBridge.handle(request, reply: replyHandler)
+        } else if message["requestConfig"] != nil {
             refreshProfileIfAsked(message)
             let config = buildConfig()
             replyHandler(config)
