@@ -19,7 +19,9 @@ struct LoopAPNSRemoteView: View {
                 ]
 
                 if viewModel.loopAPNSSetup {
-                    // Show Loop APNS command buttons if APNS setup configured
+                    // Show Loop APNS command buttons if APNS setup configured,
+                    // at the bottom within thumb reach.
+                    Spacer()
                     LazyVGrid(columns: columns, spacing: 16) {
                         // Same order, colors and glyphs as the Watch remote screen.
                         CommandButtonView(command: "Bolus", iconName: "drop.fill", destination: LoopAPNSBolusView(), color: RemoteCommandColor.bolus)
@@ -75,9 +77,10 @@ struct LoopAPNSRemoteView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 24)
+                    Spacer()
                 }
-                Spacer()
             }
+            .padding(.bottom, viewModel.loopAPNSSetup ? 16 : 0)
             .navigationBarTitle("Loop Remote Control", displayMode: .inline)
         }
     }

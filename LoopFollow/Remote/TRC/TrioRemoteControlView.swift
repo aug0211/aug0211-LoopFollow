@@ -12,7 +12,10 @@ struct TrioRemoteControlView: View {
 
     var body: some View {
         NavigationView {
-            VStack {
+            // Buttons sit at the bottom, within thumb reach.
+            VStack(spacing: 16) {
+                Spacer()
+
                 let columns = [
                     GridItem(.flexible(), spacing: 16),
                     GridItem(.flexible(), spacing: 16),
@@ -24,14 +27,16 @@ struct TrioRemoteControlView: View {
                     CommandButtonView(command: "Meal", iconName: "fork.knife", destination: MealView(), color: RemoteCommandColor.meal)
                     CommandButtonView(command: "Overrides", iconName: "bolt.fill", destination: OverrideView(), isActive: activeOverrideNote.value != nil, color: RemoteCommandColor.override)
                     CommandButtonView(command: "Temp Target", iconName: "target", destination: TempTargetView(), isActive: activeTempTarget.value != nil, color: RemoteCommandColor.tempTarget)
-                    if ProfileRemote.trio.supportsAny(in: remoteCommands.value) {
-                        CommandButtonView(command: "Profiles", iconName: "arrow.triangle.2.circlepath", destination: TherapyProfilesView(remote: .trio))
-                    }
                 }
                 .padding(.horizontal)
 
-                Spacer()
+                // Used less often: a full-width bar under the grid.
+                if ProfileRemote.trio.supportsAny(in: remoteCommands.value) {
+                    CommandButtonView(command: "Profiles", iconName: "arrow.triangle.2.circlepath", destination: TherapyProfilesView(remote: .trio), color: RemoteCommandColor.profiles, compact: true)
+                        .padding(.horizontal)
+                }
             }
+            .padding(.bottom, 16)
             .navigationBarTitle("Trio Remote Control", displayMode: .inline)
         }
     }
@@ -43,6 +48,8 @@ enum RemoteCommandColor {
     static let meal = Color.yellow
     static let override = Color.purple
     static let tempTarget = Color(red: 0.2, green: 0.9, blue: 0.1)
+    /// Neutral, so the less-used Profiles bar doesn't compete with the commands.
+    static let profiles = Color(white: 0.35)
 }
 
 struct CommandButtonView<Destination: View>: View {
@@ -53,19 +60,14 @@ struct CommandButtonView<Destination: View>: View {
     /// temp target is active.
     var isActive: Bool = false
     var color: Color = .blue
+    /// A slim full-width bar with the icon beside the title.
+    var compact: Bool = false
 
     var body: some View {
         NavigationLink(destination: destination) {
-            VStack {
-                Image(systemName: iconName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 50, height: 50)
-                Text(command)
-                    .fontWeight(.semibold)
-            }
-            .frame(maxWidth: .infinity, minHeight: 100)
-            .padding()
+            label
+                .frame(maxWidth: .infinity, minHeight: compact ? 28 : 100)
+                .padding(compact ? 12 : 16)
             .background(
                 ZStack {
                     // Lighter top, darker bottom, like the Watch tiles.
@@ -96,5 +98,28 @@ struct CommandButtonView<Destination: View>: View {
             .shadow(color: isActive ? color.opacity(0.8) : .clear, radius: isActive ? 9 : 0)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if compact {
+            HStack(spacing: 10) {
+                Image(systemName: iconName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 24, height: 24)
+                Text(command)
+                    .fontWeight(.semibold)
+            }
+        } else {
+            VStack {
+                Image(systemName: iconName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 50, height: 50)
+                Text(command)
+                    .fontWeight(.semibold)
+            }
+        }
     }
 }
