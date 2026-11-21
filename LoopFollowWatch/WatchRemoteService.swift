@@ -4,6 +4,7 @@
 import CryptoKit
 import Foundation
 import UserNotifications
+import WatchConnectivity
 import WatchKit
 
 class WatchRemoteService {
@@ -31,7 +32,18 @@ class WatchRemoteService {
                 bolusAmount: amount,
                 returnNotification: makeReturnNotificationInfo(config: config)
             )
-            sendTRCCommand(payload: payload, config: config, completion: completion)
+            let sentAt = Date()
+            sendTRCCommand(payload: payload, config: config) { success, error in
+                if success {
+                    // The iPhone writes the note that labels this bolus with its sender.
+                    WCSession.default.transferUserInfo(["remoteBolusSent": [
+                        "units": amount,
+                        "date": sentAt.timeIntervalSince1970,
+                        "sender": config.trcUser,
+                    ]])
+                }
+                completion(success, error)
+            }
         case "Nightscout":
             let body: [String: Any] = [
                 "enteredBy": "LoopFollow Watch",

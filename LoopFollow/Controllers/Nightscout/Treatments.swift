@@ -69,6 +69,8 @@ extension MainViewController {
     // Process and split out treatments to individual tasks
     func updateTreatments(entries: [[String: AnyObject]]) {
         let uniqueEntries = Self.deduplicatedTreatmentEntries(entries)
+        // Before the boluses, so they're labeled with who sent them.
+        RemoteBolusAttribution.shared.merge(fromTreatments: uniqueEntries)
 
         var tempBasal: [[String: AnyObject]] = []
         var bolus: [[String: AnyObject]] = []

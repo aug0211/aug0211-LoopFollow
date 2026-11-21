@@ -1437,6 +1437,16 @@ extension Treatment {
         return parts.compactMap { $0 }.joined(separator: " • ")
     }
 
+    /// "Bolus • Dad" for a remote bolus whose sender is known, otherwise "Bolus • Trio" (the app that logged it).
+    static func bolusSubtitle(_ entry: [String: AnyObject], date: TimeInterval, insulin: Double) -> String {
+        if let sender = RemoteBolusAttribution.shared.sender(forBolusAt: date, units: insulin) {
+            return "Bolus • \(sender)"
+        }
+        let enteredBy = (entry["enteredBy"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let source = enteredBy.lowercased().hasPrefix("loop://") ? "Loop" : enteredBy
+        return source.isEmpty ? "Bolus" : "Bolus • \(source)"
+    }
+
     /// The Treatments list entries for one Nightscout treatment. A Meal Bolus yields a carb entry and a bolus entry.
     static func historyEntries(from entry: [String: AnyObject], date: TimeInterval, nearestBG: () -> Int) -> TreatmentHistoryEntries {
         var result = TreatmentHistoryEntries()
@@ -1471,7 +1481,7 @@ extension Treatment {
                     type: .bolusManual,
                     date: date,
                     title: String(format: "%.2f U", insulin),
-                    subtitle: "Bolus",
+                    subtitle: bolusSubtitle(entry, date: date, insulin: insulin),
                     icon: "circle.fill",
                     color: .blue,
                     bgValue: actualBG
@@ -1508,7 +1518,7 @@ extension Treatment {
                         type: .bolusManual,
                         date: date,
                         title: String(format: "%.2f U", insulin),
-                        subtitle: "Bolus",
+                        subtitle: bolusSubtitle(entry, date: date, insulin: insulin),
                         icon: "circle.fill",
                         color: .blue,
                         bgValue: actualBG
@@ -1860,6 +1870,7 @@ class TreatmentsViewModel: ObservableObject {
         var detectedSMB = false
         var detectedAutomatic = false
         guard let mainVC = getMainViewController() else { return ([], false, false) }
+        RemoteBolusAttribution.shared.merge(fromTreatments: entries)
 
         for entry in entries {
             guard entry["eventType"] is String,

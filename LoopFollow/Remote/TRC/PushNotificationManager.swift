@@ -63,7 +63,8 @@ class PushNotificationManager {
             bolusAmount: bolusAmountDecimal,
             returnNotification: ReturnNotificationInfo.loopFollow()
         )
-        sendEncryptedCommand(payload: payload, completion: RemoteCommandRefresh.following(.bolus(units: bolusAmount.doubleValue(for: .internationalUnit())), completion))
+        let units = bolusAmount.doubleValue(for: .internationalUnit())
+        sendEncryptedCommand(payload: payload, completion: RemoteCommandRefresh.following(.bolus(units: units), Self.recordingBolus(units, completion)))
     }
 
     func sendTempTargetPushNotification(target: HKQuantity, duration: HKQuantity, completion: @escaping (Bool, String?) -> Void) {
@@ -126,10 +127,21 @@ class PushNotificationManager {
             scheduledTime: scheduledTimeInterval,
             returnNotification: ReturnNotificationInfo.loopFollow()
         )
+        let bolusUnits = bolusAmountValue.map { NSDecimalNumber(decimal: $0).doubleValue } ?? 0
         sendEncryptedCommand(payload: payload, completion: RemoteCommandRefresh.following(
             .meal(grams: Double(carbsValue ?? 0), bolus: bolusAmount.doubleValue(for: .internationalUnit())),
-            completion
+            Self.recordingBolus(bolusUnits, completion)
         ))
+    }
+
+    /// Records who sent the bolus once the command is on its way, so the bolus is labeled with the sender.
+    static func recordingBolus(_ units: Double, _ completion: @escaping (Bool, String?) -> Void) -> (Bool, String?) -> Void {
+        { success, error in
+            if success, units > 0 {
+                RemoteBolusAttribution.shared.recordSent(units: units)
+            }
+            completion(success, error)
+        }
     }
 
     /// Trio confirms edit/delete through a return notification, so LoopFollow's own APNs credentials are required.

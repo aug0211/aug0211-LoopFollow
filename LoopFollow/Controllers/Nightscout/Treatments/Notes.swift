@@ -13,6 +13,8 @@ extension MainViewController {
 
         for currentEntry in entries.reversed() {
             guard let currentEntry = currentEntry as? [String: AnyObject] else { continue }
+            // Labels a remote bolus with its sender; not shown as a note.
+            if RemoteBolusAttribution.isAttributionNote(currentEntry) { continue }
 
             if let parsedDate = NightscoutUtils.treatmentDate(from: currentEntry) {
                 let dateTimeStamp = parsedDate.timeIntervalSince1970

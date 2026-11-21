@@ -257,7 +257,10 @@ class LoopAPNSService {
             finalPayload["encrypted_return_notification"] = encryptedReturnInfo
         }
         LogManager.shared.log(category: .apns, message: "Sending bolus: \(String(format: "%.2f", payload.bolusAmount ?? 0.0))U")
-        sendRemoteCommand(finalPayload, completion: RemoteCommandRefresh.following(.bolus(units: payload.bolusAmount ?? 0), completion))
+        sendRemoteCommand(finalPayload, completion: RemoteCommandRefresh.following(
+            .bolus(units: payload.bolusAmount ?? 0),
+            PushNotificationManager.recordingBolus(payload.bolusAmount ?? 0, completion)
+        ))
     }
 
     /// Validates APNS credentials similar to PushNotificationManager

@@ -204,6 +204,14 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
 
     // Handle Watch requesting config via transferUserInfo
     func session(_: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        if let bolus = userInfo["remoteBolusSent"] as? [String: Any],
+           let units = (bolus["units"] as? NSNumber)?.doubleValue,
+           let date = (bolus["date"] as? NSNumber)?.doubleValue
+        {
+            let sender = bolus["sender"] as? String ?? Storage.shared.user.value
+            RemoteBolusAttribution.shared.recordSent(units: units, date: Date(timeIntervalSince1970: date), sender: sender)
+            return
+        }
         if userInfo["requestConfig"] != nil {
             refreshProfileIfAsked(userInfo)
             sendConfig()
