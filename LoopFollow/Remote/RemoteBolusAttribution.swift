@@ -2,6 +2,7 @@
 // RemoteBolusAttribution.swift
 
 import Foundation
+import UIKit
 
 /// Who sent a remote bolus. Trio and Loop log a remote bolus like any other, without the sender, so LoopFollow
 /// records each bolus it sends in a Nightscout note (`lfRemoteSender`, `lfRemoteUnits`). Every LoopFollow device
@@ -10,13 +11,39 @@ final class RemoteBolusAttribution {
     static let shared = RemoteBolusAttribution()
 
     struct Record: Codable, Equatable {
+        /// When the command was sent.
         let date: Date
         let units: Double
         let sender: String
+        /// The device it was sent from, for boluses sent since device names were recorded.
+        var device: String?
     }
 
     static let senderKey = "lfRemoteSender"
     static let unitsKey = "lfRemoteUnits"
+    static let deviceKey = "lfRemoteDevice"
+
+    /// The name of this device as a bolus sender: the name set in Remote Settings, or the model.
+    static var thisDeviceName: String {
+        let name = Storage.shared.remoteDeviceName.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? defaultDeviceName : name
+    }
+
+    static var watchDeviceName: String {
+        let name = Storage.shared.watchDeviceName.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Apple Watch" : name
+    }
+
+    static var defaultDeviceName: String {
+        #if targetEnvironment(macCatalyst)
+            let host = ProcessInfo.processInfo.hostName
+                .replacingOccurrences(of: ".local", with: "")
+                .replacingOccurrences(of: "-", with: " ")
+            return host.isEmpty ? "Mac" : host
+        #else
+            return UIDevice.current.model
+        #endif
+    }
 
     /// The AID app logs the bolus once the pump has delivered it, shortly after the command.
     static let matchWindow: ClosedRange<TimeInterval> = -120 ... 600
@@ -39,10 +66,10 @@ final class RemoteBolusAttribution {
     // MARK: - Sending
 
     /// Records a remote bolus this device sent (or its Watch sent) and writes its note to Nightscout.
-    func recordSent(units: Double, date: Date = Date(), sender: String = Storage.shared.user.value) {
+    func recordSent(units: Double, date: Date = Date(), sender: String = Storage.shared.user.value, device: String = RemoteBolusAttribution.thisDeviceName) {
         let sender = sender.trimmingCharacters(in: .whitespacesAndNewlines)
         guard units > 0, !sender.isEmpty else { return }
-        let record = Record(date: date, units: units, sender: sender)
+        let record = Record(date: date, units: units, sender: sender, device: device)
         add([record])
         Task { await upload(record) }
     }
@@ -60,6 +87,7 @@ final class RemoteBolusAttribution {
             "notes": String(format: "Remote bolus %.2f U by %@", record.units, record.sender),
             Self.senderKey: record.sender,
             Self.unitsKey: record.units,
+            Self.deviceKey: record.device ?? "",
         ]
         do {
             let jwt = try await NightscoutUtils.retrieveJWTToken()
@@ -87,7 +115,8 @@ final class RemoteBolusAttribution {
                   let units = (entry[Self.unitsKey] as? NSNumber)?.doubleValue, units > 0,
                   let date = NightscoutUtils.treatmentDate(from: entry)
             else { return nil }
-            return Record(date: date, units: units, sender: sender)
+            let device = (entry[Self.deviceKey] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return Record(date: date, units: units, sender: sender, device: device)
         }
         guard !found.isEmpty else { return }
         add(found)
@@ -95,20 +124,37 @@ final class RemoteBolusAttribution {
 
     /// The sender of a bolus of `units` logged at `date`: the closest remote bolus of that amount sent just before.
     func sender(forBolusAt date: TimeInterval, units: Double) -> String? {
+        record(forBolusAt: date, units: units)?.sender
+    }
+
+    func record(forBolusAt date: TimeInterval, units: Double) -> Record? {
         lock.lock()
         defer { lock.unlock() }
         return records
             .filter { abs($0.units - units) < 0.005 && Self.matchWindow.contains(date - $0.date.timeIntervalSince1970) }
-            .min { abs(date - $0.date.timeIntervalSince1970) < abs(date - $1.date.timeIntervalSince1970) }?
-            .sender
+            .min { abs(date - $0.date.timeIntervalSince1970) < abs(date - $1.date.timeIntervalSince1970) }
+    }
+
+    /// Everyone who has sent a remote bolus recently, most recent first.
+    var knownSenders: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        var seen = Set<String>()
+        return records.sorted { $0.date > $1.date }.compactMap { record in
+            seen.insert(record.sender.lowercased()).inserted ? record.sender : nil
+        }
     }
 
     private func add(_ new: [Record]) {
         lock.lock()
         let cutoff = Date().addingTimeInterval(-Self.keepDays)
         var all = records
-        for record in new where !all.contains(where: { $0.sender == record.sender && abs($0.units - record.units) < 0.005 && abs($0.date.timeIntervalSince(record.date)) < 5 }) {
-            all.append(record)
+        for record in new {
+            if let index = all.firstIndex(where: { $0.sender == record.sender && abs($0.units - record.units) < 0.005 && abs($0.date.timeIntervalSince(record.date)) < 5 }) {
+                if all[index].device == nil, record.device != nil { all[index].device = record.device }
+            } else {
+                all.append(record)
+            }
         }
         all.removeAll { $0.date < cutoff }
         let changed = all != records

@@ -209,7 +209,12 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
            let date = (bolus["date"] as? NSNumber)?.doubleValue
         {
             let sender = bolus["sender"] as? String ?? Storage.shared.user.value
-            RemoteBolusAttribution.shared.recordSent(units: units, date: Date(timeIntervalSince1970: date), sender: sender)
+            RemoteBolusAttribution.shared.recordSent(
+                units: units,
+                date: Date(timeIntervalSince1970: date),
+                sender: sender,
+                device: RemoteBolusAttribution.watchDeviceName
+            )
             return
         }
         if userInfo["requestConfig"] != nil {

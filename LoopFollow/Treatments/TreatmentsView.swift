@@ -550,13 +550,20 @@ struct TreatmentDetailView: View {
                         .frame(width: 24)
                     Text(treatment.title)
                         .font(.headline)
-                    if let subtitle = treatment.subtitle {
+                    if let subtitle = treatment.type == .bolusManual ? "Bolus" : treatment.subtitle {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                     Spacer()
                 }
+                if treatment.type == .bolusManual {
+                    BolusChips(isRemote: treatment.remoteBolus != nil)
+                }
+            }
+
+            if treatment.type == .bolusManual {
+                BolusSourceSection(remote: treatment.remoteBolus, loggedBy: treatment.loggedBy, deliveredAt: treatment.date)
             }
 
             if let meal = treatment.trioMeal {
@@ -1387,6 +1394,10 @@ struct Treatment: Identifiable {
     let bgValue: Int
     let trioMeal: TrioMealTreatment?
     let loopCarb: LoopCarbTreatment?
+    /// For a manual bolus: who sent it remotely, when known.
+    var remoteBolus: RemoteBolusAttribution.Record?
+    /// For a manual bolus: the app that logged it (Trio, Loop).
+    var loggedBy: String?
 
     init(id: String? = nil, type: TreatmentType, date: TimeInterval, title: String, subtitle: String?, icon: String, color: Color, bgValue: Int, trioMeal: TrioMealTreatment? = nil, loopCarb: LoopCarbTreatment? = nil) {
         self.id = id ?? "\(type)-\(date)-\(title)"
@@ -1442,9 +1453,14 @@ extension Treatment {
         if let sender = RemoteBolusAttribution.shared.sender(forBolusAt: date, units: insulin) {
             return "Bolus • \(sender)"
         }
+        return bolusApp(entry).map { "Bolus • \($0)" } ?? "Bolus"
+    }
+
+    /// The app that logged a bolus, from its `enteredBy`.
+    static func bolusApp(_ entry: [String: AnyObject]) -> String? {
         let enteredBy = (entry["enteredBy"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
         let source = enteredBy.lowercased().hasPrefix("loop://") ? "Loop" : enteredBy
-        return source.isEmpty ? "Bolus" : "Bolus • \(source)"
+        return source.isEmpty ? nil : source
     }
 
     /// The Treatments list entries for one Nightscout treatment. A Meal Bolus yields a carb entry and a bolus entry.
@@ -1476,7 +1492,7 @@ extension Treatment {
                let insulin = entry["insulin"] as? Double, insulin > 0
             {
                 let actualBG = nearestBG()
-                let treatment = Treatment(
+                var treatment = Treatment(
                     id: "\(nsId)-bolus",
                     type: .bolusManual,
                     date: date,
@@ -1486,6 +1502,8 @@ extension Treatment {
                     color: .blue,
                     bgValue: actualBG
                 )
+                treatment.remoteBolus = RemoteBolusAttribution.shared.record(forBolusAt: date, units: insulin)
+                treatment.loggedBy = bolusApp(entry)
                 result.entries.append(treatment)
             }
 
@@ -1513,7 +1531,7 @@ extension Treatment {
                     )
                     result.entries.append(treatment)
                 } else {
-                    let treatment = Treatment(
+                    var treatment = Treatment(
                         id: "\(nsId)-bolus",
                         type: .bolusManual,
                         date: date,
@@ -1523,6 +1541,8 @@ extension Treatment {
                         color: .blue,
                         bgValue: actualBG
                     )
+                    treatment.remoteBolus = RemoteBolusAttribution.shared.record(forBolusAt: date, units: insulin)
+                    treatment.loggedBy = bolusApp(entry)
                     result.entries.append(treatment)
                 }
             }

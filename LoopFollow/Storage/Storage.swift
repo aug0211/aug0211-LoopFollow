@@ -27,6 +27,9 @@ class Storage {
     var hubURL = StorageValue<String>(key: "hubURL", defaultValue: "")
     var bundleId = StorageValue<String>(key: "bundleId", defaultValue: "")
     var user = StorageValue<String>(key: "user", defaultValue: "")
+    /// Names shown as the device a remote bolus was sent from; empty uses the model name.
+    var remoteDeviceName = StorageValue<String>(key: "remoteDeviceName", defaultValue: "")
+    var watchDeviceName = StorageValue<String>(key: "watchDeviceName", defaultValue: "")
     /// Remote command types the AID app advertises in its Nightscout profile.
     var remoteCommands = StorageValue<[String]>(key: "remoteCommands", defaultValue: [])
     /// Remote command types the Loop build advertises in its devicestatus.

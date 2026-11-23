@@ -12,6 +12,8 @@ struct RemoteSettingsView: View {
     @ObservedObject private var watchRemoteCommands = Storage.shared.watchRemoteCommands
     @ObservedObject private var mealMatchTolerance = Storage.shared.mealMatchTolerance
     @ObservedObject private var nsWriteAuth = Storage.shared.nsWriteAuth
+    @ObservedObject private var remoteDeviceName = Storage.shared.remoteDeviceName
+    @ObservedObject private var watchDeviceName = Storage.shared.watchDeviceName
     @ObservedObject private var loopMaxFutureCarbHours = Storage.shared.loopMaxFutureCarbHours
 
     @State private var showAlert: Bool = false
@@ -161,7 +163,10 @@ struct RemoteSettingsView: View {
             // MARK: - User Information Section
 
             if viewModel.remoteType == .trc {
-                Section(header: Text("User Information")) {
+                Section(
+                    header: Text("User Information"),
+                    footer: Text("Shown with each bolus you send, so everyone can see who sent it and from which device.")
+                ) {
                     HStack {
                         Text("User")
                         TextField("Enter User", text: $viewModel.user)
@@ -169,7 +174,21 @@ struct RemoteSettingsView: View {
                             .disableAutocorrection(true)
                             .multilineTextAlignment(.trailing)
                     }
+                    HStack {
+                        Text("This Device")
+                        TextField(RemoteBolusAttribution.defaultDeviceName, text: $remoteDeviceName.value)
+                            .disableAutocorrection(true)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text("Apple Watch")
+                        TextField("Apple Watch", text: $watchDeviceName.value)
+                            .disableAutocorrection(true)
+                            .multilineTextAlignment(.trailing)
+                    }
                 }
+
+                SenderPicturesSection()
             }
 
             // MARK: - Trio Remote Control Settings
