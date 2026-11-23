@@ -1310,8 +1310,15 @@ private struct MainBGChart: View {
                     .position(x: x, y: (plotFrame.minY + lineBottom) / 2)
 
                 if let frame = pillFrame(for: anchor, viewportWidth: viewportWidth) {
-                    PillLabel(texts: anchor.texts, maxWidth: min(300, viewportWidth - 16), showsLink: anchor.detail != nil, size: frame.size, linkColor: pillLinkColor(at: anchor.date))
-                        .position(x: frame.midX, y: frame.midY)
+                    PillLabel(
+                        texts: anchor.texts,
+                        maxWidth: min(300, viewportWidth - 16),
+                        showsLink: anchor.detail != nil,
+                        size: frame.size,
+                        linkColor: pillLinkColor(at: anchor.date),
+                        sender: anchor.texts.count == 1 ? anchor.detail?.remoteSource?.sender : nil
+                    )
+                    .position(x: frame.midX, y: frame.midY)
                 }
             }
         }
@@ -2071,6 +2078,8 @@ private struct PillLabel: View {
     var size: CGSize? = nil
     /// Fill of a linked pill.
     var linkColor: Color = .blue
+    /// Who sent this remote bolus, meal or override: their face sits on the pill's corner.
+    var sender: String? = nil
 
     /// Dark text on green, which is too light for white text.
     private var linkTextColor: Color { linkColor == .green ? .black : .white }
@@ -2110,6 +2119,16 @@ private struct PillLabel: View {
                 Color.clear.preference(key: PillSizePreferenceKey.self, value: geo.size)
             }
         )
+        // Outside the measured size, so the pill keeps its fixed size.
+        .overlay(alignment: .topLeading) {
+            if let sender {
+                SenderAvatarView(name: sender, size: 24)
+                    .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
+                    .offset(x: -9, y: -9)
+                    .accessibilityLabel("Sent by \(sender)")
+            }
+        }
         // Transparent flexible container: it caps the width the text can
         // wrap to, while the visible pill above still hugs its content.
         .frame(maxWidth: maxWidth)

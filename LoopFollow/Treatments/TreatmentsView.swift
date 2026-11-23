@@ -558,12 +558,12 @@ struct TreatmentDetailView: View {
                     Spacer()
                 }
                 if treatment.type == .bolusManual {
-                    BolusChips(isRemote: treatment.remoteBolus != nil)
+                    BolusChips(isRemote: treatment.remoteSource != nil)
                 }
             }
 
-            if treatment.type == .bolusManual {
-                BolusSourceSection(remote: treatment.remoteBolus, loggedBy: treatment.loggedBy, deliveredAt: treatment.date)
+            if [.bolusManual, .carb, .override].contains(treatment.type) {
+                BolusSourceSection(remote: treatment.remoteSource, loggedBy: treatment.loggedBy, deliveredAt: treatment.date, kind: treatment.type)
             }
 
             if let meal = treatment.trioMeal {
@@ -1394,9 +1394,9 @@ struct Treatment: Identifiable {
     let bgValue: Int
     let trioMeal: TrioMealTreatment?
     let loopCarb: LoopCarbTreatment?
-    /// For a manual bolus: who sent it remotely, when known.
-    var remoteBolus: RemoteBolusAttribution.Record?
-    /// For a manual bolus: the app that logged it (Trio, Loop).
+    /// For a manual bolus, meal or override: who sent it remotely, when known.
+    var remoteSource: RemoteBolusAttribution.Record?
+    /// The app that logged it (Trio, Loop).
     var loggedBy: String?
 
     init(id: String? = nil, type: TreatmentType, date: TimeInterval, title: String, subtitle: String?, icon: String, color: Color, bgValue: Int, trioMeal: TrioMealTreatment? = nil, loopCarb: LoopCarbTreatment? = nil) {
@@ -1476,7 +1476,7 @@ extension Treatment {
             let carbs = entry["carbs"] as? Double ?? 0
             if carbs > 0 || trioMeal != nil {
                 let actualBG = nearestBG()
-                let treatment = Treatment.carb(
+                var treatment = Treatment.carb(
                     nightscoutID: nsId,
                     date: date,
                     carbs: carbs,
@@ -1484,6 +1484,15 @@ extension Treatment {
                     trioMeal: trioMeal,
                     loopCarb: loopCarb
                 )
+                if trioMeal?.isFPUChild != true {
+                    treatment.remoteSource = RemoteBolusAttribution.shared.record(
+                        forCarbsAt: date,
+                        carbs: carbs,
+                        fat: Double(trioMeal?.fat ?? 0),
+                        protein: Double(trioMeal?.protein ?? 0)
+                    )
+                }
+                treatment.loggedBy = bolusApp(entry)
                 result.entries.append(treatment)
             }
 
@@ -1502,7 +1511,7 @@ extension Treatment {
                     color: .blue,
                     bgValue: actualBG
                 )
-                treatment.remoteBolus = RemoteBolusAttribution.shared.record(forBolusAt: date, units: insulin)
+                treatment.remoteSource = RemoteBolusAttribution.shared.record(forBolusAt: date, units: insulin)
                 treatment.loggedBy = bolusApp(entry)
                 result.entries.append(treatment)
             }
@@ -1541,7 +1550,7 @@ extension Treatment {
                         color: .blue,
                         bgValue: actualBG
                     )
-                    treatment.remoteBolus = RemoteBolusAttribution.shared.record(forBolusAt: date, units: insulin)
+                    treatment.remoteSource = RemoteBolusAttribution.shared.record(forBolusAt: date, units: insulin)
                     treatment.loggedBy = bolusApp(entry)
                     result.entries.append(treatment)
                 }
@@ -1593,7 +1602,7 @@ extension Treatment {
             let subtitle = subtitleParts.joined(separator: " • ")
             let title = reason.isEmpty ? "Temporary Override" : reason
 
-            let treatment = Treatment(
+            var treatment = Treatment(
                 id: "\(nsId)-override",
                 type: .override,
                 date: date,
@@ -1603,6 +1612,8 @@ extension Treatment {
                 color: .purple,
                 bgValue: 0
             )
+            treatment.remoteSource = RemoteBolusAttribution.shared.record(forOverrideAt: date, name: reason)
+            treatment.loggedBy = bolusApp(entry)
             result.entries.append(treatment)
 
         case "Temporary Target":

@@ -73,7 +73,19 @@ class WatchRemoteService {
             if let entryTime = entryTime {
                 payload.scheduledTime = entryTime.timeIntervalSince1970
             }
-            sendTRCCommand(payload: payload, config: config, completion: completion)
+            let sentAt = Date()
+            sendTRCCommand(payload: payload, config: config) { success, error in
+                if success {
+                    // The iPhone writes the note that labels this meal with its sender.
+                    var meal: [String: Any] = [
+                        "carbs": carbs, "fat": fat ?? 0, "protein": protein ?? 0,
+                        "date": sentAt.timeIntervalSince1970, "sender": config.trcUser,
+                    ]
+                    if let entryTime { meal["entryDate"] = entryTime.timeIntervalSince1970 }
+                    WCSession.default.transferUserInfo(["remoteMealSent": meal])
+                }
+                completion(success, error)
+            }
         case "Nightscout":
             var body: [String: Any] = [
                 "enteredBy": "LoopFollow Watch",
@@ -151,7 +163,15 @@ class WatchRemoteService {
                 overrideName: name,
                 returnNotification: makeReturnNotificationInfo(config: config)
             )
-            sendTRCCommand(payload: payload, config: config, completion: completion)
+            let sentAt = Date()
+            sendTRCCommand(payload: payload, config: config) { success, error in
+                if success {
+                    WCSession.default.transferUserInfo(["remoteOverrideSent": [
+                        "name": name, "date": sentAt.timeIntervalSince1970, "sender": config.trcUser,
+                    ]])
+                }
+                completion(success, error)
+            }
         default:
             completion(false, "Remote type not supported for overrides")
         }

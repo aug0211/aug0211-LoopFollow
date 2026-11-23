@@ -40,7 +40,11 @@ class PushNotificationManager {
             overrideName: override.name,
             returnNotification: ReturnNotificationInfo.loopFollow()
         )
-        sendEncryptedCommand(payload: payload, completion: RemoteCommandRefresh.following(.override, completion))
+        let name = override.name
+        sendEncryptedCommand(payload: payload, completion: RemoteCommandRefresh.following(.override) { success, error in
+            if success { RemoteBolusAttribution.shared.recordOverride(name: name) }
+            completion(success, error)
+        })
     }
 
     func sendCancelOverridePushNotification(completion: @escaping (Bool, String?) -> Void) {
@@ -130,7 +134,17 @@ class PushNotificationManager {
         let bolusUnits = bolusAmountValue.map { NSDecimalNumber(decimal: $0).doubleValue } ?? 0
         sendEncryptedCommand(payload: payload, completion: RemoteCommandRefresh.following(
             .meal(grams: Double(carbsValue ?? 0), bolus: bolusAmount.doubleValue(for: .internationalUnit())),
-            Self.recordingBolus(bolusUnits, completion)
+            Self.recordingBolus(bolusUnits) { success, error in
+                if success {
+                    RemoteBolusAttribution.shared.recordMeal(
+                        carbs: Double(carbsValue ?? 0),
+                        fat: Double(fatValue ?? 0),
+                        protein: Double(proteinValue ?? 0),
+                        entryDate: scheduledTime
+                    )
+                }
+                completion(success, error)
+            }
         ))
     }
 

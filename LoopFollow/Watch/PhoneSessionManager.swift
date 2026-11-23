@@ -217,6 +217,33 @@ class PhoneSessionManager: NSObject, WCSessionDelegate {
             )
             return
         }
+        if let meal = userInfo["remoteMealSent"] as? [String: Any],
+           let date = (meal["date"] as? NSNumber)?.doubleValue
+        {
+            func number(_ key: String) -> Double { (meal[key] as? NSNumber)?.doubleValue ?? 0 }
+            RemoteBolusAttribution.shared.recordMeal(
+                carbs: number("carbs"),
+                fat: number("fat"),
+                protein: number("protein"),
+                entryDate: (meal["entryDate"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) },
+                date: Date(timeIntervalSince1970: date),
+                sender: meal["sender"] as? String ?? Storage.shared.user.value,
+                device: RemoteBolusAttribution.watchDeviceName
+            )
+            return
+        }
+        if let override = userInfo["remoteOverrideSent"] as? [String: Any],
+           let name = override["name"] as? String,
+           let date = (override["date"] as? NSNumber)?.doubleValue
+        {
+            RemoteBolusAttribution.shared.recordOverride(
+                name: name,
+                date: Date(timeIntervalSince1970: date),
+                sender: override["sender"] as? String ?? Storage.shared.user.value,
+                device: RemoteBolusAttribution.watchDeviceName
+            )
+            return
+        }
         if userInfo["requestConfig"] != nil {
             refreshProfileIfAsked(userInfo)
             sendConfig()

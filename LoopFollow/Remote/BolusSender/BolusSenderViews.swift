@@ -40,8 +40,18 @@ private struct BolusChip: View {
 struct BolusSourceSection: View {
     let remote: RemoteBolusAttribution.Record?
     let loggedBy: String?
-    /// When the AID app logged the bolus.
+    /// When the AID app logged the entry.
     let deliveredAt: TimeInterval
+    var kind: TreatmentType = .bolusManual
+
+    private var loggedLabel: String {
+        let app = loggedBy ?? "the app"
+        switch kind {
+        case .carb: return "Logged by \(app)"
+        case .override: return "Started in \(app)"
+        default: return "Delivered by \(app)"
+        }
+    }
 
     var body: some View {
         if let remote {
@@ -52,7 +62,10 @@ struct BolusSourceSection: View {
                     row("Device", device, icon: device.lowercased().contains("watch") ? "applewatch" : (device.lowercased().contains("mac") ? "laptopcomputer" : "iphone"))
                 }
                 row("Sent", time(remote.date.timeIntervalSince1970), icon: nil)
-                row("Delivered by \(loggedBy ?? "the app")", time(deliveredAt), icon: nil)
+                if let entryDate = remote.entryDate {
+                    row("Scheduled for", time(entryDate.timeIntervalSince1970), icon: nil)
+                }
+                row(loggedLabel, time(deliveredAt), icon: nil)
             }
         } else if let loggedBy {
             Section(header: Text("Entered By")) {
