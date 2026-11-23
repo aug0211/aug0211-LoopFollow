@@ -61,8 +61,8 @@ struct BolusSourceSection: View {
                 if let device = remote.device {
                     row("Device", device, icon: device.lowercased().contains("watch") ? "applewatch" : (device.lowercased().contains("mac") ? "laptopcomputer" : "iphone"))
                 }
-                row("Sent", time(remote.date.timeIntervalSince1970), icon: nil)
-                if let entryDate = remote.entryDate {
+                row(remote.isEdit == true ? "Edited" : "Sent", time(remote.date.timeIntervalSince1970), icon: nil)
+                if let entryDate = remote.entryDate, remote.isEdit != true {
                     row("Scheduled for", time(entryDate.timeIntervalSince1970), icon: nil)
                 }
                 row(loggedLabel, time(deliveredAt), icon: nil)

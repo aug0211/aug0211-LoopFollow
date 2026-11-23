@@ -1489,7 +1489,8 @@ extension Treatment {
                         forCarbsAt: date,
                         carbs: carbs,
                         fat: Double(trioMeal?.fat ?? 0),
-                        protein: Double(trioMeal?.protein ?? 0)
+                        protein: Double(trioMeal?.protein ?? 0),
+                        mealID: trioMeal?.mealID.uuidString
                     )
                 }
                 treatment.loggedBy = bolusApp(entry)

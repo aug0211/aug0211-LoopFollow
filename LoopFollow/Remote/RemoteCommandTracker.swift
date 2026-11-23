@@ -354,6 +354,10 @@ extension RemoteCommandTracker {
             protein: protein,
             scheduledTime: date
         ) { [weak self] success, error in
+            if success {
+                // The editor becomes who the meal shows as sent by, while the meal keeps these values.
+                RemoteBolusAttribution.shared.recordMealEdit(mealID: mealID, carbs: Double(carbs), fat: Double(fat), protein: Double(protein), entryDate: date)
+            }
             self?.finishTrioSend(key: mealID, commandID: commandID, success: success, error: error, completion: completion)
         }
     }

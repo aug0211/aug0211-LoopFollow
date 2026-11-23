@@ -30,6 +30,10 @@ final class RemoteBolusAttribution {
         var overrideName: String?
         /// When a scheduled meal takes effect; nil when it's the send time.
         var entryDate: Date?
+        /// For a meal edit: Trio's meal ID, which the edit is matched by.
+        var trioMealID: String?
+        /// True for a meal edit.
+        var isEdit: Bool?
 
         var effectiveKind: Kind { kind ?? .bolus }
         /// The time the AID app's entry is expected at.
@@ -41,6 +45,11 @@ final class RemoteBolusAttribution {
                 && abs(units - other.units) < 0.005
                 && (carbs ?? 0) == (other.carbs ?? 0) && (fat ?? 0) == (other.fat ?? 0) && (protein ?? 0) == (other.protein ?? 0)
                 && (overrideName ?? "") == (other.overrideName ?? "")
+                && (trioMealID ?? "") == (other.trioMealID ?? "")
+        }
+
+        func hasMacros(carbs: Double, fat: Double, protein: Double) -> Bool {
+            abs((self.carbs ?? 0) - carbs) < 0.5 && abs((self.fat ?? 0) - fat) < 0.5 && abs((self.protein ?? 0) - protein) < 0.5
         }
     }
 
@@ -53,6 +62,8 @@ final class RemoteBolusAttribution {
     static let proteinKey = "lfRemoteProtein"
     static let overrideKey = "lfRemoteOverride"
     static let entryDateKey = "lfRemoteEntryDate"
+    static let mealIDKey = "lfRemoteMealId"
+    static let editKey = "lfRemoteEdit"
 
     /// The name of this device as a bolus sender: the name set in Remote Settings, or the model.
     static var thisDeviceName: String {
@@ -108,6 +119,14 @@ final class RemoteBolusAttribution {
         record(Record(date: date, units: 0, sender: sender, device: device, kind: .carbs, carbs: carbs, fat: fat, protein: protein, entryDate: entryDate))
     }
 
+    /// Records an edit of a Trio meal, which then shows the editor as its sender.
+    func recordMealEdit(mealID: String, carbs: Double, fat: Double, protein: Double, entryDate: Date, date: Date = Date(), sender: String = Storage.shared.user.value, device: String = RemoteBolusAttribution.thisDeviceName) {
+        record(Record(
+            date: date, units: 0, sender: sender, device: device, kind: .carbs, carbs: carbs, fat: fat, protein: protein,
+            entryDate: entryDate, trioMealID: mealID, isEdit: true
+        ))
+    }
+
     /// Records a remote override start.
     func recordOverride(name: String, date: Date = Date(), sender: String = Storage.shared.user.value, device: String = RemoteBolusAttribution.thisDeviceName) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -121,7 +140,8 @@ final class RemoteBolusAttribution {
         guard !sender.isEmpty else { return }
         record = Record(
             date: record.date, units: record.units, sender: sender, device: record.device, kind: record.kind,
-            carbs: record.carbs, fat: record.fat, protein: record.protein, overrideName: record.overrideName, entryDate: record.entryDate
+            carbs: record.carbs, fat: record.fat, protein: record.protein, overrideName: record.overrideName, entryDate: record.entryDate,
+            trioMealID: record.trioMealID, isEdit: record.isEdit
         )
         add([record])
         let uploaded = record
@@ -136,7 +156,8 @@ final class RemoteBolusAttribution {
             var parts = ["\(Int(record.carbs ?? 0)) g carbs"]
             if let fat = record.fat, fat > 0 { parts.append("\(Int(fat)) g fat") }
             if let protein = record.protein, protein > 0 { parts.append("\(Int(protein)) g protein") }
-            return "Remote meal \(parts.joined(separator: ", ")) by \(record.sender)"
+            return "Remote meal \(record.isEdit == true ? "edit" : "") \(parts.joined(separator: ", ")) by \(record.sender)"
+                .replacingOccurrences(of: "  ", with: " ")
         case .override:
             return "Remote override \(record.overrideName ?? "") by \(record.sender)"
         }
@@ -163,6 +184,8 @@ final class RemoteBolusAttribution {
         if let protein = record.protein { body[Self.proteinKey] = protein }
         if let name = record.overrideName { body[Self.overrideKey] = name }
         if let entryDate = record.entryDate { body[Self.entryDateKey] = formatter.string(from: entryDate) }
+        if let mealID = record.trioMealID { body[Self.mealIDKey] = mealID }
+        if record.isEdit == true { body[Self.editKey] = true }
         do {
             let jwt = try await NightscoutUtils.retrieveJWTToken()
             var request = URLRequest(url: url)
@@ -197,7 +220,9 @@ final class RemoteBolusAttribution {
             return Record(
                 date: date, units: units, sender: sender, device: device, kind: kind,
                 carbs: number(Self.carbsKey), fat: number(Self.fatKey), protein: number(Self.proteinKey),
-                overrideName: entry[Self.overrideKey] as? String, entryDate: entryDate
+                overrideName: entry[Self.overrideKey] as? String, entryDate: entryDate,
+                trioMealID: (entry[Self.mealIDKey] as? String).flatMap { $0.isEmpty ? nil : $0 },
+                isEdit: (entry[Self.editKey] as? Bool) == true ? true : nil
             )
         }
         guard !found.isEmpty else { return }
@@ -213,11 +238,19 @@ final class RemoteBolusAttribution {
         closest(.bolus, to: date) { abs($0.units - units) < 0.005 }
     }
 
-    /// The remote meal with the same carbs, fat and protein, expected at about `date`.
-    func record(forCarbsAt date: TimeInterval, carbs: Double, fat: Double, protein: Double) -> Record? {
-        closest(.carbs, to: date) {
-            abs(($0.carbs ?? 0) - carbs) < 0.5 && abs(($0.fat ?? 0) - fat) < 0.5 && abs(($0.protein ?? 0) - protein) < 0.5
+    /// Who last set this meal's values: the latest remote edit of it that its values still show, else the remote
+    /// meal with the same carbs, fat and protein expected at about `date`. Nil when neither matches, as after an edit
+    /// made in Trio.
+    func record(forCarbsAt date: TimeInterval, carbs: Double, fat: Double, protein: Double, mealID: String? = nil) -> Record? {
+        if let mealID {
+            lock.lock()
+            let edit = records
+                .filter { $0.effectiveKind == .carbs && $0.trioMealID == mealID && $0.hasMacros(carbs: carbs, fat: fat, protein: protein) }
+                .max { $0.date < $1.date }
+            lock.unlock()
+            if let edit { return edit }
         }
+        return closest(.carbs, to: date) { $0.trioMealID == nil && $0.hasMacros(carbs: carbs, fat: fat, protein: protein) }
     }
 
     /// The remote override start with the same name, at about `date`.
